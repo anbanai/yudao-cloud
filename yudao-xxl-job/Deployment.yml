@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: xxl-job-admin
+  labels:
+    app: xxl-job-admin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xxl-job-admin
+  template:
+    metadata:
+      labels:
+        app: xxl-job-admin
+    spec:
+      containers:
+        - name: xxl-job-admin
+          image: prod-acr-brdx-registry.cn-chengdu.cr.aliyuncs.com/default/xxl-job-admin:2.4.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xxl-job-secret
+                  key: SPRING_DATASOURCE_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: xxl-job-secret
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xxl-job-secret
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: XXL_JOB_ACCESSTOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: xxl-job-secret
+                  key: XXL_JOB_ACCESS_TOKEN
+            - name: TZ
+              value: Asia/Shanghai
+            - name: SERVER_SERVLET_CONTEXT_PATH
+              value: /xxl-job-admin
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+              ephemeral-storage: 4Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
+              ephemeral-storage: 4Gi
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: xxl-job-admin-logs
+              mountPath: /data/applogs
+      imagePullSecrets:
+        - name: ${imagePullSecret}  
+      volumes:
+        - name: xxl-job-admin-logs
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: xxl-job-admin
+  labels:
+    app: xxl-job-admin
+spec:
+  selector:
+    app: xxl-job-admin
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: http
+  type: ClusterIP

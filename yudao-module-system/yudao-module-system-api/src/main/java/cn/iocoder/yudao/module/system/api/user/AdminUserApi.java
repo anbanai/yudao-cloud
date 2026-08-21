@@ -7,14 +7,18 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.enums.ApiConstants;
 import org.dromara.core.trans.anno.AutoTrans;
 import org.dromara.trans.service.AutoTransable;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Parameter;
+import feign.FeignIgnore;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static cn.iocoder.yudao.module.system.api.user.AdminUserApi.PREFIX;
 
@@ -87,13 +91,13 @@ public interface AdminUserApi extends AutoTransable<AdminUserRespDTO> {
     CommonResult<Boolean> validateUserList(@RequestParam("ids") Collection<Long> ids);
 
     @Override
-    @GetMapping("select")
+    @FeignIgnore
     default List<AdminUserRespDTO> selectByIds(List<?> ids) {
         return getUserList(Convert.toList(Long.class, ids)).getCheckedData();
     }
 
     @Override
-    @GetMapping("select-list")
+    @FeignIgnore
     default AdminUserRespDTO selectById(Object id) {
         return getUser(Convert.toLong(id)).getCheckedData();
     }

@@ -13,10 +13,10 @@ import cn.iocoder.yudao.module.fms.service.config.FmsSubjectService;
 import cn.iocoder.yudao.module.fms.service.report.FmsBalanceSheetService;
 import cn.iocoder.yudao.module.fms.service.report.FmsIncomeStatementService;
 import cn.iocoder.yudao.module.fms.service.report.FmsReportCommonService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,19 +41,19 @@ public class FmsHomeServiceImplTest extends BaseDbUnitTest {
 
     @Resource
     private FmsHomeServiceImpl homeService;
-    @MockBean
+    @MockitoBean
     private FmsAccountSetService accountSetService;
-    @MockBean
+    @MockitoBean
     private FmsClosingPeriodService closingPeriodService;
-    @MockBean
+    @MockitoBean
     private FmsIncomeStatementService incomeStatementService;
-    @MockBean
+    @MockitoBean
     private FmsBalanceSheetService balanceSheetService;
-    @MockBean
+    @MockitoBean
     private FmsReportCommonService reportCommonService;
-    @MockBean
+    @MockitoBean
     private FmsSubjectService subjectService;
-    @MockBean
+    @MockitoBean
     private FmsFinanceIndicatorService financeIndicatorService;
 
     @Test

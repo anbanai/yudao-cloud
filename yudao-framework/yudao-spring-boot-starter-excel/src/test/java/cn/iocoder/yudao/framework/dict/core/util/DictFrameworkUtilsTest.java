@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.framework.dict.core.util;
 
-import cn.hutool.core.collection.ListUtil;
 import cn.iocoder.yudao.framework.common.biz.system.dict.DictDataCommonApi;
 import cn.iocoder.yudao.framework.dict.core.DictFrameworkUtils;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
@@ -34,7 +33,7 @@ public class DictFrameworkUtilsTest extends BaseMockitoUnitTest {
     @Test
     public void testParseDictDataLabel() {
         // mock 数据
-        List<DictDataRespDTO> dictDatas = ListUtil.of(
+        List<DictDataRespDTO> dictDatas = List.of(
                 randomPojo(DictDataRespDTO.class, o -> o.setDictType("animal").setValue("cat").setLabel("猫")),
                 randomPojo(DictDataRespDTO.class, o -> o.setDictType("animal").setValue("dog").setLabel("狗"))
         );
@@ -48,7 +47,7 @@ public class DictFrameworkUtilsTest extends BaseMockitoUnitTest {
     @Test
     public void testParseDictDataValue() {
         // mock 数据
-        List<DictDataRespDTO> dictDatas = ListUtil.of(
+        List<DictDataRespDTO> dictDatas = List.of(
                 randomPojo(DictDataRespDTO.class, o -> o.setDictType("animal").setValue("cat").setLabel("猫")),
                 randomPojo(DictDataRespDTO.class, o -> o.setDictType("animal").setValue("dog").setLabel("狗"))
         );

@@ -11,10 +11,10 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceModbusConfigDO
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.dal.mysql.device.IotDeviceModbusConfigMapper;
 import cn.iocoder.yudao.module.iot.service.product.IotProductService;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import javax.annotation.Resource;
 import java.util.List;
 
 /**

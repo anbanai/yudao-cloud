@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.system.api.message.user;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**

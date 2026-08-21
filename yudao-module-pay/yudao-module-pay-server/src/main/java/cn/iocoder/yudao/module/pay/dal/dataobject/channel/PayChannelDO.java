@@ -88,7 +88,7 @@ public class PayChannelDO extends TenantBaseDO {
 
         @Override
         public Object parse(String json) {
-            PayClientConfig config = JsonUtils.parseObjectQuietly(json, new TypeReference<PayClientConfig>() {});
+            PayClientConfig config = JsonUtils.parseObjectQuietly(json, new TypeReference<>() {});
             if (config != null) {
                 return config;
             }

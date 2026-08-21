@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ${namespace}
+  name: ${micro_service_name}-${version_switch}
+  labels:
+    app: ${micro_service_name}
+    version: ${version_switch}
+spec:
+  replicas: ${replicas_count}
+  selector:
+    matchLabels:
+      app: ${micro_service_name}
+  template:
+    metadata:
+      labels:
+        app: ${micro_service_name}
+        version: ${version_switch}
+    spec:
+      containers:
+        - env:
+            - name: aliyun_logs_log-${micro_service_name}-${version_switch}_logstore
+              value: ${log_store}
+            - name: aliyun_logs_log-${micro_service_name}-${version_switch}
+              value: stdout
+            - name: aliyun_logs_${micro_service_name}-${version_switch}_tags
+              value: applog=${micro_service_name}-${version_switch}
+            - name: version_switch
+              value: ${version_switch}
+            - name: version_switch
+              value: ${version_switch}
+            - name: TZ
+              value: Asia/Shanghai
+            - name: XXL_JOB_ENABLED
+              value: "true"
+            - name: XXL_JOB_ADMIN_ADDRESSES
+              value: http://xxl-job-admin:8080/xxl-job-admin
+            - name: XXL_JOB_EXECUTOR_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: XXL_JOB_EXECUTOR_PORT
+              value: "9999"
+            - name: XXL_JOB_EXECUTOR_LOGPATH
+              value: /data/logs/xxl-job/yudao-server
+          name: ${micro_service_name}-${version_switch}
+          image: ${image_repo}
+          ports:
+            - name: http
+              containerPort: 48080
+              protocol: TCP
+            - name: xxl-job-executor
+              containerPort: 9999
+              protocol: TCP
+          resources:
+            requests:
+              cpu: ${requests_cpu}
+              memory: ${requests_memory}
+              ephemeral-storage: 2Gi
+            limits:
+              cpu: ${limits_cpu}
+              memory: ${limits_memory}
+              ephemeral-storage: 2Gi
+          volumeMounts:
+            - mountPath: /app/application.yaml
+              subPath: application.yaml
+              readOnly: true
+              name: ${micro_service_name}-config
+            - mountPath: /data
+              name: ${micro_service_name}-data
+      imagePullSecrets:
+        - name: ${imagePullSecret}
+      volumes:
+        - name: ${micro_service_name}-data
+          emptyDir: {}
+        - name: ${micro_service_name}-config
+          configMap:
+            defaultMode: 420
+            name: ${configmap_name}
+            items:
+              - key: application.yaml
+                path: application.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${micro_service_name}-svc
+  namespace: ${namespace}
+  labels:
+    app: ${micro_service_name}-svc
+spec:
+  selector:
+    app: ${micro_service_name}
+  ports:
+    - name: http-8080
+      port: 8080
+      protocol: TCP
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ${micro_service_name}-${version_switch}-hpa
+  namespace: ${namespace}
+  labels:
+    app: ${micro_service_name}-${version_switch}-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ${micro_service_name}-${version_switch}
+  minReplicas: ${min_replica}
+  maxReplicas: ${max_replica}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80

@@ -24,7 +24,7 @@ import cn.iocoder.yudao.module.im.service.websocket.notification.group.GroupRequ
 import cn.iocoder.yudao.module.im.service.websocket.notification.group.GroupRequestRejectedNotification;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;

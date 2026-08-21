@@ -30,9 +30,8 @@ import com.anji.captcha.model.common.ResponseModel;
 import com.anji.captcha.model.vo.CaptchaVO;
 import com.anji.captcha.service.CaptchaService;
 import com.google.common.annotations.VisibleForTesting;
-import javax.annotation.Resource;
-import javax.validation.Validator;
-
+import jakarta.annotation.Resource;
+import jakarta.validation.Validator;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
