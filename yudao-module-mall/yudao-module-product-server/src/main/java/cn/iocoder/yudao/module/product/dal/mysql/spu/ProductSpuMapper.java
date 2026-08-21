@@ -34,14 +34,15 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     /**
      * 获取商品 SPU 分页列表数据
      *
-     * @param reqVO 分页请求参数
+     * @param reqVO       分页请求参数
+     * @param categoryIds 分类编号集合，包含子分类
      * @return 商品 SPU 分页列表数据
      */
-    default PageResult<ProductSpuDO> selectPage(ProductSpuPageReqVO reqVO) {
+    default PageResult<ProductSpuDO> selectPage(ProductSpuPageReqVO reqVO, Set<Long> categoryIds) {
         Integer tabType = reqVO.getTabType();
         LambdaQueryWrapperX<ProductSpuDO> queryWrapper = new LambdaQueryWrapperX<ProductSpuDO>()
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getName())
-                .eqIfPresent(ProductSpuDO::getCategoryId, reqVO.getCategoryId())
+                .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime())
                 .orderByDesc(ProductSpuDO::getSort)
                 .orderByDesc(ProductSpuDO::getId);
@@ -149,14 +150,15 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     /**
      * 按筛选条件 + Tab 统计商品 SPU 数量（用于带筛选的 tab count）
      *
-     * @param reqVO   筛选条件（name/categoryId/createTime）
-     * @param tabType Tab 标签类型
+     * @param reqVO       筛选条件（name/categoryId/createTime）
+     * @param tabType     Tab 标签类型
+     * @param categoryIds 分类编号集合，包含子分类
      * @return 数量
      */
-    default Long selectCountByTab(ProductSpuPageReqVO reqVO, Integer tabType) {
+    default Long selectCountByTab(ProductSpuPageReqVO reqVO, Integer tabType, Set<Long> categoryIds) {
         LambdaQueryWrapperX<ProductSpuDO> queryWrapper = new LambdaQueryWrapperX<ProductSpuDO>()
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getName())
-                .eqIfPresent(ProductSpuDO::getCategoryId, reqVO.getCategoryId())
+                .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
         appendTabQuery(tabType, queryWrapper);
         return selectCount(queryWrapper);

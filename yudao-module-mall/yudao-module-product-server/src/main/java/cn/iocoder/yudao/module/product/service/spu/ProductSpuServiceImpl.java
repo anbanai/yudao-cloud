@@ -214,7 +214,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
 
     @Override
     public PageResult<ProductSpuDO> getSpuPage(ProductSpuPageReqVO pageReqVO) {
-        return productSpuMapper.selectPage(pageReqVO);
+        return productSpuMapper.selectPage(pageReqVO, getCategoryIdsWithChildren(pageReqVO));
     }
 
     @Override
@@ -257,19 +257,42 @@ public class ProductSpuServiceImpl implements ProductSpuService {
 
     @Override
     public Map<Integer, Long> getTabsCount(ProductSpuPageReqVO reqVO) {
+        Set<Long> categoryIds = getCategoryIdsWithChildren(reqVO);
         Map<Integer, Long> counts = Maps.newLinkedHashMapWithExpectedSize(5);
         // 每个 tab 的数量 = 筛选条件（name/categoryId/createTime）+ 该 tab 的状态/库存条件
         counts.put(ProductSpuPageReqVO.FOR_SALE,
-                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.FOR_SALE));
+                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.FOR_SALE, categoryIds));
         counts.put(ProductSpuPageReqVO.IN_WAREHOUSE,
-                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.IN_WAREHOUSE));
+                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.IN_WAREHOUSE, categoryIds));
         counts.put(ProductSpuPageReqVO.SOLD_OUT,
-                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.SOLD_OUT));
+                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.SOLD_OUT, categoryIds));
         counts.put(ProductSpuPageReqVO.ALERT_STOCK,
-                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.ALERT_STOCK));
+                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.ALERT_STOCK, categoryIds));
         counts.put(ProductSpuPageReqVO.RECYCLE_BIN,
-                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.RECYCLE_BIN));
+                productSpuMapper.selectCountByTab(reqVO, ProductSpuPageReqVO.RECYCLE_BIN, categoryIds));
         return counts;
+    }
+
+    /**
+     * 获得分类编号集合，包含其子分类。因为顶级分类不包含商品
+     *
+     * 注意：管理端不过滤分类状态，保证管理员可以查询到所有商品
+     */
+    private Set<Long> getCategoryIdsWithChildren(ProductSpuPageReqVO pageReqVO) {
+        Set<Long> categoryIds = new HashSet<>();
+        if (pageReqVO.getCategoryId() != null && pageReqVO.getCategoryId() > 0) {
+            categoryIds.add(pageReqVO.getCategoryId());
+            List<ProductCategoryDO> categoryChildren = categoryService.getCategoryList(new ProductCategoryListReqVO()
+                    .setParentId(pageReqVO.getCategoryId()));
+            categoryIds.addAll(convertList(categoryChildren, ProductCategoryDO::getId));
+        }
+        if (CollUtil.isNotEmpty(pageReqVO.getCategoryIds())) {
+            categoryIds.addAll(pageReqVO.getCategoryIds());
+            List<ProductCategoryDO> categoryChildren = categoryService.getCategoryList(new ProductCategoryListReqVO()
+                    .setParentIds(pageReqVO.getCategoryIds()));
+            categoryIds.addAll(convertList(categoryChildren, ProductCategoryDO::getId));
+        }
+        return categoryIds;
     }
 
     @Override
