@@ -50,7 +50,7 @@ spec:
             - name: http
               containerPort: 48080
               protocol: TCP
-            - name: xxl-job-executor
+            - name: xxl-job-exec
               containerPort: 9999
               protocol: TCP
           resources:
