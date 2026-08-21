@@ -5,6 +5,8 @@ import lombok.Data;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 /**
@@ -22,17 +24,21 @@ public class DeliveryExpressTemplateChargeBaseVO {
 
     @Schema(description = "首件数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "5")
     @NotNull(message = "首件数量不能为空")
+    @Positive(message = "首件数量必须大于 0")
     private Double startCount;
 
     @Schema(description = "起步价", requiredMode = Schema.RequiredMode.REQUIRED, example = "1000")
     @NotNull(message = "起步价不能为空")
+    @PositiveOrZero(message = "起步价不能小于 0")
     private Integer startPrice;
 
     @Schema(description = "续件数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     @NotNull(message = "续件数量不能为空")
+    @Positive(message = "续件数量必须大于 0")
     private Double extraCount;
 
     @Schema(description = "额外价", requiredMode = Schema.RequiredMode.REQUIRED, example = "2000")
     @NotNull(message = "额外价不能为空")
+    @PositiveOrZero(message = "额外价不能小于 0")
     private Integer extraPrice;
 }

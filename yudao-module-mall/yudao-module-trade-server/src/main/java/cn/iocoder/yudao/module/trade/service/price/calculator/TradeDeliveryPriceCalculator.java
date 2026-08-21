@@ -107,7 +107,8 @@ public class TradeDeliveryPriceCalculator implements TradePriceCalculator {
         Map<Long, DeliveryExpressTemplateRespBO> expressTemplateMap =
                 deliveryExpressTemplateService.getExpressTemplateMapByIdsAndArea(deliveryTemplateIds, address.getAreaId());
         // 2.2 计算配送费用
-        if (CollUtil.isEmpty(expressTemplateMap)) {
+        if (CollUtil.isEmpty(expressTemplateMap)
+                || !expressTemplateMap.keySet().containsAll(deliveryTemplateIds)) {
             log.error("[calculate][找不到商品 templateIds {} areaId{} 对应的运费模板]", deliveryTemplateIds, address.getAreaId());
             throw exception(PRICE_CALCULATE_DELIVERY_PRICE_TEMPLATE_NOT_FOUND);
         }

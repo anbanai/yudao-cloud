@@ -5,6 +5,7 @@ import lombok.Data;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 /**
@@ -19,10 +20,12 @@ public class DeliveryExpressTemplateFreeBaseVO {
 
     @Schema(description = "包邮金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "5000")
     @NotNull(message = "包邮金额不能为空")
+    @PositiveOrZero(message = "包邮金额不能小于 0")
     private Integer freePrice;
 
     @Schema(description = "包邮件数", requiredMode = Schema.RequiredMode.REQUIRED, example = "5")
     @NotNull(message = "包邮件数不能为空")
+    @PositiveOrZero(message = "包邮件数不能小于 0")
     private Integer freeCount;
 
 }
