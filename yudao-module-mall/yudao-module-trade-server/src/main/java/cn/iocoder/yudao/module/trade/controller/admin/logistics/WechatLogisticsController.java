@@ -33,6 +33,27 @@ public class WechatLogisticsController {
         return success(true);
     }
 
+    @GetMapping("/config")
+    @Operation(summary = "查询微信物流助手配置")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:config:query')")
+    public CommonResult<WechatLogisticsConfigRespVO> getConfig() {
+        var config = wechatLogisticsService.getConfig();
+        if (config == null) {
+            return success(null);
+        }
+        return success(new WechatLogisticsConfigRespVO()
+                .setId(config.getId()).setUserType(config.getUserType()).setDeliveryId(config.getDeliveryId())
+                .setBizId(config.getBizId()).setServiceType(config.getServiceType()).setServiceName(config.getServiceName())
+                .setEnabled(config.getEnabled()).setSenderName(config.getSenderName()).setSenderTel(config.getSenderTel())
+                .setSenderMobile(config.getSenderMobile()).setSenderCompany(config.getSenderCompany())
+                .setSenderPostCode(config.getSenderPostCode()).setSenderCountry(config.getSenderCountry())
+                .setSenderProvince(config.getSenderProvince()).setSenderCity(config.getSenderCity())
+                .setSenderArea(config.getSenderArea()).setSenderAddress(config.getSenderAddress())
+                .setDefaultWeight(config.getDefaultWeight()).setDefaultSpaceLength(config.getDefaultSpaceLength())
+                .setDefaultSpaceWidth(config.getDefaultSpaceWidth()).setDefaultSpaceHeight(config.getDefaultSpaceHeight())
+                .setUpdateTime(config.getUpdateTime()));
+    }
+
     @GetMapping("/account-status")
     @Operation(summary = "检查微信物流助手账号状态")
     @PreAuthorize("@ss.hasPermission('trade:logistics:account:query')")
