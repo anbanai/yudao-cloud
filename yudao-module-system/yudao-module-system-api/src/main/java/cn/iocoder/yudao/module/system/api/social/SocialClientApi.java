@@ -80,4 +80,57 @@ public interface SocialClientApi {
     CommonResult<Boolean>  notifyWxaOrderConfirmReceive(@RequestParam("userType") Integer userType,
                                                         @Valid @RequestBody SocialWxaOrderNotifyConfirmReceiveReqDTO reqDTO);
 
+    // =================== 微信物流助手 ===================
+
+    @GetMapping(PREFIX + "/get-wxa-express-account-list")
+    @Operation(summary = "获得微信物流助手绑定账号")
+    CommonResult<List<SocialWxaExpressAccountRespDTO>> getWxaExpressAccountList(
+            @RequestParam("userType") Integer userType);
+
+    @GetMapping(PREFIX + "/get-wxa-express-delivery-list")
+    @Operation(summary = "获得微信物流助手支持的快递公司")
+    CommonResult<List<SocialWxaExpressDeliveryRespDTO>> getWxaExpressDeliveryList(
+            @RequestParam("userType") Integer userType);
+
+    @PostMapping(PREFIX + "/add-wxa-express-order")
+    @Operation(summary = "通过微信物流助手生成运单")
+    CommonResult<SocialWxaExpressOrderRespDTO> addWxaExpressOrder(
+            @RequestParam("userType") Integer userType,
+            @Valid @RequestBody SocialWxaExpressAddOrderReqDTO reqDTO);
+
+    @PostMapping(PREFIX + "/get-wxa-express-order")
+    @Operation(summary = "查询微信物流助手运单")
+    CommonResult<SocialWxaExpressOrderRespDTO> getWxaExpressOrder(
+            @RequestParam("userType") Integer userType,
+            @Valid @RequestBody SocialWxaExpressOrderQueryReqDTO reqDTO);
+
+    @PostMapping(PREFIX + "/batch-get-wxa-express-order")
+    @Operation(summary = "批量查询微信物流助手运单")
+    CommonResult<List<SocialWxaExpressOrderRespDTO>> batchGetWxaExpressOrder(
+            @RequestParam("userType") Integer userType,
+            @Valid @RequestBody List<SocialWxaExpressOrderQueryReqDTO> reqDTO);
+
+    @PostMapping(PREFIX + "/cancel-wxa-express-order")
+    @Operation(summary = "取消微信物流助手运单")
+    CommonResult<Boolean> cancelWxaExpressOrder(
+            @RequestParam("userType") Integer userType,
+            @Valid @RequestBody SocialWxaExpressOrderQueryReqDTO reqDTO);
+
+    @PostMapping(PREFIX + "/get-wxa-express-path")
+    @Operation(summary = "查询微信物流助手运单轨迹")
+    CommonResult<SocialWxaExpressPathRespDTO> getWxaExpressPath(
+            @RequestParam("userType") Integer userType,
+            @Valid @RequestBody SocialWxaExpressOrderQueryReqDTO reqDTO);
+
+    @PostMapping(PREFIX + "/update-wxa-express-printer")
+    @Operation(summary = "更新微信物流助手打印员")
+    CommonResult<Boolean> updateWxaExpressPrinter(
+            @RequestParam("userType") Integer userType,
+            @Valid @RequestBody SocialWxaExpressPrinterUpdateReqDTO reqDTO);
+
+    @GetMapping(PREFIX + "/get-wxa-express-printer")
+    @Operation(summary = "获得微信物流助手打印员")
+    CommonResult<SocialWxaExpressPrinterRespDTO> getWxaExpressPrinter(
+            @RequestParam("userType") Integer userType);
+
 }

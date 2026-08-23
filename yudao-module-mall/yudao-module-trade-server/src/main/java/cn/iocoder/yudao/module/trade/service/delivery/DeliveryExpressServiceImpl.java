@@ -85,6 +85,11 @@ public class DeliveryExpressServiceImpl implements DeliveryExpressService {
     }
 
     @Override
+    public DeliveryExpressDO getDeliveryExpressByCode(String code) {
+        return deliveryExpressMapper.selectByCode(code);
+    }
+
+    @Override
     public DeliveryExpressDO validateDeliveryExpress(Long id) {
         DeliveryExpressDO deliveryExpress = deliveryExpressMapper.selectById(id);
         if (deliveryExpress == null) {

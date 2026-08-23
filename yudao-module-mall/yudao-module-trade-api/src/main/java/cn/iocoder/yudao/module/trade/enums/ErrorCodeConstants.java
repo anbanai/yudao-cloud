@@ -84,6 +84,17 @@ public interface ErrorCodeConstants {
     ErrorCode EXPRESS_API_QUERY_ERROR = new ErrorCode(1_011_004_101, "快递查询接口异常");
     ErrorCode EXPRESS_API_QUERY_FAILED = new ErrorCode(1_011_004_102, "快递查询返回失败，原因：{}");
 
+    // ========== 微信物流助手 1-011-004-200 ==========
+    ErrorCode WECHAT_LOGISTICS_CONFIG_NOT_EXISTS = new ErrorCode(1_011_004_200, "微信物流助手配置不存在");
+    ErrorCode WECHAT_LOGISTICS_CONFIG_INVALID = new ErrorCode(1_011_004_201, "微信物流助手配置不完整");
+    ErrorCode WECHAT_LOGISTICS_ACCOUNT_NOT_AVAILABLE = new ErrorCode(1_011_004_202, "微信物流助手没有可用的顺丰账号");
+    ErrorCode WECHAT_LOGISTICS_OPENID_NOT_EXISTS = new ErrorCode(1_011_004_203, "订单不是微信小程序支付或缺少 openid");
+    ErrorCode WECHAT_LOGISTICS_WAYBILL_NOT_EXISTS = new ErrorCode(1_011_004_204, "微信物流助手运单不存在");
+    ErrorCode WECHAT_LOGISTICS_WAYBILL_ALREADY_EXISTS = new ErrorCode(1_011_004_205, "订单已经创建微信物流运单");
+    ErrorCode WECHAT_LOGISTICS_WAYBILL_UNKNOWN = new ErrorCode(1_011_004_206, "微信物流订单状态未知，请先查询后重试");
+    ErrorCode WECHAT_LOGISTICS_PRINT_NOT_PENDING = new ErrorCode(1_011_004_207, "微信物流运单不是待确认打印状态");
+    ErrorCode WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED = new ErrorCode(1_011_004_208, "订单不是待发货状态");
+
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");
     ErrorCode EXPRESS_TEMPLATE_NOT_EXISTS = new ErrorCode(1_011_005_001, "运费模板不存在");
