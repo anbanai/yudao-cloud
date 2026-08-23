@@ -89,7 +89,7 @@ public class WechatLogisticsController {
     }
 
     @PostMapping("/waybills/{id}/confirm-print")
-    @Operation(summary = "确认已打印并发货")
+    @Operation(summary = "已打印，确认发货")
     @Parameter(name = "id", description = "微信物流运单编号", required = true)
     @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:confirm-print')")
     public CommonResult<WechatLogisticsWaybillRespVO> confirmPrint(@PathVariable("id") Long id) {

@@ -61,6 +61,8 @@ import static cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum.UND
 @Slf4j
 public class WechatLogisticsServiceImpl implements WechatLogisticsService {
 
+    /** 微信 getOrder 在缺少有效 waybill_id 时返回的错误码。旧版本曾将该预查询错误保存为 UNKNOWN。 */
+    static final int WECHAT_INVALID_WAYBILL_ID = 9300528;
     private static final Pattern WECHAT_ERROR_CODE_PATTERN = Pattern.compile(
             "(?:微信错误码|错误码|errcode|errorCode)\\s*[:：=]\\s*(-?\\d+)", Pattern.CASE_INSENSITIVE);
 
@@ -146,17 +148,26 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         }
         TradeWechatLogisticsWaybillDO existing = waybillMapper.selectByOrderIdForUpdate(orderId);
         if (existing != null) {
+            boolean retryInvalidWaybillPrequery = false;
             if (WechatLogisticsWaybillStatusEnum.UNKNOWN.name().equals(existing.getStatus())) {
                 TradeOrderDO order = validateOrder(lockedOrder);
                 TradeWechatLogisticsConfigDO config = validateConfig();
-                SocialWxaExpressOrderRespDTO remote = queryRemoteWaybill(existing);
-                if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
-                    return saveCreatedWaybill(order, config, existing.getOpenid(), existing.getWechatOrderId(), remote);
+                // 微信 getOrder 要求有效的 waybill_id。超时发生在 addOrder 返回前时，本地没有运单号，
+                // 不能用空 waybill_id 预查询，否则会得到 9300528 invalid waybill_id。
+                if (ObjectUtil.isNotEmpty(existing.getWaybillId())) {
+                    SocialWxaExpressOrderRespDTO remote = queryRemoteWaybill(existing);
+                    if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
+                        return saveCreatedWaybill(order, config, existing.getOpenid(), existing.getWechatOrderId(), remote);
+                    }
+                } else if (!shouldRetryCreateWithoutWaybill(existing)) {
+                    validateLiveConfig(config);
+                    throw exception(WECHAT_LOGISTICS_WAYBILL_UNKNOWN);
+                } else {
+                    retryInvalidWaybillPrequery = true;
                 }
-                validateLiveConfig(config);
-                throw exception(WECHAT_LOGISTICS_WAYBILL_UNKNOWN);
             }
-            if (!WechatLogisticsWaybillStatusEnum.FAILED.name().equals(existing.getStatus())) {
+            if (!WechatLogisticsWaybillStatusEnum.FAILED.name().equals(existing.getStatus())
+                    && !retryInvalidWaybillPrequery) {
                 return convertWaybill(existing);
             }
         }
@@ -170,34 +181,18 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         creating.setOrderId(orderId).setOrderNo(order.getNo()).setWechatOrderId(wechatOrderId).setOpenid(openid)
                 .setDeliveryId(config.getDeliveryId()).setBizId(config.getBizId())
                 .setStatus(WechatLogisticsWaybillStatusEnum.CREATING.name())
-                .setPrintStatus(WechatLogisticsPrintStatusEnum.PENDING.name());
+                .setPrintStatus(WechatLogisticsPrintStatusEnum.PENDING.name())
+                .setErrorCode(null).setErrorMessage(null);
         if (creating.getId() == null) {
             waybillMapper.insert(creating);
         } else {
             waybillMapper.updateById(creating);
         }
-        SocialWxaExpressOrderQueryReqDTO query = new SocialWxaExpressOrderQueryReqDTO()
-                .setOrderId(wechatOrderId).setOpenid(openid).setDeliveryId(config.getDeliveryId());
-        SocialWxaExpressOrderRespDTO remote = null;
-        try {
-            remote = socialClientApi.getWxaExpressOrder(UserTypeEnum.MEMBER.getValue(), query).getCheckedData();
-        } catch (Exception ex) {
-            if (!isWechatOrderNotFound(ex)) {
-                creating.setStatus(WechatLogisticsWaybillStatusEnum.UNKNOWN.name())
-                        .setErrorCode(extractWechatErrorCode(ex))
-                        .setErrorMessage(ex.getMessage());
-                waybillMapper.updateById(creating);
-                return convertWaybill(creating);
-            }
-            log.debug("[createWaybill][微信订单尚未存在，继续调用 addOrder：orderId({})]", orderId);
-        }
-        if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
-            return saveCreatedWaybill(order, config, openid, wechatOrderId, remote);
-        }
         List<TradeOrderItemDO> items = tradeOrderItemMapper.selectListByOrderId(orderId);
         Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Collections.emptyMap()
                 : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId).toList());
         SocialWxaExpressAddOrderReqDTO request = orderAssembler.build(tenantId(), order, items, skuMap, config, openid);
+        SocialWxaExpressOrderRespDTO remote;
         try {
             remote = socialClientApi.addWxaExpressOrder(UserTypeEnum.MEMBER.getValue(), request).getCheckedData();
         } catch (Exception ex) {
@@ -414,21 +409,6 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         return matcher.find() ? Integer.valueOf(matcher.group(1)) : null;
     }
 
-    private boolean isWechatOrderNotFound(Throwable throwable) {
-        for (Throwable current = throwable; current != null; current = current.getCause()) {
-            String message = current.getMessage();
-            if (message != null) {
-                String normalized = message.toLowerCase();
-                if (message.contains("订单不存在") || message.contains("物流订单不存在")
-                        || normalized.contains("order does not exist")
-                        || normalized.contains("order not found")) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private PayOrderRespDTO validateWxLiteOrder(TradeOrderDO order) {
         if (!PayChannelEnum.WX_LITE.getCode().equals(order.getPayChannelCode()) || order.getPayOrderId() == null) {
             throw exception(WECHAT_LOGISTICS_OPENID_NOT_EXISTS);
@@ -463,6 +443,12 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
             log.warn("[queryRemoteWaybill][查询微信未知运单失败：waybillId({})]", waybill.getId(), ex);
             return null;
         }
+    }
+
+    static boolean shouldRetryCreateWithoutWaybill(TradeWechatLogisticsWaybillDO waybill) {
+        return waybill != null && WechatLogisticsWaybillStatusEnum.UNKNOWN.name().equals(waybill.getStatus())
+                && ObjectUtil.isEmpty(waybill.getWaybillId())
+                && Objects.equals(waybill.getErrorCode(), WECHAT_INVALID_WAYBILL_ID);
     }
 
     private TradeWechatLogisticsWaybillDO validateWaybill(Long id) {
