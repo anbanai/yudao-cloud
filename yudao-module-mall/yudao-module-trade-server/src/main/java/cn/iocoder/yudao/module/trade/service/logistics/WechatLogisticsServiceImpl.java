@@ -201,7 +201,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         try {
             remote = socialClientApi.addWxaExpressOrder(UserTypeEnum.MEMBER.getValue(), request).getCheckedData();
         } catch (Exception ex) {
-            Integer errorCode = extractWechatErrorCode(ex.getMessage());
+            Integer errorCode = extractWechatErrorCode(ex);
             creating.setErrorCode(errorCode).setErrorMessage(ex.getMessage())
                     .setStatus(errorCode == null ? WechatLogisticsWaybillStatusEnum.UNKNOWN.name()
                             : WechatLogisticsWaybillStatusEnum.FAILED.name());
