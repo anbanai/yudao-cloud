@@ -63,7 +63,6 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
 
     private static final Pattern WECHAT_ERROR_CODE_PATTERN = Pattern.compile(
             "(?:微信错误码|错误码|errcode|errorCode)\\s*[:：=]\\s*(-?\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final int WECHAT_EXPRESS_ORDER_NOT_FOUND_CODE = 9300503;
 
     @Resource
     private TradeWechatLogisticsConfigMapper wechatLogisticsConfigMapper;
@@ -416,10 +415,6 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     }
 
     private boolean isWechatOrderNotFound(Throwable throwable) {
-        Integer errorCode = extractWechatErrorCode(throwable);
-        if (Objects.equals(errorCode, WECHAT_EXPRESS_ORDER_NOT_FOUND_CODE)) {
-            return true;
-        }
         for (Throwable current = throwable; current != null; current = current.getCause()) {
             String message = current.getMessage();
             if (message != null) {
