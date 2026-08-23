@@ -188,11 +188,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
                     .setStatus(errorCode == null ? WechatLogisticsWaybillStatusEnum.UNKNOWN.name()
                             : WechatLogisticsWaybillStatusEnum.FAILED.name());
             waybillMapper.updateById(creating);
-            // 确定性的微信业务错误必须直接返回给后台，网络超时才保留 UNKNOWN 等待查询确认。
-            if (errorCode != null) {
-                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
-                        .exception0(errorCode, "微信物流下单失败：{}", ex.getMessage());
-            }
+            // 业务错误由 Controller 转成 CommonResult.error 返回，避免抛异常触发事务回滚并丢失失败记录。
             return convertWaybill(creating);
         }
         if (remote == null || ObjectUtil.isEmpty(remote.getWaybillId())) {
