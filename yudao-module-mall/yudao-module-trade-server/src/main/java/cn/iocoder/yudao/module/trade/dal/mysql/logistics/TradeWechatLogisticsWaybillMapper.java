@@ -15,6 +15,11 @@ public interface TradeWechatLogisticsWaybillMapper extends BaseMapperX<TradeWech
                 .eq(TradeWechatLogisticsWaybillDO::getOrderId, orderId));
     }
 
+    default TradeWechatLogisticsWaybillDO selectByOrderIdForUpdate(Long orderId) {
+        return selectOne(new LambdaQueryWrapperX<TradeWechatLogisticsWaybillDO>()
+                .eq(TradeWechatLogisticsWaybillDO::getOrderId, orderId).last("FOR UPDATE"));
+    }
+
     default TradeWechatLogisticsWaybillDO selectByWechatOrderId(String wechatOrderId) {
         return selectOne(new LambdaQueryWrapperX<TradeWechatLogisticsWaybillDO>()
                 .eq(TradeWechatLogisticsWaybillDO::getWechatOrderId, wechatOrderId));
