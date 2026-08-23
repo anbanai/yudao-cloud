@@ -36,6 +36,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -60,7 +61,9 @@ import static cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum.UND
 @Slf4j
 public class WechatLogisticsServiceImpl implements WechatLogisticsService {
 
-    private static final Pattern WECHAT_ERROR_CODE_PATTERN = Pattern.compile("微信错误码：(-?\\d+)");
+    private static final Pattern WECHAT_ERROR_CODE_PATTERN = Pattern.compile(
+            "(?:微信错误码|错误码|errcode|errorCode)\\s*[:：=]\\s*(-?\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final int WECHAT_EXPRESS_ORDER_NOT_FOUND_CODE = 9300503;
 
     @Resource
     private TradeWechatLogisticsConfigMapper wechatLogisticsConfigMapper;
@@ -82,6 +85,8 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     private DeliveryExpressService deliveryExpressService;
     @Resource
     private TradeOrderUpdateService tradeOrderUpdateService;
+    @Resource
+    private TransactionTemplate transactionTemplate;
 
     private final WechatLogisticsOrderAssembler orderAssembler = new WechatLogisticsOrderAssembler();
 
@@ -162,21 +167,6 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         PayOrderRespDTO payOrder = validateWxLiteOrder(order);
         String openid = payOrder.getChannelUserId();
         String wechatOrderId = tenantId() + "-" + order.getNo();
-        SocialWxaExpressOrderQueryReqDTO query = new SocialWxaExpressOrderQueryReqDTO()
-                .setOrderId(wechatOrderId).setOpenid(openid).setDeliveryId(config.getDeliveryId());
-        SocialWxaExpressOrderRespDTO remote = null;
-        try {
-            remote = socialClientApi.getWxaExpressOrder(UserTypeEnum.MEMBER.getValue(), query).getCheckedData();
-        } catch (Exception ignored) {
-            log.debug("[createWaybill][微信订单尚未存在，继续调用 addOrder：orderId({})]", orderId);
-        }
-        if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
-            return saveCreatedWaybill(order, config, openid, wechatOrderId, remote);
-        }
-        List<TradeOrderItemDO> items = tradeOrderItemMapper.selectListByOrderId(orderId);
-        Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Collections.emptyMap()
-                : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId).toList());
-        SocialWxaExpressAddOrderReqDTO request = orderAssembler.build(tenantId(), order, items, skuMap, config, openid);
         TradeWechatLogisticsWaybillDO creating = existing == null ? new TradeWechatLogisticsWaybillDO() : existing;
         creating.setOrderId(orderId).setOrderNo(order.getNo()).setWechatOrderId(wechatOrderId).setOpenid(openid)
                 .setDeliveryId(config.getDeliveryId()).setBizId(config.getBizId())
@@ -187,6 +177,28 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         } else {
             waybillMapper.updateById(creating);
         }
+        SocialWxaExpressOrderQueryReqDTO query = new SocialWxaExpressOrderQueryReqDTO()
+                .setOrderId(wechatOrderId).setOpenid(openid).setDeliveryId(config.getDeliveryId());
+        SocialWxaExpressOrderRespDTO remote = null;
+        try {
+            remote = socialClientApi.getWxaExpressOrder(UserTypeEnum.MEMBER.getValue(), query).getCheckedData();
+        } catch (Exception ex) {
+            if (!isWechatOrderNotFound(ex)) {
+                creating.setStatus(WechatLogisticsWaybillStatusEnum.UNKNOWN.name())
+                        .setErrorCode(extractWechatErrorCode(ex))
+                        .setErrorMessage(ex.getMessage());
+                waybillMapper.updateById(creating);
+                return convertWaybill(creating);
+            }
+            log.debug("[createWaybill][微信订单尚未存在，继续调用 addOrder：orderId({})]", orderId);
+        }
+        if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
+            return saveCreatedWaybill(order, config, openid, wechatOrderId, remote);
+        }
+        List<TradeOrderItemDO> items = tradeOrderItemMapper.selectListByOrderId(orderId);
+        Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Collections.emptyMap()
+                : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId).toList());
+        SocialWxaExpressAddOrderReqDTO request = orderAssembler.build(tenantId(), order, items, skuMap, config, openid);
         try {
             remote = socialClientApi.addWxaExpressOrder(UserTypeEnum.MEMBER.getValue(), request).getCheckedData();
         } catch (Exception ex) {
@@ -211,7 +223,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     public List<WechatLogisticsWaybillRespVO> batchCreateWaybills(List<Long> orderIds) {
         return orderIds.stream().map(orderId -> {
             try {
-                return createWaybill(orderId);
+                return transactionTemplate.execute(status -> createWaybill(orderId));
             } catch (Exception ex) {
                 TradeWechatLogisticsWaybillDO waybill = waybillMapper.selectByOrderId(orderId);
                 if (waybill == null) {
@@ -229,6 +241,8 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     @Transactional(rollbackFor = Exception.class)
     public WechatLogisticsWaybillRespVO confirmPrint(Long waybillId) {
         TradeWechatLogisticsWaybillDO waybill = validateWaybill(waybillId);
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(waybill.getOrderId());
+        waybill = validateWaybillForUpdate(waybillId);
         if (!WechatLogisticsWaybillStatusEnum.CREATED.name().equals(waybill.getStatus())
                 || ObjectUtil.isEmpty(waybill.getWaybillId())) {
             throw exception(WECHAT_LOGISTICS_WAYBILL_NOT_CREATED);
@@ -239,7 +253,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
             }
             throw exception(WECHAT_LOGISTICS_PRINT_NOT_PENDING);
         }
-        TradeOrderDO order = validateOrder(tradeOrderMapper.selectByIdForUpdate(waybill.getOrderId()));
+        order = validateOrder(order);
         if (!UNDELIVERED.getStatus().equals(order.getStatus())) {
             throw exception(WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED);
         }
@@ -260,6 +274,8 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     @Transactional(rollbackFor = Exception.class)
     public void cancelWaybill(Long waybillId) {
         TradeWechatLogisticsWaybillDO waybill = validateWaybill(waybillId);
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(waybill.getOrderId());
+        waybill = validateWaybillForUpdate(waybillId);
         if (WechatLogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
             return;
         }
@@ -267,7 +283,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
                 || !WechatLogisticsPrintStatusEnum.PENDING.name().equals(waybill.getPrintStatus())) {
             throw exception(WECHAT_LOGISTICS_PRINT_NOT_PENDING);
         }
-        TradeOrderDO order = validateOrder(tradeOrderMapper.selectByIdForUpdate(waybill.getOrderId()));
+        order = validateOrder(order);
         if (!UNDELIVERED.getStatus().equals(order.getStatus())) {
             throw exception(WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED);
         }
@@ -381,12 +397,41 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         }
     }
 
+    private Integer extractWechatErrorCode(Throwable throwable) {
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            Integer code = extractWechatErrorCode(current.getMessage());
+            if (code != null) {
+                return code;
+            }
+        }
+        return null;
+    }
+
     private Integer extractWechatErrorCode(String message) {
         if (message == null) {
             return null;
         }
         Matcher matcher = WECHAT_ERROR_CODE_PATTERN.matcher(message);
         return matcher.find() ? Integer.valueOf(matcher.group(1)) : null;
+    }
+
+    private boolean isWechatOrderNotFound(Throwable throwable) {
+        Integer errorCode = extractWechatErrorCode(throwable);
+        if (Objects.equals(errorCode, WECHAT_EXPRESS_ORDER_NOT_FOUND_CODE)) {
+            return true;
+        }
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (message.contains("订单不存在") || message.contains("物流订单不存在")
+                        || normalized.contains("order does not exist")
+                        || normalized.contains("order not found")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private PayOrderRespDTO validateWxLiteOrder(TradeOrderDO order) {
@@ -427,6 +472,14 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
 
     private TradeWechatLogisticsWaybillDO validateWaybill(Long id) {
         TradeWechatLogisticsWaybillDO waybill = waybillMapper.selectById(id);
+        if (waybill == null) {
+            throw exception(WECHAT_LOGISTICS_WAYBILL_NOT_EXISTS);
+        }
+        return waybill;
+    }
+
+    private TradeWechatLogisticsWaybillDO validateWaybillForUpdate(Long id) {
+        TradeWechatLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(id);
         if (waybill == null) {
             throw exception(WECHAT_LOGISTICS_WAYBILL_NOT_EXISTS);
         }
