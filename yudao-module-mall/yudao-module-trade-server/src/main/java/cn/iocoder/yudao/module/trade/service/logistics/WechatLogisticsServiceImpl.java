@@ -63,7 +63,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     private static final Pattern WECHAT_ERROR_CODE_PATTERN = Pattern.compile("微信错误码：(-?\\d+)");
 
     @Resource
-    private TradeWechatLogisticsConfigMapper configMapper;
+    private TradeWechatLogisticsConfigMapper wechatLogisticsConfigMapper;
     @Resource
     private TradeWechatLogisticsWaybillMapper waybillMapper;
     @Resource
@@ -94,7 +94,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         if (Boolean.TRUE.equals(reqVO.getEnabled())) {
             validateLiveConfig(reqVO);
         }
-        TradeWechatLogisticsConfigDO config = configMapper.selectByUserType(reqVO.getUserType());
+        TradeWechatLogisticsConfigDO config = wechatLogisticsConfigMapper.selectByUserType(reqVO.getUserType());
         TradeWechatLogisticsConfigDO update = new TradeWechatLogisticsConfigDO()
                 .setUserType(reqVO.getUserType()).setDeliveryId(reqVO.getDeliveryId()).setBizId(reqVO.getBizId())
                 .setServiceType(reqVO.getServiceType()).setServiceName(reqVO.getServiceName()).setEnabled(reqVO.getEnabled())
@@ -105,16 +105,16 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
                 .setDefaultWeight(reqVO.getDefaultWeight()).setDefaultSpaceLength(reqVO.getDefaultSpaceLength())
                 .setDefaultSpaceWidth(reqVO.getDefaultSpaceWidth()).setDefaultSpaceHeight(reqVO.getDefaultSpaceHeight());
         if (config == null) {
-            configMapper.insert(update);
+            wechatLogisticsConfigMapper.insert(update);
         } else {
             update.setId(config.getId());
-            configMapper.updateById(update);
+            wechatLogisticsConfigMapper.updateById(update);
         }
     }
 
     @Override
     public TradeWechatLogisticsConfigDO getConfig() {
-        return configMapper.selectByUserType(UserTypeEnum.MEMBER.getValue());
+        return wechatLogisticsConfigMapper.selectByUserType(UserTypeEnum.MEMBER.getValue());
     }
 
     @Override
