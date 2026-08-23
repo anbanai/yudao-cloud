@@ -112,10 +112,11 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         List<SocialWxaExpressDeliveryRespDTO> deliveries = socialClientApi
                 .getWxaExpressDeliveryList(UserTypeEnum.MEMBER.getValue()).getCheckedData();
         SocialWxaExpressAccountRespDTO sf = accounts == null ? null : accounts.stream()
-                .filter(item -> "SF".equals(item.getDeliveryId()) && Objects.equals(item.getStatusCode(), 0))
+                .filter(item -> "SF".equals(item.getDeliveryId()) && Objects.equals(item.getStatusCode(), 0)
+                        && ObjectUtil.isNotEmpty(item.getServiceTypes()))
                 .findFirst().orElse(null);
         return new WechatLogisticsAccountStatusRespVO().setAvailable(sf != null)
-                .setMessage(sf == null ? "尚未绑定可用的顺丰微信物流账号" : "顺丰微信物流账号可用")
+                .setMessage(sf == null ? "尚未绑定可用的顺丰微信物流账号，或账号尚未返回服务类型" : "顺丰微信物流账号可用")
                 .setAccounts(accounts).setDeliveries(deliveries);
     }
 
