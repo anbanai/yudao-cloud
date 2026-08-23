@@ -135,11 +135,17 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public WechatLogisticsWaybillRespVO createWaybill(Long orderId) {
+        // 锁定订单行，覆盖本地运单尚未插入时的并发点击场景。
+        TradeOrderDO lockedOrder = tradeOrderMapper.selectByIdForUpdate(orderId);
+        if (lockedOrder == null) {
+            throw exception(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ORDER_NOT_FOUND);
+        }
         TradeWechatLogisticsWaybillDO existing = waybillMapper.selectByOrderIdForUpdate(orderId);
         if (existing != null) {
             if (WechatLogisticsWaybillStatusEnum.UNKNOWN.name().equals(existing.getStatus())) {
-                TradeOrderDO order = validateOrder(orderId);
+                TradeOrderDO order = validateOrder(lockedOrder);
                 TradeWechatLogisticsConfigDO config = validateConfig();
+                validateLiveConfig(config);
                 SocialWxaExpressOrderRespDTO remote = queryRemoteWaybill(existing);
                 if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
                     return saveCreatedWaybill(order, config, existing.getOpenid(), existing.getWechatOrderId(), remote);
@@ -150,8 +156,9 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
                 return convertWaybill(existing);
             }
         }
-        TradeOrderDO order = validateOrder(orderId);
+        TradeOrderDO order = validateOrder(lockedOrder);
         TradeWechatLogisticsConfigDO config = validateConfig();
+        validateLiveConfig(config);
         PayOrderRespDTO payOrder = validateWxLiteOrder(order);
         String openid = payOrder.getChannelUserId();
         String wechatOrderId = tenantId() + "-" + order.getNo();
@@ -232,7 +239,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
             }
             throw exception(WECHAT_LOGISTICS_PRINT_NOT_PENDING);
         }
-        TradeOrderDO order = validateOrder(waybill.getOrderId());
+        TradeOrderDO order = validateOrder(tradeOrderMapper.selectByIdForUpdate(waybill.getOrderId()));
         if (!UNDELIVERED.getStatus().equals(order.getStatus())) {
             throw exception(WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED);
         }
@@ -260,7 +267,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
                 || !WechatLogisticsPrintStatusEnum.PENDING.name().equals(waybill.getPrintStatus())) {
             throw exception(WECHAT_LOGISTICS_PRINT_NOT_PENDING);
         }
-        TradeOrderDO order = validateOrder(waybill.getOrderId());
+        TradeOrderDO order = validateOrder(tradeOrderMapper.selectByIdForUpdate(waybill.getOrderId()));
         if (!UNDELIVERED.getStatus().equals(order.getStatus())) {
             throw exception(WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED);
         }
@@ -330,8 +337,7 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
                 .setTagidList(printer == null ? Collections.emptyList() : printer.getTagidList());
     }
 
-    private TradeOrderDO validateOrder(Long orderId) {
-        TradeOrderDO order = tradeOrderMapper.selectById(orderId);
+    private TradeOrderDO validateOrder(TradeOrderDO order) {
         if (order == null) {
             throw exception(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ORDER_NOT_FOUND);
         }
@@ -348,18 +354,29 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     }
 
     private void validateLiveConfig(WechatLogisticsConfigSaveReqVO reqVO) {
-        if (!"SF".equals(reqVO.getDeliveryId())) {
+        validateLiveConfig(reqVO.getUserType(), reqVO.getDeliveryId(), reqVO.getBizId(),
+                reqVO.getServiceType(), reqVO.getServiceName());
+    }
+
+    private void validateLiveConfig(TradeWechatLogisticsConfigDO config) {
+        validateLiveConfig(config.getUserType(), config.getDeliveryId(), config.getBizId(),
+                config.getServiceType(), config.getServiceName());
+    }
+
+    private void validateLiveConfig(Integer userType, String deliveryId, String bizId,
+                                    Integer serviceType, String serviceName) {
+        if (!"SF".equals(deliveryId)) {
             throw exception(WECHAT_LOGISTICS_ACCOUNT_NOT_AVAILABLE);
         }
         List<SocialWxaExpressAccountRespDTO> accounts = socialClientApi
-                .getWxaExpressAccountList(reqVO.getUserType()).getCheckedData();
+                .getWxaExpressAccountList(userType).getCheckedData();
         SocialWxaExpressAccountRespDTO account = accounts == null ? null : accounts.stream()
                 .filter(item -> "SF".equals(item.getDeliveryId()) && Objects.equals(item.getStatusCode(), 0)
-                        && Objects.equals(item.getBizId(), reqVO.getBizId()))
+                        && Objects.equals(item.getBizId(), bizId))
                 .findFirst().orElse(null);
         if (account == null || account.getServiceTypes() == null || account.getServiceTypes().stream()
-                .noneMatch(item -> Objects.equals(item.getServiceType(), reqVO.getServiceType())
-                        && Objects.equals(item.getServiceName(), reqVO.getServiceName()))) {
+                .noneMatch(item -> Objects.equals(item.getServiceType(), serviceType)
+                        && Objects.equals(item.getServiceName(), serviceName))) {
             throw exception(WECHAT_LOGISTICS_ACCOUNT_NOT_AVAILABLE);
         }
     }

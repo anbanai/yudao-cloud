@@ -28,6 +28,11 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
         return selectOne(TradeOrderDO::getId, id, TradeOrderDO::getUserId, userId);
     }
 
+    default TradeOrderDO selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<TradeOrderDO>()
+                .eq(TradeOrderDO::getId, id).last("FOR UPDATE"));
+    }
+
     default PageResult<TradeOrderDO> selectPage(TradeOrderPageReqVO reqVO, Set<Long> userIds) {
         return selectPage(reqVO, new LambdaQueryWrapperX<TradeOrderDO>()
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
