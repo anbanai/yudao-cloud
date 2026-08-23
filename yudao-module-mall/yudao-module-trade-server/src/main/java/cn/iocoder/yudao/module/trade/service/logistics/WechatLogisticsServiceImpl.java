@@ -145,11 +145,11 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
             if (WechatLogisticsWaybillStatusEnum.UNKNOWN.name().equals(existing.getStatus())) {
                 TradeOrderDO order = validateOrder(lockedOrder);
                 TradeWechatLogisticsConfigDO config = validateConfig();
-                validateLiveConfig(config);
                 SocialWxaExpressOrderRespDTO remote = queryRemoteWaybill(existing);
                 if (remote != null && ObjectUtil.isNotEmpty(remote.getWaybillId())) {
                     return saveCreatedWaybill(order, config, existing.getOpenid(), existing.getWechatOrderId(), remote);
                 }
+                validateLiveConfig(config);
                 throw exception(WECHAT_LOGISTICS_WAYBILL_UNKNOWN);
             }
             if (!WechatLogisticsWaybillStatusEnum.FAILED.name().equals(existing.getStatus())) {
