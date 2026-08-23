@@ -6,6 +6,14 @@ import cn.iocoder.yudao.module.system.api.social.dto.SocialWxQrcodeReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderNotifyConfirmReceiveReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderUploadShippingInfoReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressAccountRespDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressAddOrderReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressDeliveryRespDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressOrderQueryReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressOrderRespDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressPathRespDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressPrinterRespDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressPrinterUpdateReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.socail.vo.client.SocialClientPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.socail.vo.client.SocialClientSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialClientDO;
@@ -109,6 +117,52 @@ public interface SocialClientService {
      * @param reqDTO 请求
      */
     void notifyWxaOrderConfirmReceive(Integer userType, SocialWxaOrderNotifyConfirmReceiveReqDTO reqDTO);
+
+    /**
+     * 获得微信物流助手绑定账号。
+     */
+    List<SocialWxaExpressAccountRespDTO> getWxaExpressAccountList(Integer userType);
+
+    /**
+     * 获得微信物流助手支持的快递公司。
+     */
+    List<SocialWxaExpressDeliveryRespDTO> getWxaExpressDeliveryList(Integer userType);
+
+    /**
+     * 生成微信物流助手运单。
+     */
+    SocialWxaExpressOrderRespDTO addWxaExpressOrder(Integer userType, SocialWxaExpressAddOrderReqDTO reqDTO);
+
+    /**
+     * 查询微信物流助手运单。
+     */
+    SocialWxaExpressOrderRespDTO getWxaExpressOrder(Integer userType, SocialWxaExpressOrderQueryReqDTO reqDTO);
+
+    /**
+     * 批量查询微信物流助手运单。
+     */
+    List<SocialWxaExpressOrderRespDTO> batchGetWxaExpressOrder(Integer userType,
+                                                                List<SocialWxaExpressOrderQueryReqDTO> reqDTO);
+
+    /**
+     * 取消微信物流助手运单。
+     */
+    void cancelWxaExpressOrder(Integer userType, SocialWxaExpressOrderQueryReqDTO reqDTO);
+
+    /**
+     * 查询微信物流助手运单轨迹。
+     */
+    SocialWxaExpressPathRespDTO getWxaExpressPath(Integer userType, SocialWxaExpressOrderQueryReqDTO reqDTO);
+
+    /**
+     * 更新微信物流助手打印员。
+     */
+    void updateWxaExpressPrinter(Integer userType, SocialWxaExpressPrinterUpdateReqDTO reqDTO);
+
+    /**
+     * 获得微信物流助手打印员。
+     */
+    SocialWxaExpressPrinterRespDTO getWxaExpressPrinter(Integer userType);
 
     // =================== 客户端管理 ===================
 

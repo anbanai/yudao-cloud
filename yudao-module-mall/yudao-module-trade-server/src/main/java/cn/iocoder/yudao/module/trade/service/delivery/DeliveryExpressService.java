@@ -48,6 +48,11 @@ public interface DeliveryExpressService {
     DeliveryExpressDO getDeliveryExpress(Long id);
 
     /**
+     * 按快递公司编码查询，例如微信物流助手的 SF。
+     */
+    DeliveryExpressDO getDeliveryExpressByCode(String code);
+
+    /**
      * 校验快递公司是否合法
      *
      * @param id 编号

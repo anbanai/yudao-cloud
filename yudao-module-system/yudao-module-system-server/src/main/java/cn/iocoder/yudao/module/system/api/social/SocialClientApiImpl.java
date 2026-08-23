@@ -108,4 +108,57 @@ public class SocialClientApiImpl implements SocialClientApi {
         return success(true);
     }
 
+    @Override
+    public CommonResult<List<SocialWxaExpressAccountRespDTO>> getWxaExpressAccountList(Integer userType) {
+        return success(socialClientService.getWxaExpressAccountList(userType));
+    }
+
+    @Override
+    public CommonResult<List<SocialWxaExpressDeliveryRespDTO>> getWxaExpressDeliveryList(Integer userType) {
+        return success(socialClientService.getWxaExpressDeliveryList(userType));
+    }
+
+    @Override
+    public CommonResult<SocialWxaExpressOrderRespDTO> addWxaExpressOrder(Integer userType,
+                                                                           SocialWxaExpressAddOrderReqDTO reqDTO) {
+        return success(socialClientService.addWxaExpressOrder(userType, reqDTO));
+    }
+
+    @Override
+    public CommonResult<SocialWxaExpressOrderRespDTO> getWxaExpressOrder(Integer userType,
+                                                                           SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        return success(socialClientService.getWxaExpressOrder(userType, reqDTO));
+    }
+
+    @Override
+    public CommonResult<List<SocialWxaExpressOrderRespDTO>> batchGetWxaExpressOrder(Integer userType,
+                                                                                      List<SocialWxaExpressOrderQueryReqDTO> reqDTO) {
+        return success(socialClientService.batchGetWxaExpressOrder(userType, reqDTO));
+    }
+
+    @Override
+    public CommonResult<Boolean> cancelWxaExpressOrder(Integer userType,
+                                                       SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        socialClientService.cancelWxaExpressOrder(userType, reqDTO);
+        return success(true);
+    }
+
+    @Override
+    public CommonResult<SocialWxaExpressPathRespDTO> getWxaExpressPath(Integer userType,
+                                                                         SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        return success(socialClientService.getWxaExpressPath(userType, reqDTO));
+    }
+
+    @Override
+    public CommonResult<Boolean> updateWxaExpressPrinter(Integer userType,
+                                                         SocialWxaExpressPrinterUpdateReqDTO reqDTO) {
+        socialClientService.updateWxaExpressPrinter(userType, reqDTO);
+        return success(true);
+    }
+
+    @Override
+    public CommonResult<SocialWxaExpressPrinterRespDTO> getWxaExpressPrinter(Integer userType) {
+        return success(socialClientService.getWxaExpressPrinter(userType));
+    }
+
 }

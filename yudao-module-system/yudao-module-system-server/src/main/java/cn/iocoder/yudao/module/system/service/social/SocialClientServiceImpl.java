@@ -5,6 +5,20 @@ import cn.binarywang.wx.miniapp.api.WxMaSubscribeService;
 import cn.binarywang.wx.miniapp.api.impl.WxMaServiceImpl;
 import cn.binarywang.wx.miniapp.bean.WxMaPhoneNumberInfo;
 import cn.binarywang.wx.miniapp.bean.WxMaSubscribeMessage;
+import cn.binarywang.wx.miniapp.bean.express.WxMaExpressAccount;
+import cn.binarywang.wx.miniapp.bean.express.WxMaExpressDelivery;
+import cn.binarywang.wx.miniapp.bean.express.WxMaExpressPath;
+import cn.binarywang.wx.miniapp.bean.express.WxMaExpressPrinter;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressAddOrderRequest;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressGetOrderRequest;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressOrderCargo;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressOrderCargoDetail;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressOrderInsured;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressOrderPerson;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressOrderShop;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressOrderShopDetail;
+import cn.binarywang.wx.miniapp.bean.express.request.WxMaExpressPrinterUpdateRequest;
+import cn.binarywang.wx.miniapp.bean.express.result.WxMaExpressOrderInfoResult;
 import cn.binarywang.wx.miniapp.bean.shop.request.shipping.*;
 import cn.binarywang.wx.miniapp.bean.shop.response.WxMaOrderShippingInfoBaseResponse;
 import cn.binarywang.wx.miniapp.config.impl.WxMaRedisBetterConfigImpl;
@@ -22,10 +36,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.cache.CacheUtils;
 import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
-import cn.iocoder.yudao.module.system.api.social.dto.SocialWxQrcodeReqDTO;
-import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderNotifyConfirmReceiveReqDTO;
-import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderUploadShippingInfoReqDTO;
-import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.*;
 import cn.iocoder.yudao.module.system.controller.admin.socail.vo.client.SocialClientPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.socail.vo.client.SocialClientSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialClientDO;
@@ -63,6 +74,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -419,6 +432,266 @@ public class SocialClientServiceImpl implements SocialClientService {
             log.error("[notifyWxaOrderConfirmReceive][确认收货提醒到微信小程序失败：request({})]", request, ex);
             throw exception(SOCIAL_CLIENT_WEIXIN_MINI_APP_ORDER_NOTIFY_CONFIRM_RECEIVE_ERROR, ex.getError().getErrorMsg());
         }
+    }
+
+    // =================== 微信物流助手 ===================
+
+    @Override
+    public List<SocialWxaExpressAccountRespDTO> getWxaExpressAccountList(Integer userType) {
+        try {
+            return convertExpressAccounts(getWxMaService(userType).getExpressService().getAllAccount());
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public List<SocialWxaExpressDeliveryRespDTO> getWxaExpressDeliveryList(Integer userType) {
+        try {
+            return convertExpressDeliveries(getWxMaService(userType).getExpressService().getAllDelivery());
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public SocialWxaExpressOrderRespDTO addWxaExpressOrder(Integer userType, SocialWxaExpressAddOrderReqDTO reqDTO) {
+        try {
+            WxMaExpressOrderInfoResult result = getWxMaService(userType).getExpressService()
+                    .addOrder(convertAddOrderRequest(reqDTO));
+            return convertExpressOrder(result);
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public SocialWxaExpressOrderRespDTO getWxaExpressOrder(Integer userType,
+                                                            SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        try {
+            WxMaExpressOrderInfoResult result = getWxMaService(userType).getExpressService()
+                    .getOrder(convertOrderQueryRequest(reqDTO));
+            return convertExpressOrder(result);
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public List<SocialWxaExpressOrderRespDTO> batchGetWxaExpressOrder(Integer userType,
+                                                                       List<SocialWxaExpressOrderQueryReqDTO> reqDTO) {
+        try {
+            List<WxMaExpressGetOrderRequest> requests = reqDTO == null ? Collections.emptyList()
+                    : reqDTO.stream().map(this::convertOrderQueryRequest).toList();
+            List<WxMaExpressOrderInfoResult> results = getWxMaService(userType).getExpressService()
+                    .batchGetOrder(requests);
+            return results == null ? Collections.emptyList()
+                    : results.stream().map(this::convertExpressOrder).toList();
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public void cancelWxaExpressOrder(Integer userType, SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        try {
+            getWxMaService(userType).getExpressService().cancelOrder(convertOrderQueryRequest(reqDTO));
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public SocialWxaExpressPathRespDTO getWxaExpressPath(Integer userType,
+                                                          SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        try {
+            return convertExpressPath(getWxMaService(userType).getExpressService()
+                    .getPath(convertOrderQueryRequest(reqDTO)));
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public void updateWxaExpressPrinter(Integer userType, SocialWxaExpressPrinterUpdateReqDTO reqDTO) {
+        try {
+            WxMaExpressPrinterUpdateRequest request = WxMaExpressPrinterUpdateRequest.builder()
+                    .openid(reqDTO.getOpenid()).updateType(reqDTO.getUpdateType())
+                    .tagidList(reqDTO.getTagidList()).build();
+            getWxMaService(userType).getExpressService().updatePrinter(request);
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    @Override
+    public SocialWxaExpressPrinterRespDTO getWxaExpressPrinter(Integer userType) {
+        try {
+            return convertExpressPrinter(getWxMaService(userType).getExpressService().getPrinter());
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
+        }
+    }
+
+    private List<SocialWxaExpressAccountRespDTO> convertExpressAccounts(List<WxMaExpressAccount> accounts) {
+        if (accounts == null) {
+            return Collections.emptyList();
+        }
+        return accounts.stream().map(account -> {
+            SocialWxaExpressAccountRespDTO result = new SocialWxaExpressAccountRespDTO()
+                    .setBizId(account.getBizId()).setDeliveryId(account.getDeliveryId())
+                    .setStatusCode(account.getStatusCode()).setAlias(account.getAlias())
+                    .setRemarkWrongMsg(account.getRemarkWrongMsg()).setRemarkContent(account.getRemarkContent())
+                    .setQuotaNum(account.getQuotaNum()).setQuotaUpdateTime(account.getQuotaUpdateTime());
+            result.setServiceTypes(convertServiceTypes(account.getServiceType()));
+            return result;
+        }).toList();
+    }
+
+    private List<SocialWxaExpressDeliveryRespDTO> convertExpressDeliveries(List<WxMaExpressDelivery> deliveries) {
+        if (deliveries == null) {
+            return Collections.emptyList();
+        }
+        return deliveries.stream().map(delivery -> new SocialWxaExpressDeliveryRespDTO()
+                .setDeliveryId(delivery.getDeliveryId()).setDeliveryName(delivery.getDeliveryName())
+                .setCanUseCash(delivery.getCanUseCash()).setCanGetQuota(delivery.getCanGetQuota())
+                .setCashBizId(delivery.getCashBizId())
+                .setServiceTypes(convertServiceTypes(delivery.getServiceType()))).toList();
+    }
+
+    private List<SocialWxaExpressAccountRespDTO.ServiceType> convertServiceTypes(
+            List<WxMaExpressDelivery.ServiceType> serviceTypes) {
+        if (serviceTypes == null) {
+            return Collections.emptyList();
+        }
+        return serviceTypes.stream().map(serviceType -> new SocialWxaExpressAccountRespDTO.ServiceType()
+                .setServiceType(serviceType.getServiceType()).setServiceName(serviceType.getServiceName())).toList();
+    }
+
+    private WxMaExpressAddOrderRequest convertAddOrderRequest(SocialWxaExpressAddOrderReqDTO reqDTO) {
+        SocialWxaExpressAddOrderReqDTO.Service service = reqDTO.getService();
+        WxMaExpressDelivery.ServiceType serviceType = new WxMaExpressDelivery.ServiceType();
+        if (service != null) {
+            serviceType.setServiceType(service.getServiceType());
+            serviceType.setServiceName(service.getServiceName());
+        }
+        return WxMaExpressAddOrderRequest.builder()
+                .addSource(reqDTO.getAddSource()).wxAppid(reqDTO.getWxAppid()).orderId(reqDTO.getOrderId())
+                .openid(reqDTO.getOpenid()).deliveryId(reqDTO.getDeliveryId()).bizId(reqDTO.getBizId())
+                .customRemark(reqDTO.getCustomRemark()).tagid(reqDTO.getTagid())
+                .expectTime(reqDTO.getExpectTime()).sender(convertPerson(reqDTO.getSender()))
+                .receiver(convertPerson(reqDTO.getReceiver())).cargo(convertCargo(reqDTO.getCargo()))
+                .shop(convertShop(reqDTO.getShop())).insured(convertInsured(reqDTO.getInsured()))
+                .service(serviceType).build();
+    }
+
+    private WxMaExpressOrderPerson convertPerson(SocialWxaExpressAddOrderReqDTO.Person person) {
+        if (person == null) {
+            return null;
+        }
+        WxMaExpressOrderPerson result = new WxMaExpressOrderPerson();
+        result.setName(person.getName());
+        result.setTel(person.getTel());
+        result.setMobile(person.getMobile());
+        result.setCompany(person.getCompany());
+        result.setPostCode(person.getPostCode());
+        result.setCountry(person.getCountry());
+        result.setProvince(person.getProvince());
+        result.setCity(person.getCity());
+        result.setArea(person.getArea());
+        result.setAddress(person.getAddress());
+        return result;
+    }
+
+    private WxMaExpressOrderCargo convertCargo(SocialWxaExpressAddOrderReqDTO.Cargo cargo) {
+        if (cargo == null) {
+            return null;
+        }
+        List<WxMaExpressOrderCargoDetail> details = cargo.getDetailList() == null ? Collections.emptyList()
+                : cargo.getDetailList().stream().map(detail -> {
+                    WxMaExpressOrderCargoDetail result = new WxMaExpressOrderCargoDetail();
+                    result.setName(detail.getName());
+                    result.setCount(detail.getCount());
+                    return result;
+                }).toList();
+        WxMaExpressOrderCargo result = new WxMaExpressOrderCargo();
+        result.setCount(cargo.getCount());
+        result.setWeight(cargo.getWeight());
+        result.setSpaceLength(cargo.getSpaceX());
+        result.setSpaceWidth(cargo.getSpaceY());
+        result.setSpaceHeight(cargo.getSpaceZ());
+        result.setDetailList(details);
+        return result;
+    }
+
+    private WxMaExpressOrderShop convertShop(SocialWxaExpressAddOrderReqDTO.Shop shop) {
+        if (shop == null) {
+            return null;
+        }
+        List<WxMaExpressOrderShopDetail> details = shop.getDetailList() == null ? Collections.emptyList()
+                : shop.getDetailList().stream().map(detail -> {
+                    WxMaExpressOrderShopDetail result = new WxMaExpressOrderShopDetail();
+                    result.setGoodsName(detail.getGoodsName());
+                    result.setGoodsImgUrl(detail.getGoodsImgUrl());
+                    result.setGoodsDesc(detail.getGoodsDesc());
+                    return result;
+                }).toList();
+        WxMaExpressOrderShop result = new WxMaExpressOrderShop();
+        result.setWxaPath(shop.getWxaPath());
+        result.setImgUrl(shop.getImgUrl());
+        result.setGoodsName(shop.getGoodsName());
+        result.setGoodsCount(shop.getGoodsCount());
+        result.setDetailList(details);
+        return result;
+    }
+
+    private WxMaExpressOrderInsured convertInsured(SocialWxaExpressAddOrderReqDTO.Insured insured) {
+        if (insured == null) {
+            return WxMaExpressOrderInsured.builder().useInsured(0).insuredValue(0).build();
+        }
+        return WxMaExpressOrderInsured.builder().useInsured(insured.getUseInsured())
+                .insuredValue(insured.getInsuredValue()).build();
+    }
+
+    private WxMaExpressGetOrderRequest convertOrderQueryRequest(SocialWxaExpressOrderQueryReqDTO reqDTO) {
+        return WxMaExpressGetOrderRequest.builder().orderId(reqDTO.getOrderId()).openid(reqDTO.getOpenid())
+                .deliveryId(reqDTO.getDeliveryId()).waybillId(reqDTO.getWaybillId()).build();
+    }
+
+    private SocialWxaExpressOrderRespDTO convertExpressOrder(WxMaExpressOrderInfoResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new SocialWxaExpressOrderRespDTO().setOrderId(result.getOrderId())
+                .setWaybillId(result.getWaybillId()).setPrintHtml(result.getPrintHtml())
+                .setWaybillData(result.getWaybillData()).setOrderStatus(result.getOrderStatus());
+    }
+
+    private SocialWxaExpressPathRespDTO convertExpressPath(WxMaExpressPath path) {
+        if (path == null) {
+            return null;
+        }
+        List<SocialWxaExpressPathRespDTO.PathItem> items = path.getPathItemList() == null ? Collections.emptyList()
+                : path.getPathItemList().stream().map(item -> new SocialWxaExpressPathRespDTO.PathItem()
+                        .setActionTime(item.getActionTime()).setActionType(item.getActionType())
+                        .setActionMsg(item.getActionMsg())).toList();
+        return new SocialWxaExpressPathRespDTO().setOpenid(path.getOpenid()).setDeliveryId(path.getDeliveryId())
+                .setWaybillId(path.getWaybillId()).setPathItemNum(path.getPathItemNum()).setPathItemList(items);
+    }
+
+    private SocialWxaExpressPrinterRespDTO convertExpressPrinter(WxMaExpressPrinter printer) {
+        if (printer == null) {
+            return null;
+        }
+        return new SocialWxaExpressPrinterRespDTO().setCount(printer.getCount())
+                .setOpenid(printer.getOpenid()).setTagidList(printer.getTagidList());
+    }
+
+    private RuntimeException expressException(WxErrorException ex) {
+        int errorCode = ex.getError() == null ? -1 : ex.getError().getErrorCode();
+        String errorMessage = ex.getError() == null ? ex.getMessage() : ex.getError().getErrorMsg();
+        log.error("[wechatExpress][微信物流助手调用失败：errorCode({}) errorMessage({})]", errorCode, errorMessage, ex);
+        return exception(SOCIAL_CLIENT_WEIXIN_MINI_APP_EXPRESS_ERROR, errorCode, errorMessage);
     }
 
     /**
