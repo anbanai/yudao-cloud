@@ -52,7 +52,11 @@ public class WechatLogisticsController {
     @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:create')")
     public CommonResult<WechatLogisticsWaybillRespVO> createWaybill(
             @Valid @RequestBody WechatLogisticsWaybillCreateReqVO reqVO) {
-        return success(wechatLogisticsService.createWaybill(reqVO.getOrderId()));
+        WechatLogisticsWaybillRespVO result = wechatLogisticsService.createWaybill(reqVO.getOrderId());
+        if (result.getErrorCode() != null) {
+            return CommonResult.error(result.getErrorCode(), result.getErrorMessage());
+        }
+        return success(result);
     }
 
     @PostMapping("/waybills/batch-create")
