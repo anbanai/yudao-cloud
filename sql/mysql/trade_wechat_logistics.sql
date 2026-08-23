@@ -76,3 +76,26 @@ CREATE TABLE IF NOT EXISTS `trade_wechat_logistics_trace` (
   PRIMARY KEY (`id`),
   KEY `idx_tenant_waybill` (`tenant_id`,`waybill_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信物流助手轨迹';
+
+-- 后台菜单与权限（可重复执行，按名称和权限幂等）。
+INSERT INTO `system_menu` (`name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`)
+SELECT '微信物流打单', '', 2, 66, id, 'logistics/wechat', 'ep:printer', 'mall/trade/logistics/wechat/index', 'TradeWechatLogistics', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
+FROM `system_menu` WHERE `name` = '订单中心' AND `path` = 'trade' AND `type` = 1
+  AND NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `component` = 'mall/trade/logistics/wechat/index' AND `deleted` = b'0');
+
+INSERT INTO `system_menu` (`name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`)
+SELECT `name`, `permission`, 3, `sort`, (SELECT `id` FROM `system_menu` WHERE `component` = 'mall/trade/logistics/wechat/index' AND `deleted` = b'0' LIMIT 1), '', '', '', NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
+FROM (
+  SELECT '物流配置查询' AS `name`, 'trade:logistics:config:query' AS `permission`, 1 AS `sort`
+  UNION ALL SELECT '物流配置保存', 'trade:logistics:config:update', 2
+  UNION ALL SELECT '物流账号查询', 'trade:logistics:account:query', 3
+  UNION ALL SELECT '物流运单查询', 'trade:logistics:waybill:query', 4
+  UNION ALL SELECT '物流运单创建', 'trade:logistics:waybill:create', 5
+  UNION ALL SELECT '确认打印并发货', 'trade:logistics:waybill:confirm-print', 6
+  UNION ALL SELECT '取消物流运单', 'trade:logistics:waybill:cancel', 7
+  UNION ALL SELECT '物流轨迹查询', 'trade:logistics:trace:query', 8
+  UNION ALL SELECT '同步物流轨迹', 'trade:logistics:trace:sync', 9
+  UNION ALL SELECT '打印员查询', 'trade:logistics:printer:query', 10
+  UNION ALL SELECT '打印员绑定', 'trade:logistics:printer:update', 11
+) p
+WHERE NOT EXISTS (SELECT 1 FROM `system_menu` m WHERE m.`permission` = p.`permission` AND m.`deleted` = b'0');
