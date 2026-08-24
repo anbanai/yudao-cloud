@@ -6,8 +6,10 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.pinyin.PinyinUtil;
 import org.aspectj.lang.JoinPoint;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,6 +47,9 @@ public class StrUtils {
     }
 
     public static List<Long> splitToLong(String value, CharSequence separator) {
+        if (isNullOrNullString(value)) {
+            return new ArrayList<>();
+        }
         long[] longs = StrUtil.splitToLong(value, separator);
         return Arrays.stream(longs).boxed().collect(Collectors.toList());
     }
@@ -54,13 +59,26 @@ public class StrUtils {
     }
 
     public static Set<Long> splitToLongSet(String value, CharSequence separator) {
+        if (isNullOrNullString(value)) {
+            return new HashSet<>();
+        }
         long[] longs = StrUtil.splitToLong(value, separator);
         return Arrays.stream(longs).boxed().collect(Collectors.toSet());
     }
 
     public static List<Integer> splitToInteger(String value, CharSequence separator) {
+        if (isNullOrNullString(value)) {
+            return new ArrayList<>();
+        }
         int[] integers = StrUtil.splitToInt(value, separator);
         return Arrays.stream(integers).boxed().collect(Collectors.toList());
+    }
+
+    /**
+     * 判断是否为 null、空串，或数据库中的脏数据字面量 "null"
+     */
+    private static boolean isNullOrNullString(String value) {
+        return value == null || value.trim().isEmpty() || "null".equalsIgnoreCase(value.trim());
     }
 
     /**
