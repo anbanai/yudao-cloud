@@ -14,7 +14,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import org.apache.ibatis.annotations.*;
 
-import java.util.Objects;
 import java.util.Set;
 
 @Mapper
@@ -43,10 +42,9 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         LambdaQueryWrapperX<ProductSpuDO> queryWrapper = new LambdaQueryWrapperX<ProductSpuDO>()
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getName())
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
-                .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime())
-                .orderByDesc(ProductSpuDO::getSort)
-                .orderByDesc(ProductSpuDO::getId);
+                .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
         appendTabQuery(tabType, queryWrapper);
+        appendSortQuery(queryWrapper, reqVO.getSortField(), reqVO.getSortAsc());
         return selectPage(reqVO, queryWrapper);
     }
 
@@ -76,20 +74,24 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         // 上架状态 且有库存
         query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
 
-        // 排序逻辑
-        if (Objects.equals(pageReqVO.getSortField(), AppProductSpuPageReqVO.SORT_FIELD_SALES_COUNT)) {
-            query.last(String.format(" ORDER BY (sales_count + virtual_sales_count) %s, sort DESC, id DESC",
-                    pageReqVO.getSortAsc() ? "ASC" : "DESC"));
-        } else if (Objects.equals(pageReqVO.getSortField(), AppProductSpuPageReqVO.SORT_FIELD_PRICE)) {
-            query.orderBy(true, pageReqVO.getSortAsc(), ProductSpuDO::getPrice)
+        appendSortQuery(query, pageReqVO.getSortField(), pageReqVO.getSortAsc());
+        return selectPage(pageReqVO, query);
+    }
+
+    static void appendSortQuery(LambdaQueryWrapperX<ProductSpuDO> query, String sortField, Boolean sortAsc) {
+        boolean asc = Boolean.TRUE.equals(sortAsc);
+        if (AppProductSpuPageReqVO.SORT_FIELD_SALES_COUNT.equals(sortField)) {
+            query.last(String.format("ORDER BY (sales_count + virtual_sales_count) %s, sort DESC, id DESC",
+                    asc ? "ASC" : "DESC"));
+        } else if (AppProductSpuPageReqVO.SORT_FIELD_PRICE.equals(sortField)) {
+            query.orderBy(true, asc, ProductSpuDO::getPrice)
                     .orderByDesc(ProductSpuDO::getSort).orderByDesc(ProductSpuDO::getId);
-        } else if (Objects.equals(pageReqVO.getSortField(), AppProductSpuPageReqVO.SORT_FIELD_CREATE_TIME)) {
-            query.orderBy(true, pageReqVO.getSortAsc(), ProductSpuDO::getCreateTime)
+        } else if (AppProductSpuPageReqVO.SORT_FIELD_CREATE_TIME.equals(sortField)) {
+            query.orderBy(true, asc, ProductSpuDO::getCreateTime)
                     .orderByDesc(ProductSpuDO::getSort).orderByDesc(ProductSpuDO::getId);
         } else {
             query.orderByDesc(ProductSpuDO::getSort).orderByDesc(ProductSpuDO::getId);
         }
-        return selectPage(pageReqVO, query);
     }
 
     /**

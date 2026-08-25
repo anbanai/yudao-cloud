@@ -1,7 +1,10 @@
 package cn.iocoder.yudao.module.product.controller.admin.spu.vo;
 
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -17,6 +20,10 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class ProductSpuPageReqVO extends PageParam {
+
+    public static final String SORT_FIELD_PRICE = "price";
+    public static final String SORT_FIELD_SALES_COUNT = "salesCount";
+    public static final String SORT_FIELD_CREATE_TIME = "createTime";
 
     /**
      * 出售中商品
@@ -58,5 +65,20 @@ public class ProductSpuPageReqVO extends PageParam {
     @Schema(description = "创建时间", example = "[2022-07-01 00:00:00, 2022-07-01 23:59:59]")
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] createTime;
+
+    @Schema(description = "排序字段", example = "price")
+    private String sortField;
+
+    @Schema(description = "排序方式", example = "true")
+    private Boolean sortAsc;
+
+    @AssertTrue(message = "排序字段不合法")
+    @JsonIgnore
+    public boolean isSortFieldValid() {
+        if (StrUtil.isEmpty(sortField)) {
+            return true;
+        }
+        return StrUtil.equalsAny(sortField, SORT_FIELD_PRICE, SORT_FIELD_SALES_COUNT, SORT_FIELD_CREATE_TIME);
+    }
 
 }
