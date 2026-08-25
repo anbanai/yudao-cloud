@@ -27,6 +27,36 @@ import static org.mockito.Mockito.when;
 class TradeDeliveryPriceCalculatorTest {
 
     @Test
+    void calculate_regionalChargeBoAppliesFee() {
+        TradeDeliveryPriceCalculator calculator = newCalculator(650102,
+                Map.of(10L, templateBO(new DeliveryExpressTemplateRespBO.Charge()
+                        .setStartCount(1D).setStartPrice(1200).setExtraCount(1D).setExtraPrice(0), null)));
+        TradePriceCalculateReqBO param = new TradePriceCalculateReqBO()
+                .setUserId(2L).setAddressId(1L).setDeliveryType(DeliveryTypeEnum.EXPRESS.getType());
+        TradePriceCalculateRespBO result = priceResult(10L);
+
+        calculator.calculate(param, result);
+
+        assertThat(result.getPrice().getDeliveryPrice()).isEqualTo(1200);
+        assertThat(result.getItems().get(0).getDeliveryPrice()).isEqualTo(1200);
+    }
+
+    @Test
+    void calculate_countryFreeBoLeavesDeliveryPriceZero() {
+        TradeDeliveryPriceCalculator calculator = newCalculator(110105,
+                Map.of(10L, templateBO(null, new DeliveryExpressTemplateRespBO.Free()
+                        .setFreePrice(0).setFreeCount(0))));
+        TradePriceCalculateReqBO param = new TradePriceCalculateReqBO()
+                .setUserId(2L).setAddressId(1L).setDeliveryType(DeliveryTypeEnum.EXPRESS.getType());
+        TradePriceCalculateRespBO result = priceResult(10L);
+
+        calculator.calculate(param, result);
+
+        assertThat(result.getPrice().getDeliveryPrice()).isZero();
+        assertThat(result.getItems().get(0).getDeliveryPrice()).isZero();
+    }
+
+    @Test
     void calculate_mixedMatchedTemplatesThrowsInsteadOfSkippingUnmatchedItem() {
         MemberAddressApi addressApi = mock(MemberAddressApi.class);
         DeliveryExpressTemplateService templateService = mock(DeliveryExpressTemplateService.class);
@@ -56,6 +86,36 @@ class TradeDeliveryPriceCalculatorTest {
                 () -> calculator.calculate(param, result));
 
         assertThat(exception.getCode()).isEqualTo(PRICE_CALCULATE_DELIVERY_PRICE_TEMPLATE_NOT_FOUND.getCode());
+    }
+
+    private static TradeDeliveryPriceCalculator newCalculator(Integer areaId,
+                                                               Map<Long, DeliveryExpressTemplateRespBO> templates) {
+        MemberAddressApi addressApi = mock(MemberAddressApi.class);
+        DeliveryExpressTemplateService templateService = mock(DeliveryExpressTemplateService.class);
+        TradeConfigService configService = mock(TradeConfigService.class);
+        when(addressApi.getAddress(1L, 2L)).thenReturn(CommonResult.success(
+                new MemberAddressRespDTO().setAreaId(areaId)));
+        when(configService.getTradeConfig()).thenReturn(null);
+        when(templateService.getExpressTemplateMapByIdsAndArea(anyCollection(), eq(areaId)))
+                .thenReturn(templates);
+
+        TradeDeliveryPriceCalculator calculator = new TradeDeliveryPriceCalculator();
+        ReflectionTestUtils.setField(calculator, "addressApi", addressApi);
+        ReflectionTestUtils.setField(calculator, "deliveryExpressTemplateService", templateService);
+        ReflectionTestUtils.setField(calculator, "tradeConfigService", configService);
+        return calculator;
+    }
+
+    private static DeliveryExpressTemplateRespBO templateBO(DeliveryExpressTemplateRespBO.Charge charge,
+                                                             DeliveryExpressTemplateRespBO.Free free) {
+        return new DeliveryExpressTemplateRespBO().setChargeMode(1).setCharge(charge).setFree(free);
+    }
+
+    private static TradePriceCalculateRespBO priceResult(Long templateId) {
+        return new TradePriceCalculateRespBO()
+                .setFreeDelivery(false)
+                .setPrice(new TradePriceCalculateRespBO.Price())
+                .setItems(List.of(orderItem(templateId)));
     }
 
     private static TradePriceCalculateRespBO.OrderItem orderItem(Long templateId) {
