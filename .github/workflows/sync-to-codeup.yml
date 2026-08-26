@@ -1,0 +1,36 @@
+name: Sync to Codeup
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeup-repository-mirror
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Mirror branches and tags to Codeup
+        env:
+          CODEUP_USERNAME: ${{ secrets.CODEUP_USERNAME }}
+          CODEUP_TOKEN: ${{ secrets.CODEUP_TOKEN }}
+          CODEUP_REPOSITORY: https://brdx-cn-hangzhou.devops.aliyuncs.com/codeup/anbanai/yudao-cloud.git
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          set -euo pipefail
+
+          repo_dir="$(mktemp -d)/repository.git"
+          auth_header="$(printf '%s:%s' "$CODEUP_USERNAME" "$CODEUP_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::${auth_header}"
+
+          git clone --bare "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git" "$repo_dir"
+          git -C "$repo_dir" \
+            -c "http.extraHeader=Authorization: Basic ${auth_header}" \
+            push --mirror "$CODEUP_REPOSITORY"
