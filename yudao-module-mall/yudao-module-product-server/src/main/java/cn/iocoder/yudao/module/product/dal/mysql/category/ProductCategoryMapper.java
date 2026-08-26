@@ -18,12 +18,16 @@ import java.util.List;
 public interface ProductCategoryMapper extends BaseMapperX<ProductCategoryDO> {
 
     default List<ProductCategoryDO> selectList(ProductCategoryListReqVO listReqVO) {
-        return selectList(new LambdaQueryWrapperX<ProductCategoryDO>()
+        return selectList(buildListQuery(listReqVO));
+    }
+
+    static LambdaQueryWrapperX<ProductCategoryDO> buildListQuery(ProductCategoryListReqVO listReqVO) {
+        return new LambdaQueryWrapperX<ProductCategoryDO>()
                 .likeIfPresent(ProductCategoryDO::getName, listReqVO.getName())
                 .eqIfPresent(ProductCategoryDO::getParentId, listReqVO.getParentId())
-                .inIfPresent(ProductCategoryDO::getId, listReqVO.getParentIds())
+                .inIfPresent(ProductCategoryDO::getParentId, listReqVO.getParentIds())
                 .eqIfPresent(ProductCategoryDO::getStatus, listReqVO.getStatus())
-                .orderByDesc(ProductCategoryDO::getId));
+                .orderByDesc(ProductCategoryDO::getId);
     }
 
     default Long selectCountByParentId(Long parentId) {
