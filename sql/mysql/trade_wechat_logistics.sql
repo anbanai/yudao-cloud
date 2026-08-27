@@ -78,8 +78,13 @@ CREATE TABLE IF NOT EXISTS `trade_wechat_logistics_trace` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信物流助手轨迹';
 
 -- 后台菜单与权限（可重复执行，按名称和权限幂等）。
+UPDATE `system_menu`
+SET `name` = '微信物流配置', `updater` = '1', `update_time` = NOW()
+WHERE `component` = 'mall/trade/logistics/wechat/index'
+  AND `name` = '微信物流打单' AND `deleted` = b'0';
+
 INSERT INTO `system_menu` (`name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`)
-SELECT '微信物流打单', '', 2, 66, id, 'logistics/wechat', 'ep:printer', 'mall/trade/logistics/wechat/index', 'TradeWechatLogistics', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
+SELECT '微信物流配置', '', 2, 66, id, 'logistics/wechat', 'ep:printer', 'mall/trade/logistics/wechat/index', 'TradeWechatLogistics', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'
 FROM `system_menu` WHERE `name` = '订单中心' AND `path` = 'trade' AND `type` = 1
   AND NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `component` = 'mall/trade/logistics/wechat/index' AND `deleted` = b'0');
 

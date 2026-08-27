@@ -70,7 +70,7 @@ public class WechatLogisticsController {
 
     @PostMapping("/waybills/create")
     @Operation(summary = "创建微信物流运单")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:waybill:create', 'trade:order:update')")
     public CommonResult<WechatLogisticsWaybillRespVO> createWaybill(
             @Valid @RequestBody WechatLogisticsWaybillCreateReqVO reqVO) {
         WechatLogisticsWaybillRespVO result = wechatLogisticsService.createWaybill(reqVO.getOrderId());
@@ -91,7 +91,7 @@ public class WechatLogisticsController {
     @PostMapping("/waybills/{id}/confirm-print")
     @Operation(summary = "已打印，确认发货")
     @Parameter(name = "id", description = "微信物流运单编号", required = true)
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:confirm-print')")
+    @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:waybill:confirm-print', 'trade:order:update')")
     public CommonResult<WechatLogisticsWaybillRespVO> confirmPrint(@PathVariable("id") Long id) {
         return success(wechatLogisticsService.confirmPrint(id));
     }
