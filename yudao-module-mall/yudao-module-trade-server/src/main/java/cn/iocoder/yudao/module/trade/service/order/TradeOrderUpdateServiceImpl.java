@@ -186,6 +186,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
         // 1.1 价格计算
         TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO);
+        validateExpectedPrice(userId, createReqVO, calculateRespBO);
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
         List<TradeOrderItemDO> orderItems = buildTradeOrderItems(order, calculateRespBO);
@@ -201,6 +202,23 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 4. 订单创建后的逻辑
         afterCreateTradeOrder(order, orderItems, createReqVO);
         return order;
+    }
+
+    void validateExpectedPrice(Long userId, AppTradeOrderCreateReqVO createReqVO,
+                               TradePriceCalculateRespBO calculateRespBO) {
+        Integer actualPayPrice = calculateRespBO.getPrice().getPayPrice();
+        Integer actualUsePoint = ObjectUtil.defaultIfNull(calculateRespBO.getUsePoint(), 0);
+        boolean payPriceChanged = createReqVO.getExpectedPayPrice() != null
+                && !Objects.equals(createReqVO.getExpectedPayPrice(), actualPayPrice);
+        boolean usePointChanged = createReqVO.getExpectedUsePoint() != null
+                && !Objects.equals(createReqVO.getExpectedUsePoint(), actualUsePoint);
+        if (!payPriceChanged && !usePointChanged) {
+            return;
+        }
+        log.warn("[validateExpectedPrice][用户({})订单价格快照不一致 expectedPayPrice={}, actualPayPrice={}, "
+                        + "expectedUsePoint={}, actualUsePoint={}]", userId, createReqVO.getExpectedPayPrice(),
+                actualPayPrice, createReqVO.getExpectedUsePoint(), actualUsePoint);
+        throw exception(ORDER_CREATE_PRICE_CHANGED);
     }
 
     private TradeOrderDO buildTradeOrder(Long userId, AppTradeOrderCreateReqVO createReqVO,

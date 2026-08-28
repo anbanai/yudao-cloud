@@ -18,9 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.filterList;
-import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRICE_CALCULATE_PAY_PRICE_ILLEGAL;
 
 /**
  * 使用积分的 {@link TradePriceCalculator} 实现类
@@ -39,6 +37,7 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
 
     @Override
     public void calculate(TradePriceCalculateReqBO param, TradePriceCalculateRespBO result) {
+        result.setMaxUsePoint(0).setMaxPointPrice(0);
         // 判断订单类型是否不为积分商城活动
         if (ObjectUtil.equal(result.getType(), TradeOrderTypeEnum.POINT.getType())) {
             return;
@@ -47,11 +46,7 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
         MemberUserRespDTO user = memberUserApi.getUser(param.getUserId()).getCheckedData();
         result.setTotalPoint(user.getPoint()).setUsePoint(0);
 
-        // 1.1 校验是否使用积分
-        if (!BooleanUtil.isTrue(param.getPointStatus())) {
-            return;
-        }
-        // 1.2 校验积分抵扣是否开启
+        // 1.1 校验积分抵扣是否开启
         MemberConfigRespDTO config = memberConfigApi.getConfig().getCheckedData();
         if (!isDeductPointEnable(config)) {
             return;
@@ -61,17 +56,27 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
             return;
         }
 
-        // 2.1 计算积分优惠金额
-        int pointPrice = calculatePointPrice(config, user.getPoint(), result);
+        // 2.1 计算本单积分上限，只包含优惠后的商品金额，不抵扣运费。
+        int productPayPrice = result.getPrice().getPayPrice()
+                - ObjectUtil.defaultIfNull(result.getPrice().getDeliveryPrice(), 0);
+        int maxUsePoint = calculateMaxUsePoint(config, user.getPoint(), productPayPrice);
+        int maxPointPrice = maxUsePoint * config.getPointTradeDeductUnitPrice();
+        result.setMaxUsePoint(maxUsePoint).setMaxPointPrice(maxPointPrice);
+        if (!BooleanUtil.isTrue(param.getPointStatus()) || maxUsePoint == 0) {
+            return;
+        }
+        result.setUsePoint(maxUsePoint);
+
         // 2.2 计算分摊的积分、抵扣金额
         List<TradePriceCalculateRespBO.OrderItem> orderItems = filterList(result.getItems(), TradePriceCalculateRespBO.OrderItem::getSelected);
-        List<Integer> dividePointPrices = TradePriceCalculatorHelper.dividePrice(orderItems, pointPrice);
-        List<Integer> divideUsePoints = TradePriceCalculatorHelper.dividePrice(orderItems, result.getUsePoint());
+        List<Integer> divideUsePoints = TradePriceCalculatorHelper.dividePointValue(orderItems, maxUsePoint);
+        List<Integer> dividePointPrices = divideUsePoints.stream()
+                .map(point -> point * config.getPointTradeDeductUnitPrice()).toList();
 
         // 3.1 记录优惠明细
         TradePriceCalculatorHelper.addPromotion(result, orderItems,
                 param.getUserId(), "积分抵扣", PromotionTypeEnum.POINT.getType(),
-                StrUtil.format("积分抵扣：省 {} 元", TradePriceCalculatorHelper.formatPrice(pointPrice)),
+                StrUtil.format("积分抵扣：省 {} 元", TradePriceCalculatorHelper.formatPrice(maxPointPrice)),
                 dividePointPrices);
         // 3.2 更新 SKU 优惠金额
         for (int i = 0; i < orderItems.size(); i++) {
@@ -79,6 +84,9 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
             orderItem.setPointPrice(dividePointPrices.get(i));
             orderItem.setUsePoint(divideUsePoints.get(i));
             TradePriceCalculatorHelper.recountPayPrice(orderItem);
+            if (orderItem.getPayPrice() < 0) {
+                throw new IllegalStateException("积分抵扣后订单项金额不能小于 0");
+            }
         }
         TradePriceCalculatorHelper.recountAllPrice(result);
     }
@@ -89,29 +97,15 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
                 config.getPointTradeDeductUnitPrice() != null && config.getPointTradeDeductUnitPrice() > 0; // 有没有配置：1 积分抵扣多少分
     }
 
-    private Integer calculatePointPrice(MemberConfigRespDTO config, Integer usePoint, TradePriceCalculateRespBO result) {
+    private int calculateMaxUsePoint(MemberConfigRespDTO config, int userPoint, int productPayPrice) {
         // 每个订单最多可以使用的积分数量
         if (config.getPointTradeDeductMaxPrice() != null && config.getPointTradeDeductMaxPrice() > 0) {
-            usePoint = Math.min(usePoint, config.getPointTradeDeductMaxPrice());
+            userPoint = Math.min(userPoint, config.getPointTradeDeductMaxPrice());
         }
-        // TODO @疯狂：这里应该是，抵扣到只剩下 0.01；
-        // 积分优惠金额（分）
-        int pointPrice = usePoint * config.getPointTradeDeductUnitPrice();
-        if (result.getPrice().getPayPrice() <= pointPrice) {
-            // 禁止 0 元购
-            throw exception(PRICE_CALCULATE_PAY_PRICE_ILLEGAL);
-        }
-//        // 允许0 元购!!!：用户积分比较多时，积分可以抵扣的金额要大于支付金额，这时需要根据支付金额反推使用多少积分
-//        if (result.getPrice().getPayPrice() < pointPrice) {
-//            pointPrice = result.getPrice().getPayPrice();
-//            // 反推需要扣除的积分
-//            usePoint = NumberUtil.toBigDecimal(pointPrice)
-//                    .divide(NumberUtil.toBigDecimal(config.getPointTradeDeductUnitPrice()), 0, RoundingMode.HALF_UP)
-//                    .intValue();
-//        }
-        // 记录使用的积分
-        result.setUsePoint(usePoint);
-        return pointPrice;
+        // 普通订单至少保留 0.01 元。先限制积分数量，再计算抵扣金额，避免乘法溢出。
+        int maxPointByPayPrice = Math.max((productPayPrice - 1)
+                / config.getPointTradeDeductUnitPrice(), 0);
+        return Math.min(userPoint, maxPointByPayPrice);
     }
 
 }
