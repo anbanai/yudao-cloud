@@ -62,6 +62,14 @@ public class TradePriceCalculateRespBO {
      * 使用的积分
      */
     private Integer usePoint;
+    /**
+     * 本单最多可使用的积分
+     */
+    private Integer maxUsePoint;
+    /**
+     * 本单积分最高抵扣金额，单位：分
+     */
+    private Integer maxPointPrice;
 
     /**
      * 赠送的积分

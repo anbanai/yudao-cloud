@@ -35,6 +35,12 @@ public class AppTradeOrderSettlementRespVO {
     @Schema(description = "总积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     private Integer totalPoint;
 
+    @Schema(description = "本单最多可使用的积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
+    private Integer maxUsePoint;
+
+    @Schema(description = "本单积分最高抵扣金额，单位：分", requiredMode = Schema.RequiredMode.REQUIRED, example = "50")
+    private Integer maxPointPrice;
+
     /**
      * 营销活动数组
      *

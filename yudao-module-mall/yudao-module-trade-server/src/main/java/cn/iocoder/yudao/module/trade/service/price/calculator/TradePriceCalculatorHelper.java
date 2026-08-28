@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateReqBO;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateRespBO;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -238,6 +239,43 @@ public class TradePriceCalculatorHelper {
             prices.add(partPrice);
         }
         return prices;
+    }
+
+    /**
+     * 按积分抵扣前的商品应付金额，使用最大余数法稳定分摊积分或积分金额。
+     */
+    public static List<Integer> dividePointValue(List<TradePriceCalculateRespBO.OrderItem> orderItems, int value) {
+        Assert.notEmpty(orderItems, "订单项不能为空");
+        Assert.isTrue(value >= 0, "积分分摊值必须大于等于 0");
+        long totalWeight = orderItems.stream().mapToLong(TradePriceCalculatorHelper::getPointWeight).sum();
+        Assert.isTrue(totalWeight > 0, "积分分摊权重必须大于 0");
+
+        List<Integer> values = new ArrayList<>(orderItems.size());
+        List<PointRemainder> remainders = new ArrayList<>(orderItems.size());
+        int allocated = 0;
+        for (int i = 0; i < orderItems.size(); i++) {
+            long numerator = (long) value * getPointWeight(orderItems.get(i));
+            int part = (int) (numerator / totalWeight);
+            values.add(part);
+            allocated += part;
+            remainders.add(new PointRemainder(i, numerator % totalWeight));
+        }
+        remainders.sort(Comparator.comparingLong(PointRemainder::remainder).reversed()
+                .thenComparingInt(PointRemainder::index));
+        for (int i = 0; i < value - allocated; i++) {
+            int index = remainders.get(i).index();
+            values.set(index, values.get(index) + 1);
+        }
+        return values;
+    }
+
+    private static int getPointWeight(TradePriceCalculateRespBO.OrderItem orderItem) {
+        int weight = orderItem.getPayPrice() - ObjectUtil.defaultIfNull(orderItem.getDeliveryPrice(), 0);
+        Assert.isTrue(weight >= 0, "积分分摊商品金额必须大于等于 0");
+        return weight;
+    }
+
+    private record PointRemainder(int index, long remainder) {
     }
 
     /**
