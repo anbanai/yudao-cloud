@@ -27,6 +27,8 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
     @Mock
     private ProductSkuMapper productSkuMapper;
     @Mock
+    private ProductSkuHotspotUpdateService productSkuHotspotUpdateService;
+    @Mock
     private ProductSpuService productSpuService;
 
     @Test
@@ -39,6 +41,7 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
         stockUpdateService.updateLegacy(request);
 
         verify(productSkuMapper).updateStockDecr(1L, -2);
+        verify(productSkuHotspotUpdateService, never()).updateStock(any(), any());
         verify(productSkuMapper, never()).updateStockDecrHotspot(any(), any());
         verify(productSpuService).updateSpuStock(any());
     }
@@ -46,13 +49,13 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
     @Test
     void testUpdateHotspot_usesHotspotSqlAndUpdatesSpu() {
         ProductSkuUpdateStockReqDTO request = request(1L, -2);
-        when(productSkuMapper.updateStockDecrHotspot(1L, 2)).thenReturn(1);
+        when(productSkuHotspotUpdateService.updateStock(1L, -2)).thenReturn(1);
         when(productSkuMapper.selectByIds(anyCollection()))
                 .thenReturn(List.of(new ProductSkuDO().setId(1L).setSpuId(10L)));
 
         stockUpdateService.updateHotspot(request);
 
-        verify(productSkuMapper).updateStockDecrHotspot(1L, 2);
+        verify(productSkuHotspotUpdateService).updateStock(1L, -2);
         verify(productSkuMapper, never()).updateStockDecr(any(), any());
         verify(productSpuService).updateSpuStock(any());
     }
@@ -60,7 +63,7 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
     @Test
     void testUpdateHotspot_stockNotEnough_doesNotUpdateSpu() {
         ProductSkuUpdateStockReqDTO request = request(1L, -2);
-        when(productSkuMapper.updateStockDecrHotspot(1L, 2)).thenReturn(0);
+        when(productSkuHotspotUpdateService.updateStock(1L, -2)).thenReturn(0);
 
         assertThrows(ServiceException.class, () -> stockUpdateService.updateHotspot(request));
 

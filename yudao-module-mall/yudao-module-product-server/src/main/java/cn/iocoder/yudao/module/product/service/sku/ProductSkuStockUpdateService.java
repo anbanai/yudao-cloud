@@ -8,7 +8,6 @@ import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -23,13 +22,16 @@ import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_STOCK
 /**
  * 商品 SKU 库存更新实现。
  *
- * 将旧事务路径和 PolarDB 热点行路径分开，确保热点行路径不会加入外部事务。
+ * 将旧事务路径和 PolarDB 热点行路径分开，确保热点行 Hint SQL 使用独立事务。
  */
 @Service
 public class ProductSkuStockUpdateService {
 
     @Resource
     private ProductSkuMapper productSkuMapper;
+
+    @Resource
+    private ProductSkuHotspotUpdateService productSkuHotspotUpdateService;
 
     @Resource
     @Lazy // 循环依赖，避免报错
@@ -59,25 +61,20 @@ public class ProductSkuStockUpdateService {
     /**
      * PolarDB 热点行更新路径。
      *
-     * 每条 Hint UPDATE 都必须独立提交，因此该方法不能加入调用方事务。
+     * 每条 Hint UPDATE 都由独立事务方法提交，不能加入调用方事务。
      * 多 SKU 请求由上层回退到 {@link #updateLegacy(ProductSkuUpdateStockReqDTO)}。
      * SKU 提交与 SPU 汇总更新不再是同一事务，SPU 更新失败时需要通过库存对账修复。
      *
      * @param updateStockReqDTO 单 SKU 库存变更请求
      */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void updateHotspot(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
         ProductSkuUpdateStockReqDTO.Item item = updateStockReqDTO.getItems().get(0);
-        int updateStockCount;
-        if (item.getIncrCount() > 0) {
-            updateStockCount = productSkuMapper.updateStockIncrHotspot(item.getId(), item.getIncrCount());
-        } else if (item.getIncrCount() < 0) {
-            updateStockCount = productSkuMapper.updateStockDecrHotspot(item.getId(), -item.getIncrCount());
-            if (updateStockCount == 0) {
-                throw exception(SKU_STOCK_NOT_ENOUGH);
-            }
-        } else {
+        if (item.getIncrCount() == 0) {
             return;
+        }
+        int updateStockCount = productSkuHotspotUpdateService.updateStock(item.getId(), item.getIncrCount());
+        if (item.getIncrCount() < 0 && updateStockCount == 0) {
+            throw exception(SKU_STOCK_NOT_ENOUGH);
         }
         if (updateStockCount == 0) {
             throw exception(SKU_NOT_EXISTS);
