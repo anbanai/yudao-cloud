@@ -109,6 +109,11 @@ public class SocialClientApiImpl implements SocialClientApi {
     }
 
     @Override
+    public CommonResult<String> traceWxaWaybill(Integer userType, SocialWxaWaybillTraceReqDTO reqDTO) {
+        return success(socialClientService.traceWxaWaybill(userType, reqDTO));
+    }
+
+    @Override
     public CommonResult<List<SocialWxaExpressAccountRespDTO>> getWxaExpressAccountList(Integer userType) {
         return success(socialClientService.getWxaExpressAccountList(userType));
     }

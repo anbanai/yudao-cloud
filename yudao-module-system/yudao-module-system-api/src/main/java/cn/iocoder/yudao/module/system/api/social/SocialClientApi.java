@@ -80,6 +80,11 @@ public interface SocialClientApi {
     CommonResult<Boolean>  notifyWxaOrderConfirmReceive(@RequestParam("userType") Integer userType,
                                                         @Valid @RequestBody SocialWxaOrderNotifyConfirmReceiveReqDTO reqDTO);
 
+    @PostMapping(PREFIX + "/trace-wxa-waybill")
+    @Operation(summary = "生成微信小程序物流查询组件运单令牌")
+    CommonResult<String> traceWxaWaybill(@RequestParam("userType") Integer userType,
+                                         @Valid @RequestBody SocialWxaWaybillTraceReqDTO reqDTO);
+
     // =================== 微信物流助手 ===================
 
     @GetMapping(PREFIX + "/get-wxa-express-account-list")
