@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuUpdateStockReqDTO;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.sku.ProductSkuMapper;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuHotspotUpdateService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
@@ -36,6 +37,8 @@ public class ProductSkuStockUpdateService {
     @Resource
     @Lazy // 循环依赖，避免报错
     private ProductSpuService productSpuService;
+    @Resource
+    private ProductSpuHotspotUpdateService productSpuHotspotUpdateService;
 
     /**
      * 原有库存更新路径：SKU 与 SPU 在同一个事务中更新。
@@ -55,7 +58,7 @@ public class ProductSkuStockUpdateService {
             }
         });
 
-        updateSpuStock(updateStockReqDTO);
+        updateSpuStockLegacy(updateStockReqDTO);
     }
 
     /**
@@ -81,17 +84,33 @@ public class ProductSkuStockUpdateService {
         }
 
         // SKU 已经通过 COMMIT_ON_SUCCESS 独立提交，SPU 汇总只能在后续短事务中更新。
-        updateSpuStock(updateStockReqDTO);
+        updateSpuStockHotspot(updateStockReqDTO);
     }
 
-    private void updateSpuStock(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
+    private void updateSpuStockLegacy(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
+        Map<Long, Integer> spuStockIncrCounts = getSpuStockIncrCounts(updateStockReqDTO);
+        if (CollUtil.isEmpty(spuStockIncrCounts)) {
+            return;
+        }
+        productSpuService.updateSpuStock(spuStockIncrCounts);
+    }
+
+    private void updateSpuStockHotspot(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
+        Map<Long, Integer> spuStockIncrCounts = getSpuStockIncrCounts(updateStockReqDTO);
+        if (CollUtil.isEmpty(spuStockIncrCounts)) {
+            return;
+        }
+        Map.Entry<Long, Integer> entry = spuStockIncrCounts.entrySet().iterator().next();
+        productSpuHotspotUpdateService.updateStock(entry.getKey(), entry.getValue());
+    }
+
+    private Map<Long, Integer> getSpuStockIncrCounts(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
         List<ProductSkuDO> skus = productSkuMapper.selectByIds(
                 convertSet(updateStockReqDTO.getItems(), ProductSkuUpdateStockReqDTO.Item::getId));
         if (CollUtil.isEmpty(skus)) {
-            return;
+            return Map.of();
         }
-        Map<Long, Integer> spuStockIncrCounts = INSTANCE.convertSpuStockMap(updateStockReqDTO.getItems(), skus);
-        productSpuService.updateSpuStock(spuStockIncrCounts);
+        return INSTANCE.convertSpuStockMap(updateStockReqDTO.getItems(), skus);
     }
 
 }
