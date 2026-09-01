@@ -41,6 +41,9 @@ public class ProductSpuRespVO {
     @ExcelProperty("商品分类编号")
     private Long categoryId;
 
+    @Schema(description = "商品分组编号数组", example = "[1, 2]")
+    private List<Long> groupIds;
+
     @Schema(description = "商品品牌编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @ExcelProperty("商品品牌编号")
     private Long brandId;

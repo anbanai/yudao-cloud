@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `product_spu` (
     `market_price` int NOT NULL COMMENT '市场价，单位使用：分',
     `cost_price` int NOT NULL DEFAULT '-1' COMMENT '成本价，单位： 分',
     `stock` int NOT NULL DEFAULT '0' COMMENT '库存',
+    `delivery_types` varchar(512) DEFAULT NULL COMMENT '配送方式数组',
     `delivery_template_id` bigint NOT NULL COMMENT '物流配置模板编号',
     `recommend_hot` bit(1) NOT NULL COMMENT '是否热卖推荐: 0 默认 1 热卖',
     `recommend_benefit` bit(1) NOT NULL COMMENT '是否优惠推荐: 0 默认 1 优选',
@@ -80,6 +81,36 @@ CREATE TABLE IF NOT EXISTS `product_category` (
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY("id")
 ) COMMENT '商品分类';
+
+CREATE TABLE IF NOT EXISTS `product_group` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品分组编号',
+    `name` varchar(64) NOT NULL COMMENT '商品分组名称',
+    `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
+    `status` tinyint NOT NULL COMMENT '状态',
+    `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`)
+) COMMENT '商品分组';
+
+CREATE TABLE IF NOT EXISTS `product_group_spu` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+    `group_id` bigint NOT NULL COMMENT '商品分组编号',
+    `spu_id` bigint NOT NULL COMMENT '商品 SPU 编号',
+    `sort` int NOT NULL DEFAULT '0' COMMENT '组内排序',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE (`tenant_id`, `group_id`, `spu_id`)
+) COMMENT '商品分组与 SPU 关联';
 
 CREATE TABLE IF NOT EXISTS `product_brand` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '品牌编号',
@@ -126,11 +157,11 @@ CREATE TABLE IF NOT EXISTS `product_property_value` (
     PRIMARY KEY("id")
 ) COMMENT '规格值';
 
-DROP TABLE IF EXISTS `product_comment` (
+CREATE TABLE IF NOT EXISTS `product_comment` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '评论编号，主键自增',
     `user_id` bigint DEFAULT NULL COMMENT '评价人的用户编号关联 MemberUserDO 的 id 编号',
     `user_nickname` varchar(255) DEFAULT NULL COMMENT '评价人名称',
-    `user_avatar` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '评价人头像',
+    `user_avatar` varchar(1024) DEFAULT NULL COMMENT '评价人头像',
     `anonymous` bit(1) DEFAULT NULL COMMENT '是否匿名',
     `order_id` bigint DEFAULT NULL COMMENT '交易订单编号关联 TradeOrderDO 的 id 编号',
     `order_item_id` bigint DEFAULT NULL COMMENT '交易订单项编号关联 TradeOrderItemDO 的 id 编号',
@@ -141,17 +172,17 @@ DROP TABLE IF EXISTS `product_comment` (
     `scores` tinyint DEFAULT NULL COMMENT '评分星级1-5分',
     `description_scores` tinyint DEFAULT NULL COMMENT '描述星级1-5 星',
     `benefit_scores` tinyint DEFAULT NULL COMMENT '服务星级1-5 星',
-    `content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '评论内容',
+    `content` varchar(1024) DEFAULT NULL COMMENT '评论内容',
     `pic_urls` varchar(4096) DEFAULT NULL COMMENT '评论图片地址数组',
     `reply_status` bit(1) DEFAULT NULL COMMENT '商家是否回复',
     `reply_user_id` bigint DEFAULT NULL COMMENT '回复管理员编号关联 AdminUserDO 的 id 编号',
-    `reply_content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '商家回复内容',
+    `reply_content` varchar(1024) DEFAULT NULL COMMENT '商家回复内容',
     `reply_time` datetime DEFAULT NULL COMMENT '商家回复时间',
-    `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+    `creator` varchar(64) DEFAULT '' COMMENT '创建者',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+    `updater` varchar(64) DEFAULT '' COMMENT '更新者',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+    `deleted` bit(1) NOT NULL DEFAULT FALSE COMMENT '是否删除',
     `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
-    PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 26 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '商品评论';
+    PRIMARY KEY (`id`)
+) COMMENT = '商品评论';
