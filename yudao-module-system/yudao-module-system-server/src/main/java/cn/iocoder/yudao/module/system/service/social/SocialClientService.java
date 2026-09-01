@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressPrinterUpda
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderNotifyConfirmReceiveReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderUploadShippingInfoReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaWaybillTraceReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.client.SocialClientPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.client.SocialClientSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialClientDO;
@@ -117,6 +118,11 @@ public interface SocialClientService {
      * @param reqDTO 请求
      */
     void notifyWxaOrderConfirmReceive(Integer userType, SocialWxaOrderNotifyConfirmReceiveReqDTO reqDTO);
+
+    /**
+     * 生成微信小程序物流查询组件运单令牌。
+     */
+    String traceWxaWaybill(Integer userType, SocialWxaWaybillTraceReqDTO reqDTO);
 
     /**
      * 获得微信物流助手绑定账号。

@@ -12,6 +12,7 @@ import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderUploadShippingInfoReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaWaybillTraceReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.client.SocialClientPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.client.SocialClientSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialClientDO;
@@ -31,12 +32,15 @@ import me.zhyd.oauth.model.AuthUser;
 import me.zhyd.oauth.request.AuthDefaultRequest;
 import me.zhyd.oauth.request.AuthRequest;
 import me.zhyd.oauth.utils.AuthStateUtils;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.util.List;
 
 import static cn.hutool.core.util.RandomUtil.randomEle;
 import static cn.iocoder.yudao.framework.common.util.object.ObjectUtils.cloneIgnoreId;
@@ -302,6 +306,63 @@ public class SocialClientServiceImplTest extends BaseDbUnitTest {
         // 调用并断言异常
         assertServiceException(() -> socialClientService.getWxMaPhoneNumberInfo(userType, phoneCode),
                 SOCIAL_CLIENT_WEIXIN_MINI_APP_PHONE_CODE_ERROR);
+    }
+
+    @Test
+    public void testTraceWxaWaybill_mapsRequestAndReturnsToken() throws WxErrorException {
+        // 准备参数
+        Integer userType = UserTypeEnum.MEMBER.getValue();
+        SocialWxaWaybillTraceReqDTO reqDTO = new SocialWxaWaybillTraceReqDTO()
+                .setOpenid("openid-1")
+                .setReceiverPhone("13800138000")
+                .setWaybillId("SF1234567890")
+                .setTransactionId("4200000123456789")
+                .setDeliveryId("SF")
+                .setOrderDetailPath("pages/order/detail?id=1001")
+                .setGoods(List.of(new SocialWxaWaybillTraceReqDTO.GoodsItem()
+                        .setName("测试商品")
+                        .setImageUrl("https://static.example.com/product.png")));
+        when(wxMaService.post(anyString(), anyString()))
+                .thenReturn("{\"errcode\":0,\"errmsg\":\"ok\",\"waybill_token\":\"token-123\"}");
+
+        // 调用
+        String token = socialClientService.traceWxaWaybill(userType, reqDTO);
+
+        // 断言
+        assertEquals("token-123", token);
+        ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(wxMaService).post(urlCaptor.capture(), bodyCaptor.capture());
+        assertEquals("https://api.weixin.qq.com/cgi-bin/express/delivery/open_msg/trace_waybill",
+                urlCaptor.getValue());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"openid\":\"openid-1\""));
+        assertTrue(body.contains("\"receiver_phone\":\"13800138000\""));
+        assertTrue(body.contains("\"waybill_id\":\"SF1234567890\""));
+        assertTrue(body.contains("\"trans_id\":\"4200000123456789\""));
+        assertTrue(body.contains("\"delivery_id\":\"SF\""));
+        assertTrue(body.contains("\"order_detail_path\":\"pages/order/detail?id=1001\""));
+        assertTrue(body.contains("\"goods_name\":\"测试商品\""));
+        assertTrue(body.contains("\"goods_img_url\":\"https://static.example.com/product.png\""));
+    }
+
+    @Test
+    public void testTraceWxaWaybill_wechatErrorResponse() throws WxErrorException {
+        SocialWxaWaybillTraceReqDTO reqDTO = randomPojo(SocialWxaWaybillTraceReqDTO.class);
+        when(wxMaService.post(anyString(), anyString()))
+                .thenReturn("{\"errcode\":9300622,\"errmsg\":\"delivery_id invalid\"}");
+
+        assertServiceException(() -> socialClientService.traceWxaWaybill(UserTypeEnum.MEMBER.getValue(), reqDTO),
+                SOCIAL_CLIENT_WEIXIN_MINI_APP_EXPRESS_ERROR, 9300622, "delivery_id invalid");
+    }
+
+    @Test
+    public void testTraceWxaWaybill_wechatRequestException() throws WxErrorException {
+        SocialWxaWaybillTraceReqDTO reqDTO = randomPojo(SocialWxaWaybillTraceReqDTO.class);
+        when(wxMaService.post(anyString(), anyString())).thenThrow(buildWxErrorException(40001));
+
+        assertServiceException(() -> socialClientService.traceWxaWaybill(UserTypeEnum.MEMBER.getValue(), reqDTO),
+                SOCIAL_CLIENT_WEIXIN_MINI_APP_EXPRESS_ERROR, 40001, "mock error");
     }
 
     @Test

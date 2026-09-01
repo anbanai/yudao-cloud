@@ -5,6 +5,9 @@ import cn.binarywang.wx.miniapp.api.WxMaSubscribeService;
 import cn.binarywang.wx.miniapp.api.impl.WxMaServiceImpl;
 import cn.binarywang.wx.miniapp.bean.WxMaPhoneNumberInfo;
 import cn.binarywang.wx.miniapp.bean.WxMaSubscribeMessage;
+import cn.binarywang.wx.miniapp.bean.delivery.TraceWaybillRequest;
+import cn.binarywang.wx.miniapp.bean.delivery.TraceWaybillResponse;
+import cn.binarywang.wx.miniapp.bean.delivery.WaybillGoodsInfo;
 import cn.binarywang.wx.miniapp.bean.express.WxMaExpressAccount;
 import cn.binarywang.wx.miniapp.bean.express.WxMaExpressDelivery;
 import cn.binarywang.wx.miniapp.bean.express.WxMaExpressPath;
@@ -48,6 +51,7 @@ import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaExpressPrinterUpda
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderNotifyConfirmReceiveReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaOrderUploadShippingInfoReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaWaybillTraceReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.client.SocialClientPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.client.SocialClientSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialClientDO;
@@ -135,6 +139,8 @@ public class SocialClientServiceImpl implements SocialClientService {
      * 微信错误码：支付单不存在
      */
     private static final int WX_ERR_CODE_PAY_ORDER_NOT_EXIST = 10060001;
+    private static final String TRACE_WAYBILL_URL =
+            "https://api.weixin.qq.com/cgi-bin/express/delivery/open_msg/trace_waybill";
 
     @SuppressWarnings("SpringJavaAutowiredFieldsWarningInspection")
     @Autowired(required = false) // 由于 justauth.enable 配置项，可以关闭 AuthRequestFactory 的功能，所以这里只能不强制注入
@@ -442,6 +448,36 @@ public class SocialClientServiceImpl implements SocialClientService {
         } catch (WxErrorException ex) {
             log.error("[notifyWxaOrderConfirmReceive][确认收货提醒到微信小程序失败：request({})]", request, ex);
             throw exception(SOCIAL_CLIENT_WEIXIN_MINI_APP_ORDER_NOTIFY_CONFIRM_RECEIVE_ERROR, ex.getError().getErrorMsg());
+        }
+    }
+
+    @Override
+    public String traceWxaWaybill(Integer userType, SocialWxaWaybillTraceReqDTO reqDTO) {
+        List<WaybillGoodsInfo.GoodsItem> goodsItems = reqDTO.getGoods().stream().map(item -> {
+            WaybillGoodsInfo.GoodsItem goodsItem = new WaybillGoodsInfo.GoodsItem();
+            goodsItem.setGoodsName(item.getName());
+            goodsItem.setGoodsImgUrl(item.getImageUrl());
+            return goodsItem;
+        }).toList();
+        TraceWaybillRequest request = TraceWaybillRequest.builder()
+                .openid(reqDTO.getOpenid())
+                .receiverPhone(reqDTO.getReceiverPhone())
+                .deliveryId(reqDTO.getDeliveryId())
+                .waybillId(reqDTO.getWaybillId())
+                .transId(reqDTO.getTransactionId())
+                .orderDetailPath(reqDTO.getOrderDetailPath())
+                .goodsInfo(new WaybillGoodsInfo(goodsItems))
+                .build();
+        try {
+            String responseJson = getWxMaService(userType).post(TRACE_WAYBILL_URL, request.toJson());
+            TraceWaybillResponse response = TraceWaybillResponse.fromJson(responseJson);
+            if (!Objects.equals(response.getErrcode(), 0)) {
+                throw exception(SOCIAL_CLIENT_WEIXIN_MINI_APP_EXPRESS_ERROR,
+                        response.getErrcode(), response.getErrmsg());
+            }
+            return response.getWaybillToken();
+        } catch (WxErrorException ex) {
+            throw expressException(ex);
         }
     }
 

@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleService;
 import cn.iocoder.yudao.module.trade.service.delivery.DeliveryExpressService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
+import cn.iocoder.yudao.module.trade.service.order.WechatWaybillQueryService;
 import cn.iocoder.yudao.module.trade.service.price.TradePriceService;
 import com.google.common.collect.Maps;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +54,8 @@ public class AppTradeOrderController {
     private AfterSaleService afterSaleService;
     @Resource
     private TradePriceService priceService;
+    @Resource
+    private WechatWaybillQueryService wechatWaybillQueryService;
 
     @Resource
     private TradeOrderProperties tradeOrderProperties;
@@ -123,6 +126,13 @@ public class AppTradeOrderController {
     public CommonResult<List<AppOrderExpressTrackRespDTO>> getOrderExpressTrackList(@RequestParam("id") Long id) {
         return success(TradeOrderConvert.INSTANCE.convertList02(
                 tradeOrderQueryService.getExpressTrackList(id, getLoginUserId())));
+    }
+
+    @PostMapping("/ensure-wechat-waybill-token")
+    @Operation(summary = "生成微信物流查询组件运单令牌")
+    @Parameter(name = "id", description = "交易订单编号", required = true)
+    public CommonResult<String> ensureWechatWaybillToken(@RequestParam("id") Long id) {
+        return success(wechatWaybillQueryService.ensureWechatWaybillToken(getLoginUserId(), id));
     }
 
     @GetMapping("/page")
