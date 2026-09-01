@@ -38,6 +38,12 @@ public interface TradeLogisticsPrintTaskMapper extends BaseMapperX<TradeLogistic
                 .orderByDesc(TradeLogisticsPrintTaskDO::getId).last("LIMIT 1"));
     }
 
+    default TradeLogisticsPrintTaskDO selectLatestByWaybillIdForUpdate(Long waybillId) {
+        return selectOne(new LambdaQueryWrapperX<TradeLogisticsPrintTaskDO>()
+                .eq(TradeLogisticsPrintTaskDO::getWaybillId, waybillId)
+                .orderByDesc(TradeLogisticsPrintTaskDO::getId).last("LIMIT 1 FOR UPDATE"));
+    }
+
     default List<TradeLogisticsPrintTaskDO> selectAcceptedExpired(LocalDateTime before) {
         return selectList(new LambdaQueryWrapperX<TradeLogisticsPrintTaskDO>()
                 .eq(TradeLogisticsPrintTaskDO::getStatus, LogisticsPrintTaskStatusEnum.ACCEPTED.name())

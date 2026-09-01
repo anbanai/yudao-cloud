@@ -37,6 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -289,7 +290,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                         LogisticsWaybillStatusEnum.CANCELLING.name(),
                         LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name()).contains(waybill.getStatus())
                 || !"PENDING".equals(waybill.getDeliveryStatus())) throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
-        TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillId(id);
+        TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillIdForUpdate(id);
         if (task != null && !List.of(LogisticsPrintTaskStatusEnum.PENDING.name(),
                 LogisticsPrintTaskStatusEnum.CANCELLED.name()).contains(task.getStatus())) {
             throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
@@ -308,13 +309,15 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         }
         JsonNode routes = sfClient.queryTrace(getAccount(waybill.getAccountId()), waybill.getWaybillNo());
         traceMapper.delete(TradeLogisticsTraceDO::getWaybillId, id);
-        JsonNode list = routes.path("routeResps");
-        if (!list.isArray()) list = routes.path("routes");
-        for (JsonNode route : list) {
+        for (JsonNode route : extractRoutes(routes)) {
+            String content = route.path("remark").asText();
             LocalDateTime time = parseTime(route.path("acceptTime").asText());
+            if (StrUtil.isBlank(content) || time == null) {
+                continue;
+            }
             traceMapper.insert(new TradeLogisticsTraceDO().setWaybillId(id)
                     .setProviderEventId(route.path("id").asText(null)).setStatus(route.path("opCode").asText())
-                    .setContent(route.path("remark").asText()).setLocation(route.path("acceptAddress").asText())
+                    .setContent(content).setLocation(route.path("acceptAddress").asText())
                     .setOperateTime(time).setRawData(JsonUtils.toJsonString(route)));
         }
         waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(id).setLastSyncTime(LocalDateTime.now()));
@@ -400,9 +403,28 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     }
 
     private LocalDateTime parseTime(String value) {
-        if (StrUtil.isBlank(value)) return LocalDateTime.now();
+        if (StrUtil.isBlank(value)) return null;
         try { return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")); }
-        catch (Exception ignored) { return LocalDateTime.now(); }
+        catch (Exception ignored) { return null; }
+    }
+
+    private List<JsonNode> extractRoutes(JsonNode response) {
+        List<JsonNode> result = new ArrayList<>();
+        JsonNode routeResponses = response.path("routeResps");
+        if (routeResponses.isArray()) {
+            for (JsonNode routeResponse : routeResponses) {
+                JsonNode routes = routeResponse.path("routes");
+                if (routes.isArray()) {
+                    routes.forEach(result::add);
+                }
+            }
+            return result;
+        }
+        JsonNode routes = response.path("routes");
+        if (routes.isArray()) {
+            routes.forEach(result::add);
+        }
+        return result;
     }
 
     private static void copyRemoteState(TradeLogisticsWaybillDO source, TradeLogisticsWaybillDO target) {

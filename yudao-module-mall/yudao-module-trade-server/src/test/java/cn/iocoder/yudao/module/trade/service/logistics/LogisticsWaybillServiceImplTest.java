@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.service.logistics;
 
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
@@ -16,10 +17,13 @@ import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -165,7 +169,7 @@ class LogisticsWaybillServiceImplTest {
         TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(4L)
                 .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name());
         when(waybillMapper.selectByIdForUpdate(3L)).thenReturn(waybill);
-        when(taskMapper.selectLatestByWaybillId(3L)).thenReturn(task);
+        when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(task);
         when(accountMapper.selectById(1L)).thenReturn(account());
         doThrow(new SfApiException("CANCEL_REJECTED", "cancel rejected"))
                 .when(sfClient).cancelWaybill(any(), eq("YD-9-10"));
@@ -174,6 +178,54 @@ class LogisticsWaybillServiceImplTest {
 
         assertThat(waybill.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name());
         assertThat(task.getStatus()).isEqualTo(LogisticsPrintTaskStatusEnum.CANCELLED.name());
+        verify(taskMapper).selectLatestByWaybillIdForUpdate(3L);
+    }
+
+    @Test
+    void syncTrace_flattensRoutesInsideRouteResponses() {
+        TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setAccountId(1L)
+                .setWaybillNo("SF001").setStatus(LogisticsWaybillStatusEnum.CREATED.name());
+        when(waybillMapper.selectById(3L)).thenReturn(waybill);
+        when(accountMapper.selectById(1L)).thenReturn(account());
+        when(sfClient.queryTrace(any(), eq("SF001"))).thenReturn(JsonUtils.parseTree("""
+                {"routeResps":[{"mailNo":"SF001","routes":[
+                  {"acceptTime":"2026-09-01 10:00:00","remark":"已揽收","opCode":"50"},
+                  {"acceptTime":"2026-09-01 12:00:00","remark":"运输中","opCode":"30"},
+                  {"acceptTime":"","remark":"缺少时间","opCode":"30"},
+                  {"acceptTime":"2026-09-01 13:00:00","remark":"","opCode":"30"}
+                ]}]}
+                """));
+        when(traceMapper.selectListByWaybillId(3L)).thenReturn(java.util.List.of());
+
+        service.syncTrace(3L);
+
+        ArgumentCaptor<TradeLogisticsTraceDO> captor = ArgumentCaptor.forClass(TradeLogisticsTraceDO.class);
+        verify(traceMapper, times(2)).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(TradeLogisticsTraceDO::getContent)
+                .containsExactly("已揽收", "运输中");
+        assertThat(captor.getAllValues()).extracting(TradeLogisticsTraceDO::getOperateTime)
+                .containsExactly(LocalDateTime.of(2026, 9, 1, 10, 0),
+                        LocalDateTime.of(2026, 9, 1, 12, 0));
+    }
+
+    @Test
+    void syncTrace_supportsLegacyTopLevelRoutes() {
+        TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setAccountId(1L)
+                .setWaybillNo("SF001").setStatus(LogisticsWaybillStatusEnum.CREATED.name());
+        when(waybillMapper.selectById(3L)).thenReturn(waybill);
+        when(accountMapper.selectById(1L)).thenReturn(account());
+        when(sfClient.queryTrace(any(), eq("SF001"))).thenReturn(JsonUtils.parseTree("""
+                {"routes":[
+                  {"acceptTime":"2026-09-01 10:00:00","remark":"已揽收","opCode":"50"}
+                ]}
+                """));
+        when(traceMapper.selectListByWaybillId(3L)).thenReturn(java.util.List.of());
+
+        service.syncTrace(3L);
+
+        ArgumentCaptor<TradeLogisticsTraceDO> captor = ArgumentCaptor.forClass(TradeLogisticsTraceDO.class);
+        verify(traceMapper).insert(captor.capture());
+        assertThat(captor.getValue().getContent()).isEqualTo("已揽收");
     }
 
     private TradeLogisticsAccountDO account() {
