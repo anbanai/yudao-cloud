@@ -11,9 +11,9 @@ import cn.iocoder.yudao.module.product.dal.dataobject.property.ProductPropertyDO
 import cn.iocoder.yudao.module.product.dal.dataobject.property.ProductPropertyValueDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.sku.ProductSkuMapper;
+import cn.iocoder.yudao.module.product.framework.stock.config.ProductStockProperties;
 import cn.iocoder.yudao.module.product.service.property.ProductPropertyService;
 import cn.iocoder.yudao.module.product.service.property.ProductPropertyValueService;
-import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -41,8 +41,9 @@ public class ProductSkuServiceImpl implements ProductSkuService {
     private ProductSkuMapper productSkuMapper;
 
     @Resource
-    @Lazy // 循环依赖，避免报错
-    private ProductSpuService productSpuService;
+    private ProductSkuStockUpdateService productSkuStockUpdateService;
+    @Resource
+    private ProductStockProperties productStockProperties;
     @Resource
     @Lazy // 循环依赖，避免报错
     private ProductPropertyService productPropertyService;
@@ -253,26 +254,13 @@ public class ProductSkuServiceImpl implements ProductSkuService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void updateSkuStock(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
-        // 更新 SKU 库存
-        updateStockReqDTO.getItems().forEach(item -> {
-            if (item.getIncrCount() > 0) {
-                productSkuMapper.updateStockIncr(item.getId(), item.getIncrCount());
-            } else if (item.getIncrCount() < 0) {
-                int updateStockIncr = productSkuMapper.updateStockDecr(item.getId(), item.getIncrCount());
-                if (updateStockIncr == 0) {
-                    throw exception(SKU_STOCK_NOT_ENOUGH);
-                }
-            }
-        });
-
-        // 更新 SPU 库存
-        List<ProductSkuDO> skus = productSkuMapper.selectByIds(
-                convertSet(updateStockReqDTO.getItems(), ProductSkuUpdateStockReqDTO.Item::getId));
-        Map<Long, Integer> spuStockIncrCounts = ProductSkuConvert.INSTANCE.convertSpuStockMap(
-                updateStockReqDTO.getItems(), skus);
-        productSpuService.updateSpuStock(spuStockIncrCounts);
+        // PolarDB Hint 会自动提交，只对单 SKU 请求启用，避免多 SKU 请求被部分提交。
+        if (productStockProperties.isHotspotEnabled() && updateStockReqDTO.getItems().size() == 1) {
+            productSkuStockUpdateService.updateHotspot(updateStockReqDTO);
+            return;
+        }
+        productSkuStockUpdateService.updateLegacy(updateStockReqDTO);
     }
 
 }

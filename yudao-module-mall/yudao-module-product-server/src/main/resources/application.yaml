@@ -108,6 +108,9 @@ yudao:
   info:
     version: 1.0.0
     base-package: cn.iocoder.yudao.module.product
+  product:
+    stock:
+      hotspot-enabled: false # Nacos 可动态切换的 PolarDB 热点行库存更新开关
   web:
     admin-ui:
       url: http://dashboard.yudao.iocoder.cn # Admin 管理后台 UI 的地址
