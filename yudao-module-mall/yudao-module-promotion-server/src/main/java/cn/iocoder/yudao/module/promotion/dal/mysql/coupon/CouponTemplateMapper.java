@@ -54,7 +54,12 @@ public interface CouponTemplateMapper extends BaseMapperX<CouponTemplateDO> {
     }
 
     default List<CouponTemplateDO> selectListByTakeType(Integer takeType) {
-        return selectList(CouponTemplateDO::getTakeType, takeType, CouponTemplateDO::getStatus, CommonStatusEnum.ENABLE.getStatus());
+        return selectList(new LambdaQueryWrapperX<CouponTemplateDO>()
+                .eq(CouponTemplateDO::getTakeType, takeType)
+                .eq(CouponTemplateDO::getStatus, CommonStatusEnum.ENABLE.getStatus())
+                .and(w -> w.eq(CouponTemplateDO::getValidityType, CouponTemplateValidityTypeEnum.TERM.getType())
+                        .or(ww -> ww.eq(CouponTemplateDO::getValidityType, CouponTemplateValidityTypeEnum.DATE.getType())
+                                .gt(CouponTemplateDO::getValidEndTime, LocalDateTime.now()))));
     }
 
     default List<CouponTemplateDO> selectList(List<Integer> canTakeTypes, Integer productScope, Long productScopeValue, Integer count) {

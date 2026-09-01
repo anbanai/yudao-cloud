@@ -212,12 +212,21 @@ public class CouponServiceImpl implements CouponService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void takeCouponByRegister(Long userId) {
         List<CouponTemplateDO> templates = couponTemplateService.getCouponTemplateListByTakeType(CouponTakeTypeEnum.REGISTER);
         for (CouponTemplateDO template : templates) {
-            takeCoupon(template, CollUtil.newHashSet(userId), CouponTakeTypeEnum.REGISTER);
+            try {
+                getSelf().takeCouponByRegisterTemplate(template.getId(), userId);
+            } catch (Exception e) {
+                log.error("[takeCouponByRegister][templateId({}) 给用户({})发放新人券失败]", template.getId(), userId, e);
+            }
         }
+    }
+
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW)
+    public void takeCouponByRegisterTemplate(Long templateId, Long userId) {
+        CouponTemplateDO template = couponTemplateService.getCouponTemplate(templateId);
+        takeCoupon(template, CollUtil.newHashSet(userId), CouponTakeTypeEnum.REGISTER);
     }
 
     @Override
