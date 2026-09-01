@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
+import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
@@ -52,6 +53,8 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     private ProductBrandService brandService;
     @Resource
     private ProductCategoryService categoryService;
+    @Resource
+    private ProductGroupService productGroupService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -70,6 +73,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         productSpuMapper.insert(spu);
         // 插入 SKU
         productSkuService.createSkuList(spu.getId(), skuSaveReqList);
+        productGroupService.syncSpuGroups(spu.getId(), createReqVO.getGroupIds());
         // 返回
         return spu.getId();
     }
@@ -92,6 +96,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         productSpuMapper.updateById(updateObj);
         // 批量更新 SKU
         productSkuService.updateSkuList(updateObj.getId(), updateReqVO.getSkus());
+        productGroupService.syncSpuGroups(updateObj.getId(), updateReqVO.getGroupIds());
     }
 
     /**
@@ -174,6 +179,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         productSpuMapper.deleteById(id);
         // 删除关联的 SKU
         productSkuService.deleteSkuBySpuId(id);
+        productGroupService.deleteRelationsBySpuId(id);
     }
 
     private ProductSpuDO validateSpuExists(Long id) {

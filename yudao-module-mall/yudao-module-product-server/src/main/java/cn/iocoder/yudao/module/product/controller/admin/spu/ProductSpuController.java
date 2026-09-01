@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
+import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,6 +43,8 @@ public class ProductSpuController {
     private ProductSpuService productSpuService;
     @Resource
     private ProductSkuService productSkuService;
+    @Resource
+    private ProductGroupService productGroupService;
 
     @PostMapping("/create")
     @Operation(summary = "创建商品 SPU")
@@ -87,7 +90,9 @@ public class ProductSpuController {
         }
         // 查询商品 SKU
         List<ProductSkuDO> skus = productSkuService.getSkuListBySpuId(spu.getId());
-        return success(ProductSpuConvert.INSTANCE.convert(spu, skus));
+        ProductSpuRespVO respVO = ProductSpuConvert.INSTANCE.convert(spu, skus);
+        respVO.setGroupIds(productGroupService.getGroupIdsBySpuId(spu.getId()));
+        return success(respVO);
     }
 
     @GetMapping("/list-all-simple")

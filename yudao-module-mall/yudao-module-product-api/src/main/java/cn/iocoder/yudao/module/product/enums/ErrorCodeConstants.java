@@ -53,4 +53,9 @@ public interface ErrorCodeConstants {
     ErrorCode FAVORITE_EXISTS = new ErrorCode(1_008_008_000, "该商品已经被收藏");
     ErrorCode FAVORITE_NOT_EXISTS = new ErrorCode(1_008_008_001, "商品收藏不存在");
 
+    ErrorCode GROUP_NOT_EXISTS = new ErrorCode(1_008_009_000, "商品分组不存在");
+    ErrorCode GROUP_NAME_EXISTS = new ErrorCode(1_008_009_001, "商品分组名称已存在");
+    ErrorCode GROUP_DISABLED = new ErrorCode(1_008_009_002, "商品分组已禁用");
+    ErrorCode GROUP_HAVE_BIND_SPU = new ErrorCode(1_008_009_003, "分组下存在商品，无法删除");
+
 }
