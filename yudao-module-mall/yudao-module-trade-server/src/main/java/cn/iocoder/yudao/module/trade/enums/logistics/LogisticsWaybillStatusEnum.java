@@ -5,5 +5,7 @@ public enum LogisticsWaybillStatusEnum {
     CREATED,
     UNKNOWN,
     FAILED,
+    CANCELLING,
+    CANCEL_UNKNOWN,
     CANCELLED
 }

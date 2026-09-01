@@ -166,6 +166,12 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public boolean isPrivatePresignedGetSupported() {
+        FileClient fileClient = fileConfigService.getMasterFileClient();
+        return fileClient != null && fileClient.isPrivatePresignedGetSupported();
+    }
+
+    @Override
     public Long createFile(FileCreateReqVO createReqVO) {
         // 1.1 校验参数的合法性
         FilePathUtils.validatePath(createReqVO.getPath());

@@ -28,4 +28,9 @@ public class FileApiImpl implements FileApi {
         return success(fileService.presignGetUrl(url, expirationSeconds));
     }
 
+    @Override
+    public CommonResult<Boolean> isPrivatePresignedGetSupported() {
+        return success(fileService.isPrivatePresignedGetSupported());
+    }
+
 }

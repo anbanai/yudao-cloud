@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWayb
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPrintTaskRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsTraceRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
 
 import java.util.List;
 
@@ -19,4 +20,5 @@ public interface LogisticsWaybillService {
     List<LogisticsTraceRespVO> syncTrace(Long id);
     List<LogisticsTraceRespVO> getTrace(Long id);
     void validateManualDelivery(Long orderId, Long logisticsId, String logisticsNo);
+    void deliverManually(TradeOrderDeliveryReqVO request);
 }

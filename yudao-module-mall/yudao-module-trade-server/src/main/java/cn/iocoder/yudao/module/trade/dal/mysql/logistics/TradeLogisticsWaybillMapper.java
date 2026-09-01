@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsWayb
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.util.Collection;
 
 @Mapper
 public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsWaybillDO> {
@@ -18,7 +19,6 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
     default TradeLogisticsWaybillDO selectByOrderIdForUpdate(Long orderId) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
                 .eq(TradeLogisticsWaybillDO::getOrderId, orderId)
-                .ne(TradeLogisticsWaybillDO::getStatus, "CANCELLED")
                 .orderByDesc(TradeLogisticsWaybillDO::getId).last("LIMIT 1 FOR UPDATE"));
     }
 
@@ -39,5 +39,10 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
 
     default List<TradeLogisticsWaybillDO> selectListByStatus(String status) {
         return selectList(TradeLogisticsWaybillDO::getStatus, status);
+    }
+
+    default List<TradeLogisticsWaybillDO> selectListByStatuses(Collection<String> statuses) {
+        return selectList(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
+                .in(TradeLogisticsWaybillDO::getStatus, statuses));
     }
 }

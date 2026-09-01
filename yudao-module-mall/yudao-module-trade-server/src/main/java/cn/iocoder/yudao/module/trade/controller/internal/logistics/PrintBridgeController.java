@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.trade.controller.internal.logistics;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.trade.controller.internal.logistics.vo.PrintBridgeStatusReqVO;
 import cn.iocoder.yudao.module.trade.controller.internal.logistics.vo.PrintBridgeTaskRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintDeviceDO;
@@ -17,6 +18,7 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.LOGISTICS_D
 
 @RestController
 @RequestMapping("/internal-api/trade/logistics/printbridge/tasks")
+@TenantIgnore
 public class PrintBridgeController {
 
     @Resource

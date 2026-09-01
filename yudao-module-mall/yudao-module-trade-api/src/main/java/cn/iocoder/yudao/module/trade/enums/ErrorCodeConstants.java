@@ -109,6 +109,8 @@ public interface ErrorCodeConstants {
     ErrorCode LOGISTICS_WAYBILL_ALREADY_EXISTS = new ErrorCode(1_011_004_307, "订单已经存在有效顺丰运单");
     ErrorCode LOGISTICS_SF_API_FAILED = new ErrorCode(1_011_004_308, "调用顺丰开放平台失败：{}");
     ErrorCode LOGISTICS_LABEL_INVALID = new ErrorCode(1_011_004_309, "顺丰面单不符合 100x150 mm 规范：{}");
+    ErrorCode LOGISTICS_PRIVATE_STORAGE_REQUIRED = new ErrorCode(1_011_004_310,
+            "物流面单必须使用支持 HTTPS 临时签名的私有 S3 文件存储");
 
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");

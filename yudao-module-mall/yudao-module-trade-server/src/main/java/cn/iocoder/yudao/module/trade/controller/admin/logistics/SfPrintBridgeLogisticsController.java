@@ -64,20 +64,20 @@ public class SfPrintBridgeLogisticsController {
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:query')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:query')")
     public CommonResult<List<LogisticsPendingOrderRespVO>> getPendingOrders() {
         return success(waybillService.getPendingOrders());
     }
 
     @PostMapping("/waybills/create")
-    @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:waybill:create', 'trade:order:update')")
+    @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:sf-waybill:create', 'trade:order:update')")
     public CommonResult<LogisticsWaybillRespVO> createWaybill(
             @Valid @RequestBody LogisticsWaybillCreateReqVO request) {
         return success(waybillService.createWaybill(request));
     }
 
     @PostMapping("/waybills/batch-create")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:create')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:create')")
     public CommonResult<List<LogisticsWaybillRespVO>> batchCreateWaybill(
             @Valid @RequestBody LogisticsWaybillBatchCreateReqVO request) {
         List<LogisticsWaybillRespVO> result = new ArrayList<>();
@@ -94,26 +94,26 @@ public class SfPrintBridgeLogisticsController {
     }
 
     @GetMapping("/waybills")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:query')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:query')")
     public CommonResult<List<LogisticsWaybillRespVO>> getWaybills() {
         return success(waybillService.getWaybills());
     }
 
     @GetMapping("/waybills/{id}")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:query')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:query')")
     public CommonResult<LogisticsWaybillRespVO> getWaybill(@PathVariable("id") Long id) {
         return success(waybillService.getWaybill(id));
     }
 
     @PostMapping("/waybills/{id}/cancel")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:cancel')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:cancel')")
     public CommonResult<Boolean> cancelWaybill(@PathVariable("id") Long id) {
         waybillService.cancelWaybill(id);
         return success(true);
     }
 
     @PostMapping("/waybills/{id}/reprint")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:reprint')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:reprint')")
     public CommonResult<LogisticsWaybillRespVO> reprint(@PathVariable("id") Long id,
                                                         @RequestParam(required = false) Long deviceId) {
         return success(waybillService.reprint(id, deviceId));
@@ -126,13 +126,13 @@ public class SfPrintBridgeLogisticsController {
     }
 
     @GetMapping("/waybills/{id}/trace")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:trace:query')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-trace:query')")
     public CommonResult<List<LogisticsTraceRespVO>> getTrace(@PathVariable("id") Long id) {
         return success(waybillService.getTrace(id));
     }
 
     @PostMapping("/waybills/{id}/trace/sync")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:trace:sync')")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-trace:sync')")
     public CommonResult<List<LogisticsTraceRespVO>> syncTrace(@PathVariable("id") Long id) {
         return success(waybillService.syncTrace(id));
     }

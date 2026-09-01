@@ -22,17 +22,23 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Locale;
+import java.util.function.Supplier;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 
+@Slf4j
 @Service
 public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeService {
 
@@ -52,6 +58,8 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     private FileApi fileApi;
     @Resource
     private TradeOrderMapper orderMapper;
+    @Resource
+    private PlatformTransactionManager transactionManager;
 
     @Override
     public TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode) {
@@ -89,7 +97,11 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
                     .setLeaseExpireTime(now.plusSeconds(60));
             taskMapper.updateById(task);
         }
+        if (!isPrivatePresignedStorage()) {
+            throw exception(LOGISTICS_PRIVATE_STORAGE_REQUIRED);
+        }
         String fileUrl = fileApi.presignGetUrl(task.getLabelUrl(), LABEL_URL_EXPIRATION_SECONDS).getCheckedData();
+        validateTemporaryHttpsUrl(fileUrl);
         return new PrintBridgeTaskRespVO().setType("print").setRequestId(task.getRequestId())
                 .setJobId(task.getJobId()).setFormat(task.getFormat()).setFileUrl(fileUrl)
                 .setCopies(task.getCopies()).setPaper(new PrintBridgeTaskRespVO.Paper()
@@ -97,17 +109,32 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void report(TradeLogisticsPrintDeviceDO device, PrintBridgeStatusReqVO request) {
-        TenantUtils.execute(device.getTenantId(), () -> reportInTenant(device, request));
+        TenantUtils.execute(device.getTenantId(), () -> {
+            TradeLogisticsPrintTaskDO task = inTransaction(() -> reportInTenant(device, request));
+            if (task == null || !LogisticsPrintTaskStatusEnum.SUCCESS.name().equals(task.getStatus())
+                    || Boolean.TRUE.equals(task.getTestFlag())) {
+                return;
+            }
+            try {
+                inTransaction(() -> {
+                    deliver(task);
+                    return null;
+                });
+            } catch (RuntimeException exception) {
+                // success 已独立提交，补偿任务稍后继续发货，不能让设备重复打印。
+                log.error("[report][打印成功但订单发货失败，taskId={}]", task.getId(), exception);
+            }
+        });
     }
 
-    private void reportInTenant(TradeLogisticsPrintDeviceDO device, PrintBridgeStatusReqVO request) {
+    private TradeLogisticsPrintTaskDO reportInTenant(TradeLogisticsPrintDeviceDO device,
+                                                      PrintBridgeStatusReqVO request) {
         if (StrUtil.isBlank(request.getJobId())) {
             throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
         }
         if (eventMapper.selectByEventId(request.getEventId()) != null) {
-            return;
+            return null;
         }
         TradeLogisticsPrintTaskDO task = taskMapper.selectByJobIdForUpdate(request.getJobId());
         if (task == null || !device.getId().equals(task.getDeviceId())) {
@@ -127,7 +154,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
         try {
             eventMapper.insert(event);
         } catch (DuplicateKeyException ignored) {
-            return;
+            return null;
         }
         LocalDateTime now = LocalDateTime.now();
         task.setStatus(next.name()).setLastError(next == LogisticsPrintTaskStatusEnum.FAILED ? request.getMessage() : null);
@@ -137,9 +164,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             task.setCompletedTime(now).setLeaseExpireTime(null);
         }
         taskMapper.updateById(task);
-        if (next == LogisticsPrintTaskStatusEnum.SUCCESS && !Boolean.TRUE.equals(task.getTestFlag())) {
-            deliver(task);
-        }
+        return task;
     }
 
     private void deliver(TradeLogisticsPrintTaskDO task) {
@@ -157,31 +182,40 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public int compensateDeliveredOrders() {
         int count = 0;
         for (TradeLogisticsPrintTaskDO task : taskMapper.selectListByStatus(LogisticsPrintTaskStatusEnum.SUCCESS.name())) {
-            TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(task.getWaybillId());
-            if (waybill == null || "DELIVERED".equals(waybill.getDeliveryStatus()) || Boolean.TRUE.equals(task.getTestFlag())) {
-                continue;
-            }
-            TradeOrderDO order = orderMapper.selectByIdForUpdate(waybill.getOrderId());
-            if (order != null && TradeOrderStatusEnum.isDelivered(order.getStatus())) {
-                if (waybill.getWaybillNo().equals(order.getLogisticsNo())) {
-                    waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
-                            .setDeliveryStatus("DELIVERED").setDeliveredTime(order.getDeliveryTime()));
+            try {
+                Boolean delivered = inTransaction(() -> compensateDeliveredOrder(task));
+                if (Boolean.TRUE.equals(delivered)) {
                     count++;
-                } else {
-                    waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
-                            .setDeliveryStatus("CONFLICT").setErrorCode("DELIVERY_CONFLICT")
-                            .setErrorMessage("订单已使用其他运单号发货，需人工处理"));
                 }
-                continue;
+            } catch (RuntimeException exception) {
+                log.error("[compensateDeliveredOrders][补偿发货失败，taskId={}]", task.getId(), exception);
             }
-            deliver(task);
-            count++;
         }
         return count;
+    }
+
+    private boolean compensateDeliveredOrder(TradeLogisticsPrintTaskDO task) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(task.getWaybillId());
+        if (waybill == null || "DELIVERED".equals(waybill.getDeliveryStatus()) || Boolean.TRUE.equals(task.getTestFlag())) {
+            return false;
+        }
+        TradeOrderDO order = orderMapper.selectByIdForUpdate(waybill.getOrderId());
+        if (order != null && TradeOrderStatusEnum.isDelivered(order.getStatus())) {
+            if (waybill.getWaybillNo().equals(order.getLogisticsNo())) {
+                waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
+                        .setDeliveryStatus("DELIVERED").setDeliveredTime(order.getDeliveryTime()));
+                return true;
+            }
+            waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
+                    .setDeliveryStatus("CONFLICT").setErrorCode("DELIVERY_CONFLICT")
+                    .setErrorMessage("订单已使用其他运单号发货，需人工处理"));
+            return false;
+        }
+        deliver(task);
+        return true;
     }
 
     private static LogisticsPrintTaskStatusEnum parseRemoteStatus(String status) {
@@ -195,5 +229,30 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             case "unknown" -> LogisticsPrintTaskStatusEnum.UNKNOWN;
             default -> throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
         };
+    }
+
+    private boolean isPrivatePresignedStorage() {
+        var result = fileApi.isPrivatePresignedGetSupported();
+        return result != null && Boolean.TRUE.equals(result.getData());
+    }
+
+    private static void validateTemporaryHttpsUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String query = StrUtil.blankToDefault(uri.getRawQuery(), "").toLowerCase(Locale.ROOT);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || StrUtil.isBlank(uri.getHost())
+                    || !query.contains("signature") || !query.contains("expires")) {
+                throw exception(LOGISTICS_PRIVATE_STORAGE_REQUIRED);
+            }
+        } catch (IllegalArgumentException exception) {
+            throw exception(LOGISTICS_PRIVATE_STORAGE_REQUIRED);
+        }
+    }
+
+    private <T> T inTransaction(Supplier<T> supplier) {
+        if (transactionManager == null) { // 仅供无 Spring 容器的单元测试使用
+            return supplier.get();
+        }
+        return new TransactionTemplate(transactionManager).execute(status -> supplier.get());
     }
 }

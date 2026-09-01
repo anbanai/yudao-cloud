@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `requested_device_id` bigint DEFAULT NULL,
   `provider_order_no` varchar(128) NOT NULL,
   `waybill_no` varchar(64) DEFAULT NULL,
-  `status` varchar(16) NOT NULL COMMENT 'CREATING/CREATED/UNKNOWN/FAILED/CANCELLED',
+  `status` varchar(16) NOT NULL COMMENT 'CREATING/CREATED/UNKNOWN/FAILED/CANCELLING/CANCEL_UNKNOWN/CANCELLED',
   `active_order_id` bigint GENERATED ALWAYS AS (CASE WHEN `deleted` = b'0' AND `status` <> 'CANCELLED' THEN `order_id` ELSE NULL END) STORED,
   `label_url` varchar(1024) DEFAULT NULL,
   `label_content_type` varchar(32) DEFAULT NULL,
@@ -136,9 +136,26 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_event` (
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_logistics_event` (`event_id`),
+  UNIQUE KEY `uk_logistics_event` (`tenant_id`,`event_id`),
   KEY `idx_logistics_event_task` (`tenant_id`,`task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='PrintBridge 回执事件';
+
+-- 兼容已经执行过旧版脚本的数据库：将全局 event_id 唯一约束升级为租户内唯一。
+SET @logistics_event_index_columns = (
+  SELECT GROUP_CONCAT(`column_name` ORDER BY `seq_in_index` SEPARATOR ',')
+  FROM `information_schema`.`statistics`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_print_event'
+    AND `index_name` = 'uk_logistics_event'
+);
+SET @logistics_event_index_sql = IF(
+  @logistics_event_index_columns = 'event_id',
+  'ALTER TABLE `trade_logistics_print_event` DROP INDEX `uk_logistics_event`, ADD UNIQUE KEY `uk_logistics_event` (`tenant_id`,`event_id`)',
+  'SELECT 1'
+);
+PREPARE logistics_event_index_stmt FROM @logistics_event_index_sql;
+EXECUTE logistics_event_index_stmt;
+DEALLOCATE PREPARE logistics_event_index_stmt;
 
 CREATE TABLE IF NOT EXISTS `trade_logistics_trace` (
   `id` bigint NOT NULL AUTO_INCREMENT,
@@ -170,6 +187,20 @@ SET `name`='微信物流历史',
     `updater`='1', `update_time`=NOW()
 WHERE `component`='mall/trade/logistics/wechat/index' AND `deleted`=b'0';
 
+-- 兼容旧版顺丰权限命名，并保留原菜单 ID 与角色授权关系；微信物流权限不调整。
+UPDATE `system_menu` SET `permission`='trade:logistics:sf-waybill:query', `updater`='1', `update_time`=NOW()
+WHERE `name`='顺丰运单查询' AND `permission`='trade:logistics:waybill:query' AND `deleted`=b'0';
+UPDATE `system_menu` SET `permission`='trade:logistics:sf-waybill:create', `updater`='1', `update_time`=NOW()
+WHERE `name`='创建顺丰运单' AND `permission`='trade:logistics:waybill:create' AND `deleted`=b'0';
+UPDATE `system_menu` SET `permission`='trade:logistics:sf-waybill:cancel', `updater`='1', `update_time`=NOW()
+WHERE `name`='取消顺丰运单' AND `permission`='trade:logistics:waybill:cancel' AND `deleted`=b'0';
+UPDATE `system_menu` SET `permission`='trade:logistics:sf-waybill:reprint', `updater`='1', `update_time`=NOW()
+WHERE `name`='人工重打' AND `permission`='trade:logistics:waybill:reprint' AND `deleted`=b'0';
+UPDATE `system_menu` SET `permission`='trade:logistics:sf-trace:query', `updater`='1', `update_time`=NOW()
+WHERE `name`='顺丰轨迹查询' AND `permission`='trade:logistics:trace:query' AND `deleted`=b'0';
+UPDATE `system_menu` SET `permission`='trade:logistics:sf-trace:sync', `updater`='1', `update_time`=NOW()
+WHERE `name`='顺丰轨迹同步' AND `permission`='trade:logistics:trace:sync' AND `deleted`=b'0';
+
 INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT p.name,'',2,p.sort,m.id,p.path,p.icon,p.component,p.component_name,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
 FROM (SELECT '待发货工作台' name,1 sort,'pending' path,'ep:box' icon,'mall/trade/logistics/sf/pending/index' component,'TradeSfLogisticsPending' component_name
@@ -188,12 +219,12 @@ FROM (SELECT '顺丰账号查询' name,'trade:logistics:sf-account:query' permis
       UNION ALL SELECT '打印设备查询','trade:logistics:device:query',3
       UNION ALL SELECT '打印设备维护','trade:logistics:device:update',4
       UNION ALL SELECT '本机打印诊断','trade:logistics:diagnostics',5
-      UNION ALL SELECT '顺丰运单查询','trade:logistics:waybill:query',6
-      UNION ALL SELECT '创建顺丰运单','trade:logistics:waybill:create',7
-      UNION ALL SELECT '取消顺丰运单','trade:logistics:waybill:cancel',8
-      UNION ALL SELECT '人工重打','trade:logistics:waybill:reprint',9
+      UNION ALL SELECT '顺丰运单查询','trade:logistics:sf-waybill:query',6
+      UNION ALL SELECT '创建顺丰运单','trade:logistics:sf-waybill:create',7
+      UNION ALL SELECT '取消顺丰运单','trade:logistics:sf-waybill:cancel',8
+      UNION ALL SELECT '人工重打','trade:logistics:sf-waybill:reprint',9
       UNION ALL SELECT '打印任务查询','trade:logistics:print-task:query',10
-      UNION ALL SELECT '顺丰轨迹查询','trade:logistics:trace:query',11
-      UNION ALL SELECT '顺丰轨迹同步','trade:logistics:trace:sync',12) p
+      UNION ALL SELECT '顺丰轨迹查询','trade:logistics:sf-trace:query',11
+      UNION ALL SELECT '顺丰轨迹同步','trade:logistics:sf-trace:sync',12) p
 JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.permission=p.permission AND x.deleted=b'0');

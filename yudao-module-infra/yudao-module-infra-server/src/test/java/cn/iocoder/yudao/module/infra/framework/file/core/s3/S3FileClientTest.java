@@ -9,12 +9,40 @@ import jakarta.validation.Validation;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings("resource")
 public class S3FileClientTest {
+
+    @Test
+    public void testPrivatePresignedGetSupported_requiresPrivateHttpsS3() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setDomain("https://private.example.com");
+        config.setEnablePublicAccess(false);
+        S3FileClient client = new S3FileClient(0L, config);
+        assertTrue(client.isPrivatePresignedGetSupported());
+
+        config.setEnablePublicAccess(true);
+        assertFalse(client.isPrivatePresignedGetSupported());
+        config.setEnablePublicAccess(false);
+        config.setDomain("http://private.example.com");
+        assertFalse(client.isPrivatePresignedGetSupported());
+    }
+
+    @Test
+    public void testPrivatePresignedGetSupported_rejectsHttpPresignerEndpoint() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setDomain("https://private.example.com");
+        config.setEndpoint("http://oss-cn-beijing.aliyuncs.com");
+        config.setEnablePublicAccess(false);
+        S3FileClient client = new S3FileClient(0L, config);
+
+        assertFalse(client.isPrivatePresignedGetSupported());
+    }
 
     @Test
     public void testPresignGetUrl_publicAccess_encodeUrlPath() {
@@ -103,6 +131,26 @@ public class S3FileClientTest {
         String result = client.presignPutUrl("avatar.jpg");
 
         assertTrue(result.startsWith("https://test-bucket.s3-cn-south-1.qiniucs.com/"));
+    }
+
+    @Test
+    public void testPresignGetUrl_aliyunResignKeepsOriginalObjectKey() {
+        S3FileClient client = createPrivateCloudClient("oss-cn-beijing.aliyuncs.com");
+        String original = client.presignGetUrl("labels/SF 001.png", 300);
+
+        String resigned = client.presignGetUrl(original, 300);
+
+        assertEquals("/labels/SF%20001.png", URI.create(resigned).getRawPath());
+    }
+
+    @Test
+    public void testPresignGetUrl_qiniuResignKeepsOriginalObjectKey() {
+        S3FileClient client = createPrivateCloudClient("s3-cn-south-1.qiniucs.com");
+        String original = client.presignGetUrl("labels/SF 001.png", 300);
+
+        String resigned = client.presignGetUrl(original, 300);
+
+        assertEquals("/labels/SF%20001.png", URI.create(resigned).getRawPath());
     }
 
     @Test
@@ -234,6 +282,20 @@ public class S3FileClientTest {
         if (false) {
             client.delete(path);
         }
+    }
+
+    private S3FileClient createPrivateCloudClient(String endpoint) {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setAccessKey("access-key");
+        config.setAccessSecret("access-secret");
+        config.setBucket("test-bucket");
+        config.setDomain("https://custom.example.com");
+        config.setEndpoint(endpoint);
+        config.setEnablePathStyleAccess(false);
+        config.setEnablePublicAccess(false);
+        S3FileClient client = new S3FileClient(0L, config);
+        client.init();
+        return client;
     }
 
 }

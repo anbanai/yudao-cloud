@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.internal.logistics;
 
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.trade.controller.internal.logistics.vo.PrintBridgeStatusReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintDeviceDO;
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsPrintBridgeService;
@@ -11,6 +12,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class PrintBridgeControllerTest {
+
+    @Test
+    void controller_ignoresRequestTenantUntilDeviceAuthentication() {
+        assertThat(PrintBridgeController.class.getAnnotation(TenantIgnore.class)).isNotNull();
+    }
 
     @Test
     void report_connectionTestReturnsNoContentWithoutPersistingEvent() {

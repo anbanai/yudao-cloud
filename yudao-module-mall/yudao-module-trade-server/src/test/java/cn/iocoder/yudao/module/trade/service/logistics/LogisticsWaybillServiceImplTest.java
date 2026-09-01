@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsWaybillStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfApiException;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -27,6 +29,15 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class LogisticsWaybillServiceImplTest {
+
+    @Test
+    void createWaybill_doesNotKeepSfSideEffectInsideLocalTransaction() throws Exception {
+        Transactional transactional = LogisticsWaybillServiceImpl.class
+                .getMethod("createWaybill", LogisticsWaybillCreateReqVO.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNull();
+    }
 
     @Mock private TradeOrderMapper orderMapper;
     @Mock private TradeOrderItemMapper itemMapper;
@@ -59,7 +70,8 @@ class LogisticsWaybillServiceImplTest {
 
     @Test
     void createWaybill_timeoutPersistsUnknownAndDoesNotCreatePrintTask() {
-        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1);
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         TradeLogisticsAccountDO account = account();
         TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO().setId(2L).setStatus(0);
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
@@ -82,8 +94,23 @@ class LogisticsWaybillServiceImplTest {
     }
 
     @Test
+    void createWaybill_refundingOrderIsRejectedBeforeCallingSf() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.PART.getStatus());
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+
+        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L)))
+                .isInstanceOf(cn.iocoder.yudao.framework.common.exception.ServiceException.class)
+                .extracting("code")
+                .isEqualTo(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants
+                        .ORDER_DELIVERY_FAIL_REFUND_STATUS_NOT_NONE.getCode());
+        verifyNoInteractions(sfClient);
+    }
+
+    @Test
     void createWaybill_existingTaskReturnsSameJobWithoutCallingSfAgain() {
-        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1);
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L)
                 .setOrderNo("T10").setStatus(LogisticsWaybillStatusEnum.CREATED.name());
         TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setJobId("JOB-1")
@@ -116,6 +143,37 @@ class LogisticsWaybillServiceImplTest {
 
         assertThatThrownBy(() -> service.validateManualDelivery(10L, 8L, "SF-MANUAL"))
                 .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void validateManualDelivery_locksOrderBeforeCheckingActiveWaybill() {
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(new TradeOrderDO().setId(10L));
+        when(waybillMapper.selectActiveByOrderId(10L)).thenReturn(null);
+
+        service.validateManualDelivery(10L, 8L, "SF-MANUAL");
+
+        var inOrder = inOrder(orderMapper, waybillMapper);
+        inOrder.verify(orderMapper).selectByIdForUpdate(10L);
+        inOrder.verify(waybillMapper).selectActiveByOrderId(10L);
+    }
+
+    @Test
+    void cancelWaybill_knownFailureKeepsTaskCancelledForManualReconciliation() {
+        TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setAccountId(1L)
+                .setProviderOrderNo("YD-9-10").setStatus(LogisticsWaybillStatusEnum.CREATED.name())
+                .setDeliveryStatus("PENDING");
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(4L)
+                .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name());
+        when(waybillMapper.selectByIdForUpdate(3L)).thenReturn(waybill);
+        when(taskMapper.selectLatestByWaybillId(3L)).thenReturn(task);
+        when(accountMapper.selectById(1L)).thenReturn(account());
+        doThrow(new SfApiException("CANCEL_REJECTED", "cancel rejected"))
+                .when(sfClient).cancelWaybill(any(), eq("YD-9-10"));
+
+        assertThatThrownBy(() -> service.cancelWaybill(3L)).isInstanceOf(SfApiException.class);
+
+        assertThat(waybill.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name());
+        assertThat(task.getStatus()).isEqualTo(LogisticsPrintTaskStatusEnum.CANCELLED.name());
     }
 
     private TradeLogisticsAccountDO account() {

@@ -12,6 +12,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Slf4j
 @Component
 public class SfUnknownWaybillRecoveryJob {
@@ -22,10 +24,18 @@ public class SfUnknownWaybillRecoveryJob {
     @TenantJob
     public String execute(String param) {
         int count = 0;
-        for (TradeLogisticsWaybillDO waybill : waybillMapper.selectListByStatus(LogisticsWaybillStatusEnum.UNKNOWN.name())) {
+        List<String> statuses = List.of(LogisticsWaybillStatusEnum.CREATING.name(),
+                LogisticsWaybillStatusEnum.UNKNOWN.name(), LogisticsWaybillStatusEnum.CANCELLING.name(),
+                LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name());
+        for (TradeLogisticsWaybillDO waybill : waybillMapper.selectListByStatuses(statuses)) {
             try {
-                waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(waybill.getOrderId())
-                        .setAccountId(waybill.getAccountId()).setDeviceId(waybill.getRequestedDeviceId()));
+                if (List.of(LogisticsWaybillStatusEnum.CANCELLING.name(),
+                        LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name()).contains(waybill.getStatus())) {
+                    waybillService.cancelWaybill(waybill.getId());
+                } else {
+                    waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(waybill.getOrderId())
+                            .setAccountId(waybill.getAccountId()).setDeviceId(waybill.getRequestedDeviceId()));
+                }
                 count++;
             } catch (Exception exception) {
                 log.warn("[execute][恢复顺丰未知运单失败，waybillId={}]", waybill.getId(), exception);

@@ -114,9 +114,7 @@ public class TradeOrderController {
     @Operation(summary = "订单发货")
     @PreAuthorize("@ss.hasPermission('trade:order:update')")
     public CommonResult<Boolean> deliveryOrder(@RequestBody TradeOrderDeliveryReqVO deliveryReqVO) {
-        logisticsWaybillService.validateManualDelivery(deliveryReqVO.getId(), deliveryReqVO.getLogisticsId(),
-                deliveryReqVO.getLogisticsNo());
-        tradeOrderUpdateService.deliveryOrder(deliveryReqVO);
+        logisticsWaybillService.deliverManually(deliveryReqVO);
         return success(true);
     }
 

@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintTaskDO;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.time.LocalDateTime;
@@ -45,5 +46,14 @@ public interface TradeLogisticsPrintTaskMapper extends BaseMapperX<TradeLogistic
 
     default List<TradeLogisticsPrintTaskDO> selectListByStatus(String status) {
         return selectList(TradeLogisticsPrintTaskDO::getStatus, status);
+    }
+
+    default int markAcceptedExpiredUnknown(Long id, LocalDateTime acceptedBefore, String error) {
+        return update(new TradeLogisticsPrintTaskDO()
+                        .setStatus(LogisticsPrintTaskStatusEnum.UNKNOWN.name()).setLastError(error),
+                new LambdaUpdateWrapper<TradeLogisticsPrintTaskDO>()
+                        .eq(TradeLogisticsPrintTaskDO::getId, id)
+                        .eq(TradeLogisticsPrintTaskDO::getStatus, LogisticsPrintTaskStatusEnum.ACCEPTED.name())
+                        .lt(TradeLogisticsPrintTaskDO::getAcceptedTime, acceptedBefore));
     }
 }

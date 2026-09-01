@@ -19,11 +19,10 @@ public class PrintBridgeTimeoutJob {
     @TenantJob
     public String execute(String param) {
         int count = 0;
-        for (TradeLogisticsPrintTaskDO task : taskMapper.selectAcceptedExpired(LocalDateTime.now().minusMinutes(5))) {
-            taskMapper.updateById(new TradeLogisticsPrintTaskDO().setId(task.getId())
-                    .setStatus(LogisticsPrintTaskStatusEnum.UNKNOWN.name())
-                    .setLastError("PrintBridge accepted 后 5 分钟未返回结果，禁止自动重打"));
-            count++;
+        LocalDateTime acceptedBefore = LocalDateTime.now().minusMinutes(5);
+        for (TradeLogisticsPrintTaskDO task : taskMapper.selectAcceptedExpired(acceptedBefore)) {
+            count += taskMapper.markAcceptedExpiredUnknown(task.getId(), acceptedBefore,
+                    "PrintBridge accepted 后 5 分钟未返回结果，禁止自动重打");
         }
         return StrUtil.format("标记 PrintBridge 未知任务 {} 个", count);
     }
