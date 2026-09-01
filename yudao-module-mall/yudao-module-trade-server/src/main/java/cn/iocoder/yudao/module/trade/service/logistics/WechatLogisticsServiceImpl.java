@@ -23,6 +23,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeWechatLogisticsConfigMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeWechatLogisticsTraceMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeWechatLogisticsWaybillMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsWaybillMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
@@ -72,6 +73,8 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     private TradeWechatLogisticsConfigMapper wechatLogisticsConfigMapper;
     @Resource
     private TradeWechatLogisticsWaybillMapper waybillMapper;
+    @Resource
+    private TradeLogisticsWaybillMapper sfWaybillMapper;
     @Resource
     private TradeWechatLogisticsTraceMapper traceMapper;
     @Resource
@@ -255,6 +258,9 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         order = validateOrder(order);
         if (!UNDELIVERED.getStatus().equals(order.getStatus())) {
             throw exception(WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED);
+        }
+        if (sfWaybillMapper.selectActiveByOrderId(order.getId()) != null) {
+            throw exception(LOGISTICS_WAYBILL_ALREADY_EXISTS);
         }
         DeliveryExpressDO express = deliveryExpressService.getDeliveryExpressByCode(waybill.getDeliveryId());
         if (express == null) {

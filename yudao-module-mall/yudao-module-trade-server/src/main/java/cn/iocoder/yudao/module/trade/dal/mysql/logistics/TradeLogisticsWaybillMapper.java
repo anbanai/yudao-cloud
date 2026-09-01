@@ -25,7 +25,8 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
     default TradeLogisticsWaybillDO selectActiveByOrderId(Long orderId) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
                 .eq(TradeLogisticsWaybillDO::getOrderId, orderId)
-                .ne(TradeLogisticsWaybillDO::getStatus, "CANCELLED")
+                .in(TradeLogisticsWaybillDO::getStatus, List.of("CREATING", "CREATED", "UNKNOWN",
+                        "CANCELLING", "CANCEL_UNKNOWN"))
                 .orderByDesc(TradeLogisticsWaybillDO::getId).last("LIMIT 1"));
     }
 

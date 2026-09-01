@@ -38,8 +38,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
@@ -53,6 +55,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     @Resource private TradeOrderItemMapper orderItemMapper;
     @Resource private TradeLogisticsAccountMapper accountMapper;
     @Resource private TradeLogisticsWaybillMapper waybillMapper;
+    @Resource private TradeWechatLogisticsWaybillMapper wechatWaybillMapper;
     @Resource private TradeLogisticsPrintDeviceMapper deviceMapper;
     @Resource private TradeLogisticsPrintTaskMapper taskMapper;
     @Resource private TradeLogisticsTraceMapper traceMapper;
@@ -86,6 +89,11 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     private CreationPreparation prepareCreation(LogisticsWaybillCreateReqVO request) {
         TradeOrderDO order = orderMapper.selectByIdForUpdate(request.getOrderId());
         validateOrder(order);
+        TradeWechatLogisticsWaybillDO wechatWaybill = wechatWaybillMapper.selectByOrderIdForUpdate(order.getId());
+        if (wechatWaybill != null && List.of("CREATING", "CREATED", "UNKNOWN")
+                .contains(wechatWaybill.getStatus())) {
+            throw exception(WECHAT_LOGISTICS_WAYBILL_ALREADY_EXISTS);
+        }
         TradeLogisticsAccountDO account = getAccount(request.getAccountId());
         TradeLogisticsPrintDeviceDO device = getDevice(request.getDeviceId());
         TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId());
@@ -101,10 +109,20 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             newRecord = true;
         } else {
             TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillId(waybill.getId());
-            if (task != null || LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
+            if (LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
+                String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId()
+                        + "-" + IdUtil.fastSimpleUUID();
+                waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setOrderNo(order.getNo())
+                        .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
+                        .setRequestedDeviceId(device.getId()).setProviderOrderNo(providerOrderNo)
+                        .setStatus(LogisticsWaybillStatusEnum.CREATING.name()).setDeliveryStatus("PENDING");
+                waybillMapper.insert(waybill);
+                newRecord = true;
+            } else if (task != null) {
                 return new CreationPreparation(order, account, device, waybill, task, false);
+            } else {
+                account = getAccount(waybill.getAccountId());
             }
-            account = getAccount(waybill.getAccountId());
         }
         return new CreationPreparation(order, account, device, waybill, null, newRecord);
     }
@@ -233,7 +251,14 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     @Override
     public List<LogisticsPendingOrderRespVO> getPendingOrders() {
-        return orderMapper.selectListUndeliveredExpress().stream().map(order -> new LogisticsPendingOrderRespVO()
+        List<TradeOrderDO> orders = orderMapper.selectListUndeliveredExpress();
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> blockedOrderIds = wechatWaybillMapper.selectListByOrderIdsAndStatuses(
+                        orders.stream().map(TradeOrderDO::getId).toList(), List.of("CREATING", "CREATED", "UNKNOWN"))
+                .stream().map(TradeWechatLogisticsWaybillDO::getOrderId).collect(Collectors.toCollection(HashSet::new));
+        return orders.stream().filter(order -> !blockedOrderIds.contains(order.getId())).map(order -> new LogisticsPendingOrderRespVO()
                 .setId(order.getId()).setNo(order.getNo()).setReceiverName(order.getReceiverName())
                 .setReceiverMobile(order.getReceiverMobile()).setProductCount(order.getProductCount())
                 .setPayPrice(order.getPayPrice()).setCreateTime(order.getCreateTime())).toList();

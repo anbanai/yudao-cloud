@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.service.logistics;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPendingOrderRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.*;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -11,6 +12,8 @@ import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsWaybillStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.logistics.WechatLogisticsPrintStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.logistics.WechatLogisticsWaybillStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfApiException;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
@@ -24,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -47,6 +51,7 @@ class LogisticsWaybillServiceImplTest {
     @Mock private TradeOrderItemMapper itemMapper;
     @Mock private TradeLogisticsAccountMapper accountMapper;
     @Mock private TradeLogisticsWaybillMapper waybillMapper;
+    @Mock private TradeWechatLogisticsWaybillMapper wechatWaybillMapper;
     @Mock private TradeLogisticsPrintDeviceMapper deviceMapper;
     @Mock private TradeLogisticsPrintTaskMapper taskMapper;
     @Mock private TradeLogisticsTraceMapper traceMapper;
@@ -63,6 +68,7 @@ class LogisticsWaybillServiceImplTest {
         ReflectionTestUtils.setField(service, "orderItemMapper", itemMapper);
         ReflectionTestUtils.setField(service, "accountMapper", accountMapper);
         ReflectionTestUtils.setField(service, "waybillMapper", waybillMapper);
+        ReflectionTestUtils.setField(service, "wechatWaybillMapper", wechatWaybillMapper);
         ReflectionTestUtils.setField(service, "deviceMapper", deviceMapper);
         ReflectionTestUtils.setField(service, "taskMapper", taskMapper);
         ReflectionTestUtils.setField(service, "traceMapper", traceMapper);
@@ -129,6 +135,65 @@ class LogisticsWaybillServiceImplTest {
 
         assertThat(result.getJobId()).isEqualTo("JOB-1");
         verifyNoInteractions(sfClient);
+    }
+
+    @Test
+    void createWaybill_activeWechatWaybillIsRejected() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+        when(wechatWaybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(new TradeWechatLogisticsWaybillDO()
+                .setOrderId(10L).setStatus(WechatLogisticsWaybillStatusEnum.CREATED.name())
+                .setPrintStatus(WechatLogisticsPrintStatusEnum.PENDING.name()));
+
+        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L)))
+                .isInstanceOf(cn.iocoder.yudao.framework.common.exception.ServiceException.class)
+                .extracting("code")
+                .isEqualTo(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants
+                        .WECHAT_LOGISTICS_WAYBILL_ALREADY_EXISTS.getCode());
+        verifyNoInteractions(sfClient);
+        verifyNoInteractions(accountMapper, deviceMapper);
+    }
+
+    @Test
+    void createWaybill_cancelledWaybillCreatesNewAttemptWithUniqueProviderOrderNo() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        TradeLogisticsWaybillDO cancelled = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L)
+                .setProviderOrderNo("YD-null-10").setStatus(LogisticsWaybillStatusEnum.CANCELLED.name());
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+        when(accountMapper.selectDefaultEnabled()).thenReturn(account());
+        when(deviceMapper.selectDefaultEnabled()).thenReturn(new TradeLogisticsPrintDeviceDO().setId(2L).setStatus(0));
+        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(cancelled);
+        doAnswer(invocation -> {
+            ((TradeLogisticsWaybillDO) invocation.getArgument(0)).setId(4L);
+            return 1;
+        }).when(waybillMapper).insert(any(TradeLogisticsWaybillDO.class));
+        when(sfClient.createWaybill(any(), anyString(), eq(order), anyList(), anyMap()))
+                .thenThrow(new SfApiException("REJECTED", "rejected", false, null));
+
+        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+
+        ArgumentCaptor<TradeLogisticsWaybillDO> captor = ArgumentCaptor.forClass(TradeLogisticsWaybillDO.class);
+        verify(waybillMapper).insert(captor.capture());
+        assertThat(captor.getValue().getId()).isEqualTo(4L);
+        assertThat(captor.getValue().getProviderOrderNo()).startsWith("YD-null-10-")
+                .isNotEqualTo(cancelled.getProviderOrderNo());
+        assertThat(result.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.FAILED.name());
+    }
+
+    @Test
+    void getPendingOrders_excludesOrdersWithActiveWechatWaybill() {
+        TradeOrderDO blocked = new TradeOrderDO().setId(10L).setNo("T10");
+        TradeOrderDO available = new TradeOrderDO().setId(11L).setNo("T11");
+        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(blocked, available));
+        when(wechatWaybillMapper.selectListByOrderIdsAndStatuses(anyList(), anyList()))
+                .thenReturn(List.of(new TradeWechatLogisticsWaybillDO().setOrderId(10L)
+                        .setStatus(WechatLogisticsWaybillStatusEnum.CREATED.name())));
+
+        var result = service.getPendingOrders();
+
+        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(11L);
     }
 
     @Test
