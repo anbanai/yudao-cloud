@@ -33,6 +33,13 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .eq(TradeOrderDO::getId, id).last("FOR UPDATE"));
     }
 
+    default List<TradeOrderDO> selectListUndeliveredExpress() {
+        return selectList(new LambdaQueryWrapperX<TradeOrderDO>()
+                .eq(TradeOrderDO::getStatus, 10)
+                .eq(TradeOrderDO::getDeliveryType, 1)
+                .orderByAsc(TradeOrderDO::getCreateTime));
+    }
+
     default PageResult<TradeOrderDO> selectPage(TradeOrderPageReqVO reqVO, Set<Long> userIds) {
         return selectPage(reqVO, new LambdaQueryWrapperX<TradeOrderDO>()
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())

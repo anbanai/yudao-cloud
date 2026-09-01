@@ -43,4 +43,9 @@ public interface TradeWechatLogisticsWaybillMapper extends BaseMapperX<TradeWech
                 .isNotNull(TradeWechatLogisticsWaybillDO::getWaybillId)
                 .orderByAsc(TradeWechatLogisticsWaybillDO::getId));
     }
+
+    default List<TradeWechatLogisticsWaybillDO> selectListHistory() {
+        return selectList(new LambdaQueryWrapperX<TradeWechatLogisticsWaybillDO>()
+                .orderByDesc(TradeWechatLogisticsWaybillDO::getId));
+    }
 }

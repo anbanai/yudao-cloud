@@ -1,0 +1,308 @@
+package cn.iocoder.yudao.module.trade.service.logistics;
+
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.DigestUtil;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
+import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPendingOrderRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPrintTaskRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsTraceRespVO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.*;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
+import cn.iocoder.yudao.module.trade.dal.mysql.logistics.*;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
+import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsWaybillStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
+import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfApiException;
+import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.annotation.Resource;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
+
+@Service
+public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
+
+    @Resource private TradeOrderMapper orderMapper;
+    @Resource private TradeOrderItemMapper orderItemMapper;
+    @Resource private TradeLogisticsAccountMapper accountMapper;
+    @Resource private TradeLogisticsWaybillMapper waybillMapper;
+    @Resource private TradeLogisticsPrintDeviceMapper deviceMapper;
+    @Resource private TradeLogisticsPrintTaskMapper taskMapper;
+    @Resource private TradeLogisticsTraceMapper traceMapper;
+    @Resource private SfLogisticsClient sfClient;
+    @Resource private LogisticsLabelNormalizer labelNormalizer;
+    @Resource private FileApi fileApi;
+    @Resource private ProductSkuApi productSkuApi;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public LogisticsWaybillRespVO createWaybill(LogisticsWaybillCreateReqVO request) {
+        TradeOrderDO order = orderMapper.selectByIdForUpdate(request.getOrderId());
+        validateOrder(order);
+        TradeLogisticsAccountDO account = getAccount(request.getAccountId());
+        TradeLogisticsPrintDeviceDO device = getDevice(request.getDeviceId());
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId());
+        if (waybill == null) {
+            String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId()
+                    + "-" + IdUtil.getSnowflakeNextIdStr();
+            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setOrderNo(order.getNo())
+                    .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
+                    .setRequestedDeviceId(device.getId())
+                    .setProviderOrderNo(providerOrderNo).setStatus(LogisticsWaybillStatusEnum.CREATING.name())
+                    .setDeliveryStatus("PENDING");
+            waybillMapper.insert(waybill);
+        } else {
+            TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillId(waybill.getId());
+            if (task != null || LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
+                return toResp(waybill, task);
+            }
+            account = getAccount(waybill.getAccountId());
+        }
+        if (LogisticsWaybillStatusEnum.UNKNOWN.name().equals(waybill.getStatus())) {
+            try {
+                SfLogisticsClient.WaybillResult result = sfClient.queryByProviderOrderNo(account,
+                        waybill.getProviderOrderNo());
+                markCreated(waybill, result);
+            } catch (SfApiException exception) {
+                updateFailure(waybill, exception);
+                return toResp(waybill, null);
+            }
+        } else if (!LogisticsWaybillStatusEnum.CREATED.name().equals(waybill.getStatus())) {
+            try {
+                List<TradeOrderItemDO> items = orderItemMapper.selectListByOrderId(order.getId());
+                Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Map.of()
+                        : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId)
+                                .collect(Collectors.toSet()));
+                SfLogisticsClient.WaybillResult result = sfClient.createWaybill(account,
+                        waybill.getProviderOrderNo(), order, items, skuMap);
+                markCreated(waybill, result);
+            } catch (SfApiException exception) {
+                updateFailure(waybill, exception);
+                return toResp(waybill, null);
+            }
+        }
+        return createLabelAndTask(waybill, account, device);
+    }
+
+    private LogisticsWaybillRespVO createLabelAndTask(TradeLogisticsWaybillDO waybill,
+                                                        TradeLogisticsAccountDO account,
+                                                        TradeLogisticsPrintDeviceDO device) {
+        try {
+            byte[] pdf = sfClient.getLabel(account, waybill.getWaybillNo());
+            byte[] png = labelNormalizer.normalizePdf(pdf, account.getPaperWidthMm(), account.getPaperHeightMm(),
+                    account.getDpi());
+            String checksum = DigestUtil.sha256Hex(png);
+            String labelUrl = fileApi.createFile(png, waybill.getWaybillNo() + ".png",
+                    "trade/logistics/labels", "image/png");
+            waybill.setLabelUrl(labelUrl).setLabelContentType("image/png").setLabelChecksum(checksum)
+                    .setLabelSize((long) png.length).setTemplateCode(account.getTemplateCode())
+                    .setPaperWidthMm(account.getPaperWidthMm()).setPaperHeightMm(account.getPaperHeightMm())
+                    .setDpi(account.getDpi()).setErrorCode(null).setErrorMessage(null);
+            waybillMapper.updateById(waybill);
+            TradeLogisticsPrintTaskDO task = newTask(waybill, device);
+            taskMapper.insert(task);
+            return toResp(waybill, task);
+        } catch (RuntimeException exception) {
+            waybill.setErrorCode("LABEL_FAILED").setErrorMessage(StrUtil.maxLength(exception.getMessage(), 1024));
+            waybillMapper.updateById(waybill);
+            return toResp(waybill, null);
+        }
+    }
+
+    private void markCreated(TradeLogisticsWaybillDO waybill, SfLogisticsClient.WaybillResult result) {
+        waybill.setWaybillNo(result.waybillNo()).setStatus(LogisticsWaybillStatusEnum.CREATED.name())
+                .setProviderResponse(StrUtil.maxLength(JsonUtils.toJsonString(result.rawResponse()), 10_000))
+                .setLastSyncTime(LocalDateTime.now()).setErrorCode(null).setErrorMessage(null);
+        waybillMapper.updateById(waybill);
+    }
+
+    private void updateFailure(TradeLogisticsWaybillDO waybill, SfApiException exception) {
+        waybill.setStatus(exception.isUnknownResult() ? LogisticsWaybillStatusEnum.UNKNOWN.name()
+                        : LogisticsWaybillStatusEnum.FAILED.name())
+                .setErrorCode(exception.getCode()).setErrorMessage(StrUtil.maxLength(exception.getMessage(), 1024));
+        waybillMapper.updateById(waybill);
+    }
+
+    private TradeLogisticsPrintTaskDO newTask(TradeLogisticsWaybillDO waybill,
+                                               TradeLogisticsPrintDeviceDO device) {
+        return new TradeLogisticsPrintTaskDO().setRequestId("REQ-" + IdUtil.fastSimpleUUID())
+                .setJobId("JOB-" + IdUtil.fastSimpleUUID()).setOrderId(waybill.getOrderId())
+                .setWaybillId(waybill.getId()).setDeviceId(device.getId())
+                .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name()).setFormat("image")
+                .setLabelUrl(waybill.getLabelUrl()).setChecksum(waybill.getLabelChecksum())
+                .setPaperWidthMm(waybill.getPaperWidthMm()).setPaperHeightMm(waybill.getPaperHeightMm())
+                .setDpi(waybill.getDpi()).setCopies(1).setTestFlag(false);
+    }
+
+    @Override
+    public LogisticsWaybillRespVO getWaybill(Long id) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectById(id);
+        if (waybill == null) throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
+        return toResp(waybill, taskMapper.selectLatestByWaybillId(id));
+    }
+
+    @Override
+    public List<LogisticsWaybillRespVO> getWaybills() {
+        return waybillMapper.selectListAll().stream()
+                .map(waybill -> toResp(waybill, taskMapper.selectLatestByWaybillId(waybill.getId()))).toList();
+    }
+
+    @Override
+    public List<LogisticsPendingOrderRespVO> getPendingOrders() {
+        return orderMapper.selectListUndeliveredExpress().stream().map(order -> new LogisticsPendingOrderRespVO()
+                .setId(order.getId()).setNo(order.getNo()).setReceiverName(order.getReceiverName())
+                .setReceiverMobile(order.getReceiverMobile()).setProductCount(order.getProductCount())
+                .setPayPrice(order.getPayPrice()).setCreateTime(order.getCreateTime())).toList();
+    }
+
+    @Override
+    public List<LogisticsPrintTaskRespVO> getPrintTasks() {
+        return taskMapper.selectListAll().stream().map(this::toTaskResp).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public LogisticsWaybillRespVO reprint(Long id, Long deviceId) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(id);
+        if (waybill == null || !LogisticsWaybillStatusEnum.CREATED.name().equals(waybill.getStatus())) {
+            throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
+        }
+        TradeLogisticsPrintTaskDO previous = taskMapper.selectLatestByWaybillId(id);
+        if (previous != null && !List.of(LogisticsPrintTaskStatusEnum.FAILED.name(),
+                LogisticsPrintTaskStatusEnum.UNKNOWN.name()).contains(previous.getStatus())) {
+            throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
+        }
+        TradeLogisticsPrintTaskDO task = newTask(waybill, getDevice(deviceId));
+        taskMapper.insert(task);
+        return toResp(waybill, task);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelWaybill(Long id) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(id);
+        if (waybill == null || !LogisticsWaybillStatusEnum.CREATED.name().equals(waybill.getStatus())
+                || !"PENDING".equals(waybill.getDeliveryStatus())) throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
+        TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillId(id);
+        if (task != null && !LogisticsPrintTaskStatusEnum.PENDING.name().equals(task.getStatus())) {
+            throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
+        }
+        sfClient.cancelWaybill(getAccount(waybill.getAccountId()), waybill.getProviderOrderNo());
+        if (task != null) taskMapper.updateById(task.setStatus(LogisticsPrintTaskStatusEnum.CANCELLED.name()));
+        waybillMapper.updateById(waybill.setStatus(LogisticsWaybillStatusEnum.CANCELLED.name())
+                .setCancelledTime(LocalDateTime.now()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<LogisticsTraceRespVO> syncTrace(Long id) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectById(id);
+        if (waybill == null || !LogisticsWaybillStatusEnum.CREATED.name().equals(waybill.getStatus())) {
+            throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
+        }
+        JsonNode routes = sfClient.queryTrace(getAccount(waybill.getAccountId()), waybill.getWaybillNo());
+        traceMapper.delete(TradeLogisticsTraceDO::getWaybillId, id);
+        JsonNode list = routes.path("routeResps");
+        if (!list.isArray()) list = routes.path("routes");
+        for (JsonNode route : list) {
+            LocalDateTime time = parseTime(route.path("acceptTime").asText());
+            traceMapper.insert(new TradeLogisticsTraceDO().setWaybillId(id)
+                    .setProviderEventId(route.path("id").asText(null)).setStatus(route.path("opCode").asText())
+                    .setContent(route.path("remark").asText()).setLocation(route.path("acceptAddress").asText())
+                    .setOperateTime(time).setRawData(JsonUtils.toJsonString(route)));
+        }
+        waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(id).setLastSyncTime(LocalDateTime.now()));
+        return traceMapper.selectListByWaybillId(id).stream().map(this::toTraceResp).toList();
+    }
+
+    @Override
+    public List<LogisticsTraceRespVO> getTrace(Long id) {
+        if (waybillMapper.selectById(id) == null) throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
+        return traceMapper.selectListByWaybillId(id).stream().map(this::toTraceResp).toList();
+    }
+
+    @Override
+    public void validateManualDelivery(Long orderId, Long logisticsId, String logisticsNo) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectActiveByOrderId(orderId);
+        if (waybill == null || !List.of(LogisticsWaybillStatusEnum.CREATING.name(),
+                LogisticsWaybillStatusEnum.CREATED.name(), LogisticsWaybillStatusEnum.UNKNOWN.name())
+                .contains(waybill.getStatus())) {
+            return;
+        }
+        throw exception(LOGISTICS_WAYBILL_ALREADY_EXISTS);
+    }
+
+    private void validateOrder(TradeOrderDO order) {
+        if (order == null || !TradeOrderStatusEnum.isUndelivered(order.getStatus())) {
+            throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+        }
+        if (!DeliveryTypeEnum.EXPRESS.getType().equals(order.getDeliveryType())) {
+            throw exception(ORDER_DELIVERY_FAIL_DELIVERY_TYPE_NOT_EXPRESS);
+        }
+    }
+
+    private TradeLogisticsAccountDO getAccount(Long id) {
+        TradeLogisticsAccountDO account = id == null ? accountMapper.selectDefaultEnabled() : accountMapper.selectById(id);
+        if (account == null) throw exception(LOGISTICS_ACCOUNT_NOT_EXISTS);
+        if (account.getStatus() == null || account.getStatus() != 0) throw exception(LOGISTICS_ACCOUNT_DISABLED);
+        return account;
+    }
+
+    private TradeLogisticsPrintDeviceDO getDevice(Long id) {
+        TradeLogisticsPrintDeviceDO device = id == null ? deviceMapper.selectDefaultEnabled() : deviceMapper.selectById(id);
+        if (device == null || device.getStatus() == null || device.getStatus() != 0) {
+            throw exception(LOGISTICS_DEVICE_NOT_EXISTS);
+        }
+        return device;
+    }
+
+    private LogisticsWaybillRespVO toResp(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task) {
+        return new LogisticsWaybillRespVO().setId(waybill.getId()).setOrderId(waybill.getOrderId())
+                .setOrderNo(waybill.getOrderNo()).setProviderOrderNo(waybill.getProviderOrderNo())
+                .setWaybillNo(waybill.getWaybillNo()).setStatus(waybill.getStatus())
+                .setDeliveryStatus(waybill.getDeliveryStatus()).setPrintStatus(task == null ? null : task.getStatus())
+                .setJobId(task == null ? null : task.getJobId()).setDeviceId(task == null ? null : task.getDeviceId())
+                .setErrorCode(waybill.getErrorCode()).setErrorMessage(waybill.getErrorMessage())
+                .setCreateTime(waybill.getCreateTime());
+    }
+
+    private LogisticsPrintTaskRespVO toTaskResp(TradeLogisticsPrintTaskDO task) {
+        return new LogisticsPrintTaskRespVO().setId(task.getId()).setRequestId(task.getRequestId())
+                .setJobId(task.getJobId()).setOrderId(task.getOrderId()).setWaybillId(task.getWaybillId())
+                .setDeviceId(task.getDeviceId()).setStatus(task.getStatus()).setFormat(task.getFormat())
+                .setPaperWidthMm(task.getPaperWidthMm()).setPaperHeightMm(task.getPaperHeightMm())
+                .setDpi(task.getDpi()).setCopies(task.getCopies()).setLeaseExpireTime(task.getLeaseExpireTime())
+                .setLastError(task.getLastError()).setCreateTime(task.getCreateTime());
+    }
+
+    private LogisticsTraceRespVO toTraceResp(TradeLogisticsTraceDO trace) {
+        return new LogisticsTraceRespVO().setId(trace.getId()).setStatus(trace.getStatus())
+                .setContent(trace.getContent()).setLocation(trace.getLocation()).setOperateTime(trace.getOperateTime());
+    }
+
+    private LocalDateTime parseTime(String value) {
+        if (StrUtil.isBlank(value)) return LocalDateTime.now();
+        try { return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")); }
+        catch (Exception ignored) { return LocalDateTime.now(); }
+    }
+}

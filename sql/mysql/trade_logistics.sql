@@ -1,0 +1,199 @@
+-- 顺丰直连 + PrintBridge 打单（MySQL 8）
+-- 不删除、不修改 trade_wechat_logistics_* 历史表。
+
+CREATE TABLE IF NOT EXISTS `trade_logistics_account` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `name` varchar(64) NOT NULL,
+  `logistics_id` bigint NOT NULL COMMENT 'trade_delivery_express.id（顺丰）',
+  `endpoint` varchar(255) NOT NULL,
+  `partner_id` varchar(512) NOT NULL COMMENT '加密保存',
+  `check_word` varchar(512) NOT NULL COMMENT '加密保存',
+  `monthly_card` varchar(512) NOT NULL COMMENT '加密保存',
+  `service_code` varchar(32) NOT NULL COMMENT '顺丰产品类型编号',
+  `template_code` varchar(64) NOT NULL COMMENT '100x150 云打印模板代码',
+  `sender_name` varchar(64) NOT NULL,
+  `sender_phone` varchar(32) NOT NULL,
+  `sender_province` varchar(64) NOT NULL,
+  `sender_city` varchar(64) NOT NULL,
+  `sender_district` varchar(64) DEFAULT NULL,
+  `sender_address` varchar(512) NOT NULL,
+  `default_weight_kg` decimal(10,3) NOT NULL,
+  `paper_width_mm` int NOT NULL DEFAULT 100,
+  `paper_height_mm` int NOT NULL DEFAULT 150,
+  `dpi` int NOT NULL DEFAULT 203,
+  `default_flag` bit(1) NOT NULL DEFAULT b'0',
+  `status` tinyint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_logistics_account_tenant_status` (`tenant_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顺丰开放平台账号';
+
+CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `order_id` bigint NOT NULL,
+  `order_no` varchar(64) NOT NULL,
+  `account_id` bigint NOT NULL,
+  `logistics_id` bigint NOT NULL,
+  `requested_device_id` bigint DEFAULT NULL,
+  `provider_order_no` varchar(128) NOT NULL,
+  `waybill_no` varchar(64) DEFAULT NULL,
+  `status` varchar(16) NOT NULL COMMENT 'CREATING/CREATED/UNKNOWN/FAILED/CANCELLED',
+  `active_order_id` bigint GENERATED ALWAYS AS (CASE WHEN `deleted` = b'0' AND `status` <> 'CANCELLED' THEN `order_id` ELSE NULL END) STORED,
+  `label_url` varchar(1024) DEFAULT NULL,
+  `label_content_type` varchar(32) DEFAULT NULL,
+  `label_checksum` varchar(64) DEFAULT NULL,
+  `label_size` bigint DEFAULT NULL,
+  `template_code` varchar(64) DEFAULT NULL,
+  `paper_width_mm` int DEFAULT NULL,
+  `paper_height_mm` int DEFAULT NULL,
+  `dpi` int DEFAULT NULL,
+  `delivery_status` varchar(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/DELIVERED/CONFLICT',
+  `error_code` varchar(64) DEFAULT NULL,
+  `error_message` varchar(1024) DEFAULT NULL,
+  `provider_response` longtext,
+  `last_sync_time` datetime DEFAULT NULL,
+  `delivered_time` datetime DEFAULT NULL,
+  `cancelled_time` datetime DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_logistics_active_order` (`tenant_id`,`active_order_id`),
+  UNIQUE KEY `uk_logistics_provider_order` (`tenant_id`,`provider_order_no`),
+  UNIQUE KEY `uk_logistics_waybill_no` (`tenant_id`,`waybill_no`),
+  KEY `idx_logistics_waybill_status` (`tenant_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顺丰运单';
+
+CREATE TABLE IF NOT EXISTS `trade_logistics_print_device` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `device_code` varchar(64) NOT NULL,
+  `device_name` varchar(128) NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `default_flag` bit(1) NOT NULL DEFAULT b'0',
+  `status` tinyint NOT NULL DEFAULT 0,
+  `version` varchar(32) DEFAULT NULL,
+  `last_poll_time` datetime DEFAULT NULL,
+  `token_created_time` datetime NOT NULL,
+  `disabled_time` datetime DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_logistics_device_code` (`tenant_id`,`device_code`,`deleted`),
+  UNIQUE KEY `uk_logistics_device_token` (`token_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='PrintBridge 设备';
+
+CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `request_id` varchar(64) NOT NULL,
+  `job_id` varchar(64) NOT NULL,
+  `order_id` bigint DEFAULT NULL,
+  `waybill_id` bigint DEFAULT NULL,
+  `device_id` bigint NOT NULL,
+  `status` varchar(16) NOT NULL COMMENT 'PENDING/DISPATCHED/ACCEPTED/SUCCESS/FAILED/UNKNOWN/CANCELLED',
+  `format` varchar(16) NOT NULL DEFAULT 'image',
+  `label_url` varchar(1024) NOT NULL,
+  `checksum` varchar(64) NOT NULL,
+  `paper_width_mm` int NOT NULL DEFAULT 100,
+  `paper_height_mm` int NOT NULL DEFAULT 150,
+  `dpi` int NOT NULL DEFAULT 203,
+  `copies` int NOT NULL DEFAULT 1,
+  `test_flag` bit(1) NOT NULL DEFAULT b'0',
+  `lease_expire_time` datetime DEFAULT NULL,
+  `dispatched_time` datetime DEFAULT NULL,
+  `accepted_time` datetime DEFAULT NULL,
+  `completed_time` datetime DEFAULT NULL,
+  `last_error` varchar(1024) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_logistics_request_id` (`request_id`),
+  UNIQUE KEY `uk_logistics_job_id` (`job_id`),
+  KEY `idx_logistics_task_pull` (`tenant_id`,`device_id`,`status`,`lease_expire_time`),
+  KEY `idx_logistics_task_waybill` (`tenant_id`,`waybill_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='持久化打印任务';
+
+CREATE TABLE IF NOT EXISTS `trade_logistics_print_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `event_id` varchar(128) NOT NULL,
+  `task_id` bigint NOT NULL,
+  `device_id` bigint NOT NULL,
+  `job_id` varchar(64) NOT NULL,
+  `event_type` varchar(32) NOT NULL,
+  `status` varchar(32) NOT NULL,
+  `message` varchar(1024) DEFAULT NULL,
+  `event_time` datetime NOT NULL,
+  `raw_payload` longtext,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_logistics_event` (`event_id`),
+  KEY `idx_logistics_event_task` (`tenant_id`,`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='PrintBridge 回执事件';
+
+CREATE TABLE IF NOT EXISTS `trade_logistics_trace` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `waybill_id` bigint NOT NULL,
+  `provider_event_id` varchar(128) DEFAULT NULL,
+  `status` varchar(32) DEFAULT NULL,
+  `content` varchar(1024) NOT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `operate_time` datetime NOT NULL,
+  `raw_data` longtext,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_logistics_trace_waybill` (`tenant_id`,`waybill_id`,`operate_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顺丰物流轨迹';
+
+-- 物流打单目录
+INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT '物流打单','',1,67,id,'logistics','ep:printer','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
+FROM `system_menu` WHERE `name`='订单中心' AND `path`='trade' AND `type`=1
+AND NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `path`='logistics' AND `name`='物流打单' AND `deleted`=b'0');
+
+UPDATE `system_menu`
+SET `name`='微信物流历史',
+    `path`='wechat-history',
+    `parent_id`=(SELECT m.id FROM (SELECT id FROM `system_menu` WHERE `name`='物流打单' AND `path`='logistics' AND `deleted`=b'0' LIMIT 1) m),
+    `updater`='1', `update_time`=NOW()
+WHERE `component`='mall/trade/logistics/wechat/index' AND `deleted`=b'0';
+
+INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT p.name,'',2,p.sort,m.id,p.path,p.icon,p.component,p.component_name,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
+FROM (SELECT '待发货工作台' name,1 sort,'pending' path,'ep:box' icon,'mall/trade/logistics/sf/pending/index' component,'TradeSfLogisticsPending' component_name
+      UNION ALL SELECT '顺丰账号',2,'accounts','ep:key','mall/trade/logistics/sf/accounts/index','TradeSfLogisticsAccounts'
+      UNION ALL SELECT '打印设备',3,'devices','ep:monitor','mall/trade/logistics/sf/devices/index','TradeSfLogisticsDevices'
+      UNION ALL SELECT '运单管理',4,'waybills','ep:tickets','mall/trade/logistics/sf/waybills/index','TradeSfLogisticsWaybills'
+      UNION ALL SELECT '打印任务',5,'tasks','ep:list','mall/trade/logistics/sf/tasks/index','TradeSfLogisticsTasks'
+      UNION ALL SELECT '微信物流历史',6,'wechat-history','ep:clock','mall/trade/logistics/wechat/index','TradeWechatLogistics') p
+JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
+WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.component=p.component AND x.deleted=b'0');
+
+INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT p.name,p.permission,3,p.sort,m.id,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
+FROM (SELECT '顺丰账号查询' name,'trade:logistics:sf-account:query' permission,1 sort
+      UNION ALL SELECT '顺丰账号维护','trade:logistics:sf-account:update',2
+      UNION ALL SELECT '打印设备查询','trade:logistics:device:query',3
+      UNION ALL SELECT '打印设备维护','trade:logistics:device:update',4
+      UNION ALL SELECT '本机打印诊断','trade:logistics:diagnostics',5
+      UNION ALL SELECT '顺丰运单查询','trade:logistics:waybill:query',6
+      UNION ALL SELECT '创建顺丰运单','trade:logistics:waybill:create',7
+      UNION ALL SELECT '取消顺丰运单','trade:logistics:waybill:cancel',8
+      UNION ALL SELECT '人工重打','trade:logistics:waybill:reprint',9
+      UNION ALL SELECT '打印任务查询','trade:logistics:print-task:query',10
+      UNION ALL SELECT '顺丰轨迹查询','trade:logistics:trace:query',11
+      UNION ALL SELECT '顺丰轨迹同步','trade:logistics:trace:sync',12) p
+JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
+WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.permission=p.permission AND x.deleted=b'0');

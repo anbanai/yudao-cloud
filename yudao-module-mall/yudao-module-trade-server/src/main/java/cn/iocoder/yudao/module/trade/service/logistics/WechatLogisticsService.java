@@ -31,6 +31,8 @@ public interface WechatLogisticsService {
 
     List<WechatLogisticsWaybillRespVO> getPendingWaybills();
 
+    List<WechatLogisticsWaybillRespVO> getHistoryWaybills();
+
     List<WechatLogisticsTraceRespVO> getTrace(Long waybillId);
 
     void syncTrace(Long waybillId);

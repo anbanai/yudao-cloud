@@ -68,6 +68,13 @@ public class WechatLogisticsController {
         return success(wechatLogisticsService.getPendingWaybills());
     }
 
+    @GetMapping("/history")
+    @Operation(summary = "查询微信物流历史运单")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:query')")
+    public CommonResult<List<WechatLogisticsWaybillRespVO>> getHistoryWaybills() {
+        return success(wechatLogisticsService.getHistoryWaybills());
+    }
+
     @PostMapping("/waybills/create")
     @Operation(summary = "创建微信物流运单")
     @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:waybill:create', 'trade:order:update')")

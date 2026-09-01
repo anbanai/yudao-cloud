@@ -31,6 +31,8 @@ public class SecurityConfiguration {
                 registry.requestMatchers("/druid/**").anonymous();
                 // RPC 服务的安全配置
                 registry.requestMatchers(ApiConstants.PREFIX + "/**").permitAll();
+                // PrintBridge 使用设备专属 Bearer Token 鉴权，不使用后台用户 Token。
+                registry.requestMatchers("/internal-api/trade/logistics/printbridge/**").permitAll();
             }
 
         };

@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderLogDO;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
+import cn.iocoder.yudao.module.trade.service.logistics.LogisticsWaybillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,8 @@ public class TradeOrderController {
 
     @Resource
     private TradeOrderUpdateService tradeOrderUpdateService;
+    @Resource
+    private LogisticsWaybillService logisticsWaybillService;
     @Resource
     private TradeOrderQueryService tradeOrderQueryService;
     @Resource
@@ -111,6 +114,8 @@ public class TradeOrderController {
     @Operation(summary = "订单发货")
     @PreAuthorize("@ss.hasPermission('trade:order:update')")
     public CommonResult<Boolean> deliveryOrder(@RequestBody TradeOrderDeliveryReqVO deliveryReqVO) {
+        logisticsWaybillService.validateManualDelivery(deliveryReqVO.getId(), deliveryReqVO.getLogisticsId(),
+                deliveryReqVO.getLogisticsNo());
         tradeOrderUpdateService.deliveryOrder(deliveryReqVO);
         return success(true);
     }
