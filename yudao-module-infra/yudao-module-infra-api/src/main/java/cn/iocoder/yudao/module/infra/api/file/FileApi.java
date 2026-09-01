@@ -70,4 +70,11 @@ public interface FileApi {
     CommonResult<String> presignGetUrl(@NotEmpty(message = "URL 不能为空") @RequestParam("url") String url,
                                        Integer expirationSeconds);
 
+    /**
+     * 判断主文件存储是否为 HTTPS 私有 S3，并支持短时效下载签名。
+     */
+    @GetMapping(PREFIX + "/private-presigned-get-supported")
+    @Operation(summary = "判断主文件存储是否支持私有 HTTPS 预签名下载")
+    CommonResult<Boolean> isPrivatePresignedGetSupported();
+
 }

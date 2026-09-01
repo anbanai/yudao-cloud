@@ -54,6 +54,8 @@ public interface FileService {
      */
     String presignGetUrl(String url, Integer expirationSeconds);
 
+    boolean isPrivatePresignedGetSupported();
+
     /**
      * 创建文件
      *

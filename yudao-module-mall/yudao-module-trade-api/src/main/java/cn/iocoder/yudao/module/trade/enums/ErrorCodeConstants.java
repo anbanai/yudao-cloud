@@ -96,6 +96,21 @@ public interface ErrorCodeConstants {
     ErrorCode WECHAT_LOGISTICS_PRINT_NOT_PENDING = new ErrorCode(1_011_004_207, "微信物流运单不是待确认打印状态");
     ErrorCode WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED = new ErrorCode(1_011_004_208, "订单不是待发货状态");
     ErrorCode WECHAT_LOGISTICS_WAYBILL_NOT_CREATED = new ErrorCode(1_011_004_209, "微信物流运单尚未创建成功，不能确认打印");
+    ErrorCode WECHAT_LOGISTICS_CREATE_DISABLED = new ErrorCode(1_011_004_210, "微信物流新建面单已停用，请使用顺丰直连打单");
+
+    // ========== 顺丰直连打单 1-011-004-300 ==========
+    ErrorCode LOGISTICS_ACCOUNT_NOT_EXISTS = new ErrorCode(1_011_004_300, "顺丰物流账号不存在");
+    ErrorCode LOGISTICS_ACCOUNT_DISABLED = new ErrorCode(1_011_004_301, "顺丰物流账号未启用");
+    ErrorCode LOGISTICS_DEVICE_NOT_EXISTS = new ErrorCode(1_011_004_302, "打印设备不存在");
+    ErrorCode LOGISTICS_DEVICE_AUTH_FAILED = new ErrorCode(1_011_004_303, "PrintBridge 设备认证失败");
+    ErrorCode LOGISTICS_PRINT_TASK_NOT_EXISTS = new ErrorCode(1_011_004_304, "打印任务不存在");
+    ErrorCode LOGISTICS_PRINT_TASK_INVALID_STATE = new ErrorCode(1_011_004_305, "打印任务状态不允许当前操作");
+    ErrorCode LOGISTICS_WAYBILL_NOT_EXISTS = new ErrorCode(1_011_004_306, "顺丰运单不存在");
+    ErrorCode LOGISTICS_WAYBILL_ALREADY_EXISTS = new ErrorCode(1_011_004_307, "订单已经存在有效顺丰运单");
+    ErrorCode LOGISTICS_SF_API_FAILED = new ErrorCode(1_011_004_308, "调用顺丰开放平台失败：{}");
+    ErrorCode LOGISTICS_LABEL_INVALID = new ErrorCode(1_011_004_309, "顺丰面单不符合 100x150 mm 规范：{}");
+    ErrorCode LOGISTICS_PRIVATE_STORAGE_REQUIRED = new ErrorCode(1_011_004_310,
+            "物流面单必须使用支持 HTTPS 临时签名的私有 S3 文件存储");
 
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");

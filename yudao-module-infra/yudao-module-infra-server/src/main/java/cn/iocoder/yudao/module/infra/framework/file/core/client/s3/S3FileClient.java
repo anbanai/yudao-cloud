@@ -116,13 +116,8 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
     @Override
     public String presignGetUrl(String url, Integer expirationSeconds) {
         // 1. 将 url 转换为 path
-        // 完整 Domain URL 会解码还原为原始对象名；裸 path 约定已经是未编码的对象名
-        boolean domainUrl = StrUtil.startWith(url, config.getDomain() + "/");
-        String path = domainUrl ? StrUtil.removePrefix(url, config.getDomain() + "/") : url;
-        if (domainUrl) {
-            path = HttpUtils.removeUrlPathQueryAndFragment(path);
-            path = HttpUtils.decodeUrlPath(path);
-        }
+        // 完整 Domain/签名 URL 会解码还原为原始对象名；裸 path 约定已经是未编码的对象名
+        String path = extractObjectPath(url);
 
         // 2.1 情况一：公开访问：无需签名
         // 考虑到老版本的兼容，所以必须是 config.getEnablePublicAccess() 为 false 时，才进行签名
@@ -138,6 +133,50 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
                 .getObjectRequest(b -> b.bucket(config.getBucket()).key(finalPath)).build())
                 .url();
         return signedUrl.toString();
+    }
+
+    @Override
+    public boolean isPrivatePresignedGetSupported() {
+        return BooleanUtil.isFalse(config.getEnablePublicAccess())
+                && HttpUtil.isHttps(config.getDomain())
+                && HttpUtil.isHttps(buildPresignerEndpoint());
+    }
+
+    private String extractObjectPath(String value) {
+        if (!HttpUtil.isHttp(value) && !HttpUtil.isHttps(value)) {
+            return value;
+        }
+        URI valueUri = URI.create(value);
+        String path = extractRelativePath(valueUri, URI.create(config.getDomain()), false);
+        if (path == null) {
+            path = extractRelativePath(valueUri, URI.create(buildPresignerEndpoint()),
+                    Boolean.TRUE.equals(config.getEnablePathStyleAccess()));
+        }
+        return path != null ? HttpUtils.decodeUrlPath(path) : value;
+    }
+
+    private String extractRelativePath(URI valueUri, URI baseUri, boolean pathStyle) {
+        String baseHost = baseUri.getHost();
+        String valueHost = valueUri.getHost();
+        if (StrUtil.isEmpty(baseHost) || StrUtil.isEmpty(valueHost)) {
+            return null;
+        }
+        boolean sameHost = StrUtil.equalsIgnoreCase(valueHost, baseHost);
+        boolean bucketHost = !pathStyle
+                && StrUtil.equalsIgnoreCase(valueHost, config.getBucket() + "." + baseHost);
+        if (!sameHost && !bucketHost) {
+            return null;
+        }
+        String basePath = StrUtil.removeSuffix(StrUtil.blankToDefault(baseUri.getRawPath(), ""), "/");
+        if (pathStyle) {
+            basePath += "/" + config.getBucket();
+        }
+        String valuePath = valueUri.getRawPath();
+        String prefix = basePath + "/";
+        if (!StrUtil.startWith(valuePath, prefix)) {
+            return null;
+        }
+        return StrUtil.removePrefix(valuePath, prefix);
     }
 
     /**

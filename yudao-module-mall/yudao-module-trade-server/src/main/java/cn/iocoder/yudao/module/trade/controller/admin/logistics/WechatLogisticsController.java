@@ -68,24 +68,11 @@ public class WechatLogisticsController {
         return success(wechatLogisticsService.getPendingWaybills());
     }
 
-    @PostMapping("/waybills/create")
-    @Operation(summary = "创建微信物流运单")
-    @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:waybill:create', 'trade:order:update')")
-    public CommonResult<WechatLogisticsWaybillRespVO> createWaybill(
-            @Valid @RequestBody WechatLogisticsWaybillCreateReqVO reqVO) {
-        WechatLogisticsWaybillRespVO result = wechatLogisticsService.createWaybill(reqVO.getOrderId());
-        if (result.getErrorCode() != null) {
-            return CommonResult.error(result.getErrorCode(), result.getErrorMessage());
-        }
-        return success(result);
-    }
-
-    @PostMapping("/waybills/batch-create")
-    @Operation(summary = "批量创建微信物流运单")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:create')")
-    public CommonResult<List<WechatLogisticsWaybillRespVO>> batchCreateWaybills(
-            @Valid @RequestBody WechatLogisticsWaybillBatchCreateReqVO reqVO) {
-        return success(wechatLogisticsService.batchCreateWaybills(reqVO.getOrderIds()));
+    @GetMapping("/history")
+    @Operation(summary = "查询微信物流历史运单")
+    @PreAuthorize("@ss.hasPermission('trade:logistics:waybill:query')")
+    public CommonResult<List<WechatLogisticsWaybillRespVO>> getHistoryWaybills() {
+        return success(wechatLogisticsService.getHistoryWaybills());
     }
 
     @PostMapping("/waybills/{id}/confirm-print")

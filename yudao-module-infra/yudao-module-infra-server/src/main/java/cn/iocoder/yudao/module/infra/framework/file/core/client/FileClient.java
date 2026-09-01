@@ -63,4 +63,11 @@ public interface FileClient {
         throw new UnsupportedOperationException("不支持的操作");
     }
 
+    /**
+     * 是否能生成 HTTPS、有限时效且底层对象不可公开读取的下载地址。
+     */
+    default boolean isPrivatePresignedGetSupported() {
+        return false;
+    }
+
 }

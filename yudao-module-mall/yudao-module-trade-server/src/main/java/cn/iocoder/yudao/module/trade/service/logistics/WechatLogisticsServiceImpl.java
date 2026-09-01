@@ -23,6 +23,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeWechatLogisticsConfigMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeWechatLogisticsTraceMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeWechatLogisticsWaybillMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsWaybillMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
@@ -61,6 +62,8 @@ import static cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum.UND
 @Slf4j
 public class WechatLogisticsServiceImpl implements WechatLogisticsService {
 
+    /** 新订单统一走顺丰直连；保留旧实现仅用于已有历史运单的查询和维护。 */
+    private static final boolean WECHAT_CREATE_ENABLED = false;
     /** 微信 getOrder 在缺少有效 waybill_id 时返回的错误码。旧版本曾将该预查询错误保存为 UNKNOWN。 */
     static final int WECHAT_INVALID_WAYBILL_ID = 9300528;
     private static final Pattern WECHAT_ERROR_CODE_PATTERN = Pattern.compile(
@@ -70,6 +73,8 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     private TradeWechatLogisticsConfigMapper wechatLogisticsConfigMapper;
     @Resource
     private TradeWechatLogisticsWaybillMapper waybillMapper;
+    @Resource
+    private TradeLogisticsWaybillMapper sfWaybillMapper;
     @Resource
     private TradeWechatLogisticsTraceMapper traceMapper;
     @Resource
@@ -141,6 +146,9 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public WechatLogisticsWaybillRespVO createWaybill(Long orderId) {
+        if (!WECHAT_CREATE_ENABLED) {
+            throw exception(WECHAT_LOGISTICS_CREATE_DISABLED);
+        }
         // 锁定订单行，覆盖本地运单尚未插入时的并发点击场景。
         TradeOrderDO lockedOrder = tradeOrderMapper.selectByIdForUpdate(orderId);
         if (lockedOrder == null) {
@@ -251,6 +259,9 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
         if (!UNDELIVERED.getStatus().equals(order.getStatus())) {
             throw exception(WECHAT_LOGISTICS_ORDER_NOT_UNDELIVERED);
         }
+        if (sfWaybillMapper.selectActiveByOrderId(order.getId()) != null) {
+            throw exception(LOGISTICS_WAYBILL_ALREADY_EXISTS);
+        }
         DeliveryExpressDO express = deliveryExpressService.getDeliveryExpressByCode(waybill.getDeliveryId());
         if (express == null) {
             throw exception(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.EXPRESS_NOT_EXISTS);
@@ -299,6 +310,11 @@ public class WechatLogisticsServiceImpl implements WechatLogisticsService {
     @Override
     public List<WechatLogisticsWaybillRespVO> getPendingWaybills() {
         return waybillMapper.selectListByPendingPrint().stream().map(this::convertWaybill).toList();
+    }
+
+    @Override
+    public List<WechatLogisticsWaybillRespVO> getHistoryWaybills() {
+        return waybillMapper.selectListHistory().stream().map(this::convertWaybill).toList();
     }
 
     @Override

@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeWechatLogisticsWaybillDO;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.Collection;
 import java.util.List;
 
 @Mapper
@@ -25,6 +26,13 @@ public interface TradeWechatLogisticsWaybillMapper extends BaseMapperX<TradeWech
                 .eq(TradeWechatLogisticsWaybillDO::getId, id).last("FOR UPDATE"));
     }
 
+    default List<TradeWechatLogisticsWaybillDO> selectListByOrderIdsAndStatuses(
+            Collection<Long> orderIds, Collection<String> statuses) {
+        return selectList(new LambdaQueryWrapperX<TradeWechatLogisticsWaybillDO>()
+                .in(TradeWechatLogisticsWaybillDO::getOrderId, orderIds)
+                .in(TradeWechatLogisticsWaybillDO::getStatus, statuses));
+    }
+
     default TradeWechatLogisticsWaybillDO selectByWechatOrderId(String wechatOrderId) {
         return selectOne(new LambdaQueryWrapperX<TradeWechatLogisticsWaybillDO>()
                 .eq(TradeWechatLogisticsWaybillDO::getWechatOrderId, wechatOrderId));
@@ -42,5 +50,10 @@ public interface TradeWechatLogisticsWaybillMapper extends BaseMapperX<TradeWech
                 .eq(TradeWechatLogisticsWaybillDO::getStatus, "CREATED")
                 .isNotNull(TradeWechatLogisticsWaybillDO::getWaybillId)
                 .orderByAsc(TradeWechatLogisticsWaybillDO::getId));
+    }
+
+    default List<TradeWechatLogisticsWaybillDO> selectListHistory() {
+        return selectList(new LambdaQueryWrapperX<TradeWechatLogisticsWaybillDO>()
+                .orderByDesc(TradeWechatLogisticsWaybillDO::getId));
     }
 }
