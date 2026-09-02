@@ -43,6 +43,7 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeService {
 
     private static final int LABEL_URL_EXPIRATION_SECONDS = 15 * 60;
+    private static final int ENROLLMENT_TTL_MINUTES = 10;
 
     @Resource
     private TradeLogisticsPrintDeviceMapper deviceMapper;
@@ -62,13 +63,35 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     private PlatformTransactionManager transactionManager;
 
     @Override
-    public TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode) {
-        if (StrUtil.isBlank(token) || StrUtil.isBlank(deviceCode)) {
+    public TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode, String deviceName) {
+        if (StrUtil.isBlank(token) || token.length() > 512 || StrUtil.isBlank(deviceCode)
+                || deviceCode.length() > 128) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
         TradeLogisticsPrintDeviceDO device = deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash(token));
-        if (device == null || device.getStatus() == null || device.getStatus() != 0
-                || !StrUtil.equals(device.getDeviceCode(), deviceCode)) {
+        if (device == null || device.getStatus() == null || device.getStatus() != 0) {
+            throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
+        }
+        if (isPending(device)) {
+            if (device.getTokenCreatedTime() == null
+                    || device.getTokenCreatedTime().isBefore(LocalDateTime.now().minusMinutes(ENROLLMENT_TTL_MINUTES))) {
+                throw exception(LOGISTICS_DEVICE_AUTH_FAILED, "PrintBridge 配置已过期，请重新下载");
+            }
+            if (!StrUtil.equals(device.getDeviceCode(), deviceCode)) {
+                throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
+            }
+            String adoptedName = StrUtil.blankToDefault(StrUtil.sub(deviceName, 0, 128), "PrintBridge 设备");
+            try {
+                if (deviceMapper.bindPendingDevice(device.getId(), deviceCode, adoptedName) > 0) {
+                    device.setDeviceCode(deviceCode).setDeviceName(adoptedName);
+                } else {
+                    device = deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash(token));
+                }
+            } catch (DuplicateKeyException exception) {
+                throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
+            }
+        }
+        if (!StrUtil.equals(device.getDeviceCode(), deviceCode)) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
         return device;
@@ -104,8 +127,14 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
         validateTemporaryHttpsUrl(fileUrl);
         return new PrintBridgeTaskRespVO().setType("print").setRequestId(task.getRequestId())
                 .setJobId(task.getJobId()).setFormat(task.getFormat()).setFileUrl(fileUrl)
+                .setPrinterName(device.getPrinterName())
                 .setCopies(task.getCopies()).setPaper(new PrintBridgeTaskRespVO.Paper()
                         .setWidthMm(task.getPaperWidthMm()).setHeightMm(task.getPaperHeightMm()));
+    }
+
+    private static boolean isPending(TradeLogisticsPrintDeviceDO device) {
+        return StrUtil.equals(device.getEnrollmentKey(), "ACTIVE")
+                || StrUtil.startWith(device.getDeviceCode(), "pending-");
     }
 
     @Override

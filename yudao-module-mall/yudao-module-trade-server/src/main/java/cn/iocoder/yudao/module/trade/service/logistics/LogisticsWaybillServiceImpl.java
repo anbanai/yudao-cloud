@@ -413,6 +413,10 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         if (device == null || device.getStatus() == null || device.getStatus() != 0) {
             throw exception(LOGISTICS_DEVICE_NOT_EXISTS);
         }
+        if (StrUtil.isNotBlank(device.getEnrollmentKey())
+                || StrUtil.startWith(device.getDeviceCode(), "pending-") || StrUtil.isBlank(device.getPrinterName())) {
+            throw exception(LOGISTICS_DEVICE_NOT_READY);
+        }
         return device;
     }
 

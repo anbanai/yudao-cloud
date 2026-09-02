@@ -8,7 +8,9 @@ import cn.iocoder.yudao.module.trade.service.logistics.LogisticsWaybillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,10 +52,11 @@ public class SfPrintBridgeLogisticsController {
         return success(managementService.saveDevice(request));
     }
 
-    @PostMapping("/devices/{id}/rotate-token")
+    @PostMapping("/devices/enroll")
     @PreAuthorize("@ss.hasPermission('trade:logistics:device:update')")
-    public CommonResult<LogisticsPrintDeviceRespVO> rotateDeviceToken(@PathVariable("id") Long id) {
-        return success(managementService.rotateDeviceToken(id));
+    public CommonResult<LogisticsPrintDeviceRespVO> enrollDevice(HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return success(managementService.enrollDevice());
     }
 
     @PostMapping("/diagnostics/test-payload")

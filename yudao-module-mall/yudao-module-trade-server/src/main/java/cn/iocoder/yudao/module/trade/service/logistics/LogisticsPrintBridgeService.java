@@ -6,7 +6,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrin
 
 public interface LogisticsPrintBridgeService {
 
-    TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode);
+    TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode, String deviceName);
 
     PrintBridgeTaskRespVO pull(TradeLogisticsPrintDeviceDO device, String deviceName);
 

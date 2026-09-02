@@ -9,6 +9,6 @@ public interface LogisticsManagementService {
     Long saveAccount(SfLogisticsAccountSaveReqVO request);
     List<LogisticsPrintDeviceRespVO> getDevices();
     LogisticsPrintDeviceRespVO saveDevice(LogisticsPrintDeviceSaveReqVO request);
-    LogisticsPrintDeviceRespVO rotateDeviceToken(Long id);
+    LogisticsPrintDeviceRespVO enrollDevice();
     String createDiagnosticPayload(int paperWidthMm, int paperHeightMm);
 }

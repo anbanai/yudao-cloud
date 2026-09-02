@@ -83,7 +83,7 @@ class LogisticsWaybillServiceImplTest {
         TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
                 .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         TradeLogisticsAccountDO account = account();
-        TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO().setId(2L).setStatus(0);
+        TradeLogisticsPrintDeviceDO device = readyDevice();
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account);
         when(deviceMapper.selectDefaultEnabled()).thenReturn(device);
@@ -127,7 +127,7 @@ class LogisticsWaybillServiceImplTest {
                 .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(new TradeLogisticsPrintDeviceDO().setId(2L).setStatus(0));
+        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
         when(taskMapper.selectLatestByWaybillId(3L)).thenReturn(task);
 
@@ -164,7 +164,7 @@ class LogisticsWaybillServiceImplTest {
                 .setProviderOrderNo("YD-null-10").setStatus(LogisticsWaybillStatusEnum.CANCELLED.name());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(new TradeLogisticsPrintDeviceDO().setId(2L).setStatus(0));
+        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(cancelled);
         doAnswer(invocation -> {
             ((TradeLogisticsWaybillDO) invocation.getArgument(0)).setId(4L);
@@ -195,6 +195,20 @@ class LogisticsWaybillServiceImplTest {
         var result = service.getPendingOrders();
 
         assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(11L);
+    }
+
+    @Test
+    void createWaybill_deviceWithoutPrinterIsRejectedBeforeCallingSf() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+        when(accountMapper.selectDefaultEnabled()).thenReturn(account());
+        when(deviceMapper.selectDefaultEnabled()).thenReturn(new TradeLogisticsPrintDeviceDO()
+                .setId(2L).setDeviceCode("device-1").setStatus(0));
+
+        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L)))
+                .hasMessageContaining("未选择打印机");
+        verifyNoInteractions(sfClient);
     }
 
     @Test
@@ -318,5 +332,10 @@ class LogisticsWaybillServiceImplTest {
     private TradeLogisticsAccountDO account() {
         return new TradeLogisticsAccountDO().setId(1L).setLogisticsId(8L).setStatus(0)
                 .setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
+    }
+
+    private TradeLogisticsPrintDeviceDO readyDevice() {
+        return new TradeLogisticsPrintDeviceDO().setId(2L).setDeviceCode("device-1")
+                .setDeviceName("仓库电脑").setPrinterName("Deli GS050DY").setStatus(0);
     }
 }

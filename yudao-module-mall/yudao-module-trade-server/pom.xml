@@ -141,6 +141,10 @@
             <artifactId>pdfbox</artifactId>
             <version>3.0.7</version>
         </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

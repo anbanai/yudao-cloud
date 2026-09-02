@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -72,6 +73,70 @@ class SfLogisticsClientTest {
         assertThatThrownBy(() -> client.createWaybill(account(), "ORDER-1", order(), List.of(), Map.of()))
                 .isInstanceOfSatisfying(SfApiException.class,
                         exception -> assertThat(exception.isUnknownResult()).isTrue());
+    }
+
+    @Test
+    void getLabelRequestsSynchronousPdfAndUsesDownloadToken() throws Exception {
+        byte[] expected = "%PDF-test".getBytes(StandardCharsets.UTF_8);
+        SfLogisticsClient testClient = new SfLogisticsClient() {
+            @Override
+            byte[] downloadLabel(String url, String token) {
+                assertThat(url).isEqualTo("https://download.sf-express.com/label.pdf");
+                assertThat(token).isEqualTo("download-token");
+                return expected;
+            }
+        };
+        ReflectionTestUtils.setField(testClient, "openApiClient", openApiClient);
+        ArgumentCaptor<JsonNode> payload = ArgumentCaptor.forClass(JsonNode.class);
+        when(openApiClient.invoke(any(), eq(SfLogisticsClient.CLOUD_PRINT), payload.capture()))
+                .thenReturn(JsonNodeFactory.instance.objectNode()
+                        .put("url", "https://download.sf-express.com/label.pdf")
+                        .put("token", "download-token"));
+
+        byte[] actual = testClient.getLabel(account().setTemplateCode("fm_verified"), "SF001");
+
+        assertThat(actual).isEqualTo(expected);
+        assertThat(payload.getValue().path("sync").asBoolean()).isTrue();
+        assertThat(payload.getValue().path("templateCode").asText()).isEqualTo("fm_verified");
+    }
+
+    @Test
+    void validateLabelDownloadUrlRejectsInsecureAndPrivateDestinations() {
+        assertThatThrownBy(() -> SfLogisticsClient.validateLabelDownloadUrl(
+                "http://download.sf-express.com/a.pdf", List.of("sf-express.com")))
+                .isInstanceOf(SfApiException.class);
+        assertThatThrownBy(() -> SfLogisticsClient.validateLabelDownloadUrl(
+                "https://127.0.0.1/a.pdf", List.of("sf-express.com")))
+                .isInstanceOf(SfApiException.class);
+        assertThatThrownBy(() -> SfLogisticsClient.validateLabelDownloadUrl(
+                "https://localhost/a.pdf", List.of("sf-express.com")))
+                .isInstanceOf(SfApiException.class);
+    }
+
+    @Test
+    void validateLabelDownloadUrlRejectsHostOutsideConfiguredSuffixes() {
+        assertThatThrownBy(() -> SfLogisticsClient.validateLabelDownloadUrl(
+                "https://files.example.test/label.pdf", List.of("sf-express.com", "sf-express.cn")))
+                .isInstanceOfSatisfying(SfApiException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo("LABEL_URL_REJECTED"));
+    }
+
+    @Test
+    void decodeInlineLabelRejectsNonPdfContent() {
+        String content = java.util.Base64.getEncoder().encodeToString("not-a-pdf".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> SfLogisticsClient.decodeInlineLabel(content))
+                .isInstanceOfSatisfying(SfApiException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo("LABEL_INVALID_PDF"));
+    }
+
+    @Test
+    void decodeInlineLabelRejectsOversizedEncodedContentBeforeDecode() {
+        String content = "A".repeat(14_000_000);
+
+        assertThatThrownBy(() -> SfLogisticsClient.decodeInlineLabel(content))
+                .isInstanceOfSatisfying(SfApiException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo("LABEL_TOO_LARGE"));
     }
 
     private static TradeLogisticsAccountDO account() {

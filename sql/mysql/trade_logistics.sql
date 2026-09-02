@@ -73,7 +73,9 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_device` (
   `tenant_id` bigint NOT NULL DEFAULT 0,
   `device_code` varchar(64) NOT NULL,
   `device_name` varchar(128) NOT NULL,
+  `printer_name` varchar(255) DEFAULT NULL COMMENT 'Windows 打印机名称',
   `token_hash` char(64) NOT NULL,
+  `enrollment_key` varchar(32) DEFAULT NULL COMMENT '首次连接占位键；连接成功后清空',
   `default_flag` bit(1) NOT NULL DEFAULT b'0',
   `status` tinyint NOT NULL DEFAULT 0,
   `version` varchar(32) DEFAULT NULL,
@@ -85,8 +87,55 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_device` (
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_logistics_device_code` (`tenant_id`,`device_code`,`deleted`),
-  UNIQUE KEY `uk_logistics_device_token` (`token_hash`)
+  UNIQUE KEY `uk_logistics_device_token` (`token_hash`),
+  UNIQUE KEY `uk_logistics_device_enrollment` (`tenant_id`,`enrollment_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='PrintBridge 设备';
+
+-- 兼容已执行旧版脚本的数据库。
+SET @logistics_printer_name_count = (
+  SELECT COUNT(*) FROM `information_schema`.`columns`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_print_device'
+    AND `column_name` = 'printer_name'
+);
+SET @logistics_printer_name_sql = IF(
+  @logistics_printer_name_count = 0,
+  'ALTER TABLE `trade_logistics_print_device` ADD COLUMN `printer_name` varchar(255) DEFAULT NULL COMMENT ''Windows 打印机名称'' AFTER `device_name`',
+  'SELECT 1'
+);
+PREPARE logistics_printer_name_stmt FROM @logistics_printer_name_sql;
+EXECUTE logistics_printer_name_stmt;
+DEALLOCATE PREPARE logistics_printer_name_stmt;
+
+SET @logistics_enrollment_key_count = (
+  SELECT COUNT(*) FROM `information_schema`.`columns`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_print_device'
+    AND `column_name` = 'enrollment_key'
+);
+SET @logistics_enrollment_key_sql = IF(
+  @logistics_enrollment_key_count = 0,
+  'ALTER TABLE `trade_logistics_print_device` ADD COLUMN `enrollment_key` varchar(32) DEFAULT NULL COMMENT ''首次连接占位键；连接成功后清空'' AFTER `token_hash`',
+  'SELECT 1'
+);
+PREPARE logistics_enrollment_key_stmt FROM @logistics_enrollment_key_sql;
+EXECUTE logistics_enrollment_key_stmt;
+DEALLOCATE PREPARE logistics_enrollment_key_stmt;
+
+SET @logistics_enrollment_index_count = (
+  SELECT COUNT(*) FROM `information_schema`.`statistics`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_print_device'
+    AND `index_name` = 'uk_logistics_device_enrollment'
+);
+SET @logistics_enrollment_index_sql = IF(
+  @logistics_enrollment_index_count = 0,
+  'ALTER TABLE `trade_logistics_print_device` ADD UNIQUE KEY `uk_logistics_device_enrollment` (`tenant_id`,`enrollment_key`)',
+  'SELECT 1'
+);
+PREPARE logistics_enrollment_index_stmt FROM @logistics_enrollment_index_sql;
+EXECUTE logistics_enrollment_index_stmt;
+DEALLOCATE PREPARE logistics_enrollment_index_stmt;
 
 CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   `id` bigint NOT NULL AUTO_INCREMENT,

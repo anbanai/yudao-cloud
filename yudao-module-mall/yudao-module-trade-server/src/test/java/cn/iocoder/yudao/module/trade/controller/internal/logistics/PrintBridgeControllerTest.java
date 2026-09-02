@@ -22,7 +22,7 @@ class PrintBridgeControllerTest {
     void report_connectionTestReturnsNoContentWithoutPersistingEvent() {
         LogisticsPrintBridgeService service = mock(LogisticsPrintBridgeService.class);
         TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO().setId(1L);
-        when(service.authenticate("secret", "packing-01")).thenReturn(device);
+        when(service.authenticate("secret", "packing-01", null)).thenReturn(device);
         PrintBridgeController controller = new PrintBridgeController();
         ReflectionTestUtils.setField(controller, "service", service);
         PrintBridgeStatusReqVO request = new PrintBridgeStatusReqVO().setEvent("connection_test")
@@ -31,7 +31,7 @@ class PrintBridgeControllerTest {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             assertThat(factory.getValidator().validate(request)).isEmpty();
         }
-        assertThat(controller.report("Bearer secret", "packing-01", true, request).getStatusCode().value())
+        assertThat(controller.report("Bearer secret", "packing-01", null, true, request).getStatusCode().value())
                 .isEqualTo(204);
         verify(service, never()).report(any(), any());
     }

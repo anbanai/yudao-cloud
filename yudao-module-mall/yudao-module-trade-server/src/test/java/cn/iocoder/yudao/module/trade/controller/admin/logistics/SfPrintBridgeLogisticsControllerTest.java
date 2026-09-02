@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWayb
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsManagementService;
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsWaybillService;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -19,6 +20,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SfPrintBridgeLogisticsControllerTest {
+
+    @Test
+    void enrollDevicePreventsCredentialResponseCaching() {
+        LogisticsManagementService managementService = mock(LogisticsManagementService.class);
+        SfPrintBridgeLogisticsController controller = new SfPrintBridgeLogisticsController();
+        ReflectionTestUtils.setField(controller, "managementService", managementService);
+        ReflectionTestUtils.setField(controller, "waybillService", mock(LogisticsWaybillService.class));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.enrollDevice(response);
+
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        verify(managementService).enrollDevice();
+    }
 
     @Test
     void batchCreateWaybillContinuesAfterSingleBusinessFailure() {

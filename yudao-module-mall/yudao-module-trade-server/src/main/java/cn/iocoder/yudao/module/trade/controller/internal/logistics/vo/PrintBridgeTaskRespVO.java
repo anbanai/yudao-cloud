@@ -14,6 +14,8 @@ public class PrintBridgeTaskRespVO {
     @JsonProperty("job_id")
     private String jobId;
     private String format;
+    @JsonProperty("printer_name")
+    private String printerName;
     @JsonProperty("file_url")
     private String fileUrl;
     private Integer copies;

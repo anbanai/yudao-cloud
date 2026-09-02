@@ -17,15 +17,12 @@ import java.math.BigDecimal;
 public class SfLogisticsAccountSaveReqVO {
     private Long id;
     @NotBlank private String name;
-    @NotNull private Long logisticsId;
-    @NotBlank private String endpoint;
     private String partnerId;
     private String checkWord;
     private String monthlyCard;
     @NotBlank
     @Pattern(regexp = "\\d+", message = "产品类型必须是顺丰数字服务代码")
     private String serviceCode;
-    @NotBlank private String templateCode;
     @NotBlank private String senderName;
     @NotBlank private String senderPhone;
     @NotBlank private String senderProvince;

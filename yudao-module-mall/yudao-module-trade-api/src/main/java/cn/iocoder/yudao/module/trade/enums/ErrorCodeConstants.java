@@ -111,6 +111,10 @@ public interface ErrorCodeConstants {
     ErrorCode LOGISTICS_LABEL_INVALID = new ErrorCode(1_011_004_309, "顺丰面单不符合 100x150 mm 规范：{}");
     ErrorCode LOGISTICS_PRIVATE_STORAGE_REQUIRED = new ErrorCode(1_011_004_310,
             "物流面单必须使用支持 HTTPS 临时签名的私有 S3 文件存储");
+    ErrorCode LOGISTICS_DEVICE_NOT_READY = new ErrorCode(1_011_004_311, "打印设备尚未连接或未选择打印机");
+    ErrorCode LOGISTICS_CONFIGURATION_INVALID = new ErrorCode(1_011_004_312, "物流服务端配置不完整：{}");
+    ErrorCode LOGISTICS_DEVICE_ENROLLMENT_PENDING = new ErrorCode(1_011_004_313,
+            "PrintBridge 配置已生成，请导入刚下载的文件并等待设备连接");
 
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");

@@ -30,7 +30,7 @@ public class PrintBridgeController {
             @RequestHeader("X-PrintBridge-Device-Id") String deviceCode,
             @RequestHeader(value = "X-PrintBridge-Device-Name", required = false) String deviceName,
             @RequestHeader(value = "X-PrintBridge-Test", required = false) Boolean test) {
-        TradeLogisticsPrintDeviceDO device = service.authenticate(bearerToken(authorization), deviceCode);
+        TradeLogisticsPrintDeviceDO device = service.authenticate(bearerToken(authorization), deviceCode, deviceName);
         if (Boolean.TRUE.equals(test)) {
             return ResponseEntity.noContent().build();
         }
@@ -42,9 +42,10 @@ public class PrintBridgeController {
     public ResponseEntity<Void> report(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestHeader("X-PrintBridge-Device-Id") String deviceCode,
+            @RequestHeader(value = "X-PrintBridge-Device-Name", required = false) String deviceName,
             @RequestHeader(value = "X-PrintBridge-Test", required = false) Boolean test,
             @Valid @RequestBody PrintBridgeStatusReqVO request) {
-        TradeLogisticsPrintDeviceDO device = service.authenticate(bearerToken(authorization), deviceCode);
+        TradeLogisticsPrintDeviceDO device = service.authenticate(bearerToken(authorization), deviceCode, deviceName);
         if (Boolean.TRUE.equals(test)) {
             return ResponseEntity.noContent().build();
         }

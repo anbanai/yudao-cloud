@@ -30,9 +30,26 @@ public interface TradeLogisticsPrintDeviceMapper extends BaseMapperX<TradeLogist
         return selectList(new LambdaQueryWrapperX<TradeLogisticsPrintDeviceDO>().orderByDesc(TradeLogisticsPrintDeviceDO::getId));
     }
 
+    default TradeLogisticsPrintDeviceDO selectPendingEnrollmentForUpdate() {
+        return selectOne(new LambdaQueryWrapperX<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getEnrollmentKey, "ACTIVE")
+                .last("LIMIT 1 FOR UPDATE"));
+    }
+
     default void clearDefault(Long exceptId) {
         update(null, new LambdaUpdateWrapper<TradeLogisticsPrintDeviceDO>()
                 .ne(exceptId != null, TradeLogisticsPrintDeviceDO::getId, exceptId)
                 .set(TradeLogisticsPrintDeviceDO::getDefaultFlag, false));
+    }
+
+    @TenantIgnore
+    default int bindPendingDevice(Long id, String deviceCode, String deviceName) {
+        return update(null, new LambdaUpdateWrapper<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getId, id)
+                .eq(TradeLogisticsPrintDeviceDO::getDeviceCode, deviceCode)
+                .eq(TradeLogisticsPrintDeviceDO::getEnrollmentKey, "ACTIVE")
+                .set(TradeLogisticsPrintDeviceDO::getDeviceCode, deviceCode)
+                .set(TradeLogisticsPrintDeviceDO::getDeviceName, deviceName)
+                .set(TradeLogisticsPrintDeviceDO::getEnrollmentKey, null));
     }
 }

@@ -10,12 +10,9 @@ import java.math.BigDecimal;
 public class SfLogisticsAccountRespVO {
     private Long id;
     private String name;
-    private Long logisticsId;
-    private String endpoint;
     private String partnerIdMasked;
     private String monthlyCardMasked;
     private String serviceCode;
-    private String templateCode;
     private String senderName;
     private String senderPhone;
     private String senderProvince;

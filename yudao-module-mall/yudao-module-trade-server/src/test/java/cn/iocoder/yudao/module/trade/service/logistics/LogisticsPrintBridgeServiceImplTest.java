@@ -22,6 +22,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -65,8 +67,70 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setDeviceCode("packing-01").setStatus(0);
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token"))).thenReturn(device);
 
-        assertThatThrownBy(() -> service.authenticate("secret-token", "packing-02"))
+        assertThatThrownBy(() -> service.authenticate("secret-token", "packing-02", "另一台电脑"))
                 .isInstanceOf(ServiceException.class);
+    }
+
+    @Test
+    void authenticate_firstPollAtomicallyAdoptsPrintBridgeIdentity() {
+        TradeLogisticsPrintDeviceDO pending = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
+                .setDeviceCode("generated-device-id").setDeviceName("打印工作站-123456").setStatus(0)
+                .setEnrollmentKey("ACTIVE")
+                .setTokenCreatedTime(LocalDateTime.now());
+        when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
+                .thenReturn(pending);
+        when(deviceMapper.bindPendingDevice(9L, "generated-device-id", "仓库电脑"))
+                .thenReturn(1);
+
+        TradeLogisticsPrintDeviceDO actual = service.authenticate("secret-token", "generated-device-id", "仓库电脑");
+
+        assertThat(actual.getDeviceCode()).isEqualTo("generated-device-id");
+        assertThat(actual.getDeviceName()).isEqualTo("仓库电脑");
+    }
+
+    @Test
+    void authenticate_pendingTokenRejectsDifferentDeviceIdentity() {
+        TradeLogisticsPrintDeviceDO pending = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
+                .setDeviceCode("configured-device-id").setDeviceName("打印工作站-123456").setStatus(0)
+                .setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now());
+        when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
+                .thenReturn(pending);
+
+        assertThatThrownBy(() -> service.authenticate("secret-token", "different-device-id", "另一台电脑"))
+                .isInstanceOf(ServiceException.class);
+        verify(deviceMapper, never()).bindPendingDevice(any(), any(), any());
+    }
+
+    @Test
+    void authenticate_rejectsExpiredFirstPollEnrollment() {
+        TradeLogisticsPrintDeviceDO pending = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
+                .setDeviceCode("pending-123").setEnrollmentKey("ACTIVE").setStatus(0)
+                .setTokenCreatedTime(LocalDateTime.now().minusMinutes(11));
+        when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
+                .thenReturn(pending);
+
+        assertThatThrownBy(() -> service.authenticate("secret-token", "generated-device-id", "仓库电脑"))
+                .isInstanceOf(ServiceException.class);
+        verify(deviceMapper, never()).bindPendingDevice(any(), any(), any());
+    }
+
+    @Test
+    void authenticate_boundTokenCannotBeReusedByAnotherDevice() {
+        TradeLogisticsPrintDeviceDO bound = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
+                .setDeviceCode("bound-device").setStatus(0);
+        when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
+                .thenReturn(bound);
+
+        assertThatThrownBy(() -> service.authenticate("secret-token", "another-device", "另一台电脑"))
+                .isInstanceOf(ServiceException.class);
+    }
+
+    @Test
+    void authenticate_rejectsOversizedDeviceIdentityBeforeDatabaseLookup() {
+        assertThatThrownBy(() -> service.authenticate("secret-token", "x".repeat(129), "仓库电脑"))
+                .isInstanceOf(ServiceException.class);
+
+        verifyNoInteractions(deviceMapper);
     }
 
     @Test
@@ -94,6 +158,26 @@ class LogisticsPrintBridgeServiceImplTest {
 
         assertThatThrownBy(() -> service.pull(device, "packing-01"))
                 .hasRootCauseInstanceOf(ServiceException.class);
+    }
+
+    @Test
+    void pull_includesConfiguredPrinterName() {
+        TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO()
+                .setId(1L).setTenantId(9L).setStatus(0).setPrinterName("Deli GS050DY");
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setDeviceId(1L)
+                .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
+                .setFormat("image").setLabelUrl("private://label.png")
+                .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
+        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
+        when(fileApi.isPrivatePresignedGetSupported())
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
+        when(fileApi.presignGetUrl(task.getLabelUrl(), 900))
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
+                        "https://files.example/label.png?signature=x&expires=1"));
+
+        var response = service.pull(device, "仓库电脑");
+
+        assertThat(response.getPrinterName()).isEqualTo("Deli GS050DY");
     }
 
     @Test

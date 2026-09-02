@@ -372,6 +372,14 @@ yudao:
     begin-code: 9999 # 这里配置 9999 的原因是，测试方便。
     end-code: 9999 # 这里配置 9999 的原因是，测试方便。
   trade:
+    logistics:
+      sf:
+        callback-token: ${SF_LOGISTICS_CALLBACK_TOKEN:} # 顺丰回调 URL 的 token，生产环境必须配置至少 16 位
+        template-100x150-code: ${SF_LOGISTICS_TEMPLATE_100X150_CODE:} # 顺丰分配的 100x150 云打印模板代码
+        label-host-suffixes: ${SF_LOGISTICS_LABEL_HOST_SUFFIXES:sf-express.com,sf-express.cn} # 面单下载域名白名单
+      printbridge:
+        task-endpoint: ${PRINTBRIDGE_TASK_ENDPOINT:} # 固定的 HTTPS 任务地址，例如 https://api.example.com/internal-api/trade/logistics/printbridge/tasks
+        admin-origin: ${PRINTBRIDGE_ADMIN_ORIGIN:} # 固定的管理后台 Origin，例如 https://admin.example.com
     order:
       pay-expire-time: 2h # 支付的过期时间
       receive-expire-time: 14d # 收货的过期时间

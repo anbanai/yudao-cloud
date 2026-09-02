@@ -19,7 +19,10 @@ public class TradeLogisticsPrintDeviceDO extends TenantBaseDO {
     private Long id;
     private String deviceCode;
     private String deviceName;
+    private String printerName;
     private String tokenHash;
+    /** Non-null only while waiting for the first PrintBridge poll. */
+    private String enrollmentKey;
     private Boolean defaultFlag;
     /** 0 enabled, 1 disabled. */
     private Integer status;

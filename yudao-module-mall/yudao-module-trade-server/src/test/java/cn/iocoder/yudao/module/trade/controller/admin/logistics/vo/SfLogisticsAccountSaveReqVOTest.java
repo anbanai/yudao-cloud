@@ -55,9 +55,8 @@ class SfLogisticsAccountSaveReqVOTest {
     }
 
     private static SfLogisticsAccountSaveReqVO validRequest() {
-        return new SfLogisticsAccountSaveReqVO().setName("顺丰月结账号").setLogisticsId(1L)
-                .setEndpoint("https://sfapi.sf-express.com/std/service").setServiceCode("1")
-                .setTemplateCode("fm_76130").setSenderName("仓库").setSenderPhone("13800138000")
+        return new SfLogisticsAccountSaveReqVO().setName("顺丰月结账号").setServiceCode("1")
+                .setSenderName("仓库").setSenderPhone("13800138000")
                 .setSenderProvince("四川省").setSenderCity("成都市").setSenderAddress("高新区 1 号")
                 .setDefaultWeightKg(BigDecimal.ONE).setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203);
     }
