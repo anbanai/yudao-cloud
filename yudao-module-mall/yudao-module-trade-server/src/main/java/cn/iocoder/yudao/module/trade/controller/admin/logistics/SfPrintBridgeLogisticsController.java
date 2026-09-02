@@ -81,7 +81,7 @@ public class SfPrintBridgeLogisticsController {
     public CommonResult<List<LogisticsWaybillRespVO>> batchCreateWaybill(
             @Valid @RequestBody LogisticsWaybillBatchCreateReqVO request) {
         List<LogisticsWaybillRespVO> result = new ArrayList<>();
-        for (Long orderId : request.getOrderIds()) {
+        for (Long orderId : request.getOrderIds().stream().distinct().toList()) {
             try {
                 result.add(waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(orderId)
                         .setAccountId(request.getAccountId()).setDeviceId(request.getDeviceId())));

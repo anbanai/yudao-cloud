@@ -134,6 +134,7 @@ class LogisticsWaybillServiceImplTest {
         var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
 
         assertThat(result.getJobId()).isEqualTo("JOB-1");
+        assertThat(result).extracting("reused").isEqualTo(true);
         verifyNoInteractions(sfClient);
     }
 

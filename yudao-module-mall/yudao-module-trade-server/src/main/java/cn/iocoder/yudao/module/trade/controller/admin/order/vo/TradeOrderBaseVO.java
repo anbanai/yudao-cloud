@@ -131,6 +131,9 @@ public class TradeOrderBaseVO {
     @Schema(description = "退款金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "100")
     private Integer refundPrice;
 
+    @Schema(description = "退款状态：0-未退款，10-部分退款，20-全部退款", example = "0")
+    private Integer refundStatus;
+
     // ========== 营销基本信息 ==========
 
     @Schema(description = "优惠劵编号", example = "1024")

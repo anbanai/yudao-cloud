@@ -18,6 +18,7 @@ public class LogisticsWaybillRespVO {
     private String printStatus;
     private String jobId;
     private Long deviceId;
+    private boolean reused;
     private String errorCode;
     private String errorMessage;
     private LocalDateTime createTime;

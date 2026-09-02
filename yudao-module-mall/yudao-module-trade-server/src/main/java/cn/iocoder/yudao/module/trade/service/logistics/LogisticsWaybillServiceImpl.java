@@ -71,7 +71,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         CreationPreparation preparation = inTransaction(() -> prepareCreation(request));
         TradeLogisticsWaybillDO waybill = preparation.waybill();
         if (preparation.task() != null) {
-            return toResp(waybill, preparation.task());
+            return toResp(waybill, preparation.task()).setReused(true);
         }
         TradeLogisticsAccountDO account = preparation.account();
         if (preparation.newRecord() || LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus())) {
@@ -184,7 +184,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         if (current == null) current = waybill;
         TradeLogisticsPrintTaskDO existingTask = taskMapper.selectLatestByWaybillId(waybill.getId());
         if (existingTask != null) {
-            return toResp(current, existingTask);
+            return toResp(current, existingTask).setReused(true);
         }
         current.setLabelUrl(labelUrl).setLabelContentType("image/png").setLabelChecksum(checksum)
                 .setLabelSize((long) labelSize).setTemplateCode(account.getTemplateCode())
