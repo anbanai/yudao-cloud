@@ -1,9 +1,12 @@
 package cn.iocoder.yudao.module.trade.controller.admin.logistics.vo;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import cn.iocoder.yudao.module.trade.enums.logistics.SfLabelSpec;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
@@ -32,9 +35,15 @@ public class SfLogisticsAccountSaveReqVO {
     @NotNull
     @Positive
     private BigDecimal defaultWeightKg;
-    @NotNull @Min(100) @Max(100) private Integer paperWidthMm = 100;
-    @NotNull @Min(150) @Max(150) private Integer paperHeightMm = 150;
+    @NotNull private Integer paperWidthMm = 76;
+    @NotNull private Integer paperHeightMm = 130;
     @NotNull @Min(203) @Max(203) private Integer dpi = 203;
     private Boolean defaultFlag = false;
     private Integer status = 0;
+
+    @JsonIgnore
+    @AssertTrue(message = "纸张规格只支持 76x130 或 100x150 mm，且 DPI 必须为 203")
+    public boolean isPaperSpecSupported() {
+        return SfLabelSpec.supports(paperWidthMm, paperHeightMm, dpi);
+    }
 }

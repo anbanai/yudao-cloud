@@ -13,9 +13,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +65,24 @@ class LogisticsManagementServiceImplTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("顺丰");
         verifyNoInteractions(accountMapper);
+    }
+
+    @Test
+    void createDiagnosticPayloadUsesRequested76x130Specification() throws Exception {
+        doReturn("private://diagnostic").when(fileApi).createFile(any(byte[].class),
+                eq("printbridge-test-76x130.png"), eq("trade/logistics/diagnostics"), eq("image/png"));
+        when(fileApi.presignGetUrl("private://diagnostic", 15 * 60))
+                .thenReturn(success("https://files.example.test/diagnostic?signature=x&expires=1"));
+
+        String url = service.createDiagnosticPayload(76, 130);
+
+        var contentCaptor = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        org.mockito.Mockito.verify(fileApi).createFile(contentCaptor.capture(),
+                eq("printbridge-test-76x130.png"), eq("trade/logistics/diagnostics"), eq("image/png"));
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(contentCaptor.getValue()));
+        assertThat(image.getWidth()).isEqualTo(607);
+        assertThat(image.getHeight()).isEqualTo(1039);
+        assertThat(url).contains("diagnostic");
     }
 
     private static SfLogisticsAccountSaveReqVO validRequest() {

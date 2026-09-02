@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_account` (
   `check_word` varchar(512) NOT NULL COMMENT '加密保存',
   `monthly_card` varchar(512) NOT NULL COMMENT '加密保存',
   `service_code` varchar(32) NOT NULL COMMENT '顺丰产品类型编号',
-  `template_code` varchar(64) NOT NULL COMMENT '100x150 云打印模板代码',
+  `template_code` varchar(64) NOT NULL COMMENT '顺丰云打印模板代码（必须与纸张规格匹配）',
   `sender_name` varchar(64) NOT NULL,
   `sender_phone` varchar(32) NOT NULL,
   `sender_province` varchar(64) NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_account` (
   `sender_district` varchar(64) DEFAULT NULL,
   `sender_address` varchar(512) NOT NULL,
   `default_weight_kg` decimal(10,3) NOT NULL,
-  `paper_width_mm` int NOT NULL DEFAULT 100,
-  `paper_height_mm` int NOT NULL DEFAULT 150,
+  `paper_width_mm` int NOT NULL DEFAULT 76,
+  `paper_height_mm` int NOT NULL DEFAULT 130,
   `dpi` int NOT NULL DEFAULT 203,
   `default_flag` bit(1) NOT NULL DEFAULT b'0',
   `status` tinyint NOT NULL DEFAULT 0,
@@ -100,8 +100,8 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   `format` varchar(16) NOT NULL DEFAULT 'image',
   `label_url` varchar(1024) NOT NULL,
   `checksum` varchar(64) NOT NULL,
-  `paper_width_mm` int NOT NULL DEFAULT 100,
-  `paper_height_mm` int NOT NULL DEFAULT 150,
+  `paper_width_mm` int NOT NULL DEFAULT 76,
+  `paper_height_mm` int NOT NULL DEFAULT 130,
   `dpi` int NOT NULL DEFAULT 203,
   `copies` int NOT NULL DEFAULT 1,
   `test_flag` bit(1) NOT NULL DEFAULT b'0',
@@ -171,8 +171,44 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_trace` (
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_logistics_trace_event` (`tenant_id`,`waybill_id`,`provider_event_id`),
   KEY `idx_logistics_trace_waybill` (`tenant_id`,`waybill_id`,`operate_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顺丰物流轨迹';
+
+-- 兼容已经执行过旧版脚本的数据库：只修改新记录默认值，不更新已有账号和打印任务。
+ALTER TABLE `trade_logistics_account`
+  MODIFY COLUMN `template_code` varchar(64) NOT NULL COMMENT '顺丰云打印模板代码（必须与纸张规格匹配）',
+  MODIFY COLUMN `paper_width_mm` int NOT NULL DEFAULT 76,
+  MODIFY COLUMN `paper_height_mm` int NOT NULL DEFAULT 130;
+ALTER TABLE `trade_logistics_print_task`
+  MODIFY COLUMN `paper_width_mm` int NOT NULL DEFAULT 76,
+  MODIFY COLUMN `paper_height_mm` int NOT NULL DEFAULT 130;
+
+SET @logistics_trace_event_index_count = (
+  SELECT COUNT(*) FROM `information_schema`.`statistics`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_trace'
+    AND `index_name` = 'uk_logistics_trace_event'
+);
+-- 旧版本曾采用“删除后全量重建”轨迹；建唯一键前只清理同一顺丰事件的重复行。
+DELETE duplicate_trace
+FROM `trade_logistics_trace` duplicate_trace
+JOIN `trade_logistics_trace` retained_trace
+  ON retained_trace.`tenant_id` = duplicate_trace.`tenant_id`
+ AND retained_trace.`waybill_id` = duplicate_trace.`waybill_id`
+ AND retained_trace.`provider_event_id` = duplicate_trace.`provider_event_id`
+ AND duplicate_trace.`provider_event_id` IS NOT NULL
+ AND (retained_trace.`deleted` < duplicate_trace.`deleted`
+   OR (retained_trace.`deleted` = duplicate_trace.`deleted` AND retained_trace.`id` < duplicate_trace.`id`))
+WHERE @logistics_trace_event_index_count = 0;
+SET @logistics_trace_event_index_sql = IF(
+  @logistics_trace_event_index_count = 0,
+  'ALTER TABLE `trade_logistics_trace` ADD UNIQUE KEY `uk_logistics_trace_event` (`tenant_id`,`waybill_id`,`provider_event_id`)',
+  'SELECT 1'
+);
+PREPARE logistics_trace_event_index_stmt FROM @logistics_trace_event_index_sql;
+EXECUTE logistics_trace_event_index_stmt;
+DEALLOCATE PREPARE logistics_trace_event_index_stmt;
 
 -- 物流打单目录
 INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)

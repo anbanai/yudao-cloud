@@ -15,4 +15,11 @@ public interface TradeLogisticsTraceMapper extends BaseMapperX<TradeLogisticsTra
                 .eq(TradeLogisticsTraceDO::getWaybillId, waybillId)
                 .orderByDesc(TradeLogisticsTraceDO::getOperateTime));
     }
+
+    default TradeLogisticsTraceDO selectByWaybillIdAndProviderEventId(Long waybillId, String providerEventId) {
+        return selectOne(new LambdaQueryWrapperX<TradeLogisticsTraceDO>()
+                .eq(TradeLogisticsTraceDO::getWaybillId, waybillId)
+                .eq(TradeLogisticsTraceDO::getProviderEventId, providerEventId)
+                .last("LIMIT 1"));
+    }
 }

@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrin
 import cn.iocoder.yudao.module.trade.dal.mysql.delivery.DeliveryExpressMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsAccountMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsPrintDeviceMapper;
+import cn.iocoder.yudao.module.trade.enums.logistics.SfLabelSpec;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
@@ -101,22 +102,28 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
 
     @Override
     @SneakyThrows
-    public String createDiagnosticPayload() {
-        BufferedImage image = new BufferedImage(799, 1199, BufferedImage.TYPE_INT_RGB);
+    public String createDiagnosticPayload(int paperWidthMm, int paperHeightMm) {
+        SfLabelSpec spec = SfLabelSpec.of(paperWidthMm, paperHeightMm, 203);
+        BufferedImage image = new BufferedImage(spec.getWidthPixels(), spec.getHeightPixels(),
+                BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         try {
             graphics.setColor(Color.WHITE); graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
             graphics.setColor(Color.BLACK); graphics.setStroke(new BasicStroke(4));
             graphics.drawRect(8, 8, image.getWidth() - 17, image.getHeight() - 17);
-            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 48));
-            graphics.drawString("PrintBridge 100 x 150 mm", 70, 130);
-            graphics.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 32));
-            graphics.drawString("203 DPI / 799 x 1199 px", 90, 210);
-            for (int y = 300; y < 1000; y += 100) graphics.drawLine(60, y, 740, y);
+            int margin = Math.max(40, image.getWidth() / 14);
+            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, Math.max(32, image.getWidth() / 16)));
+            graphics.drawString("PrintBridge " + paperWidthMm + " x " + paperHeightMm + " mm", margin, 120);
+            graphics.setFont(new Font(Font.MONOSPACED, Font.PLAIN, Math.max(24, image.getWidth() / 24)));
+            graphics.drawString("203 DPI / " + image.getWidth() + " x " + image.getHeight() + " px", margin, 190);
+            for (int y = 280; y < image.getHeight() - 80; y += 100) {
+                graphics.drawLine(margin, y, image.getWidth() - margin, y);
+            }
         } finally { graphics.dispose(); }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(image, "png", output);
-        String url = fileApi.createFile(output.toByteArray(), "printbridge-test-100x150.png",
+        String url = fileApi.createFile(output.toByteArray(),
+                "printbridge-test-" + paperWidthMm + "x" + paperHeightMm + ".png",
                 "trade/logistics/diagnostics", "image/png");
         return fileApi.presignGetUrl(url, 15 * 60).getCheckedData();
     }

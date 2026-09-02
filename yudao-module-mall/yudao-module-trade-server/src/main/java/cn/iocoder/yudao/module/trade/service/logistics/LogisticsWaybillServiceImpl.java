@@ -30,6 +30,7 @@ import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.Resource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -333,17 +334,29 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
         }
         JsonNode routes = sfClient.queryTrace(getAccount(waybill.getAccountId()), waybill.getWaybillNo());
-        traceMapper.delete(TradeLogisticsTraceDO::getWaybillId, id);
         for (JsonNode route : extractRoutes(routes)) {
             String content = route.path("remark").asText();
             LocalDateTime time = parseTime(route.path("acceptTime").asText());
             if (StrUtil.isBlank(content) || time == null) {
                 continue;
             }
-            traceMapper.insert(new TradeLogisticsTraceDO().setWaybillId(id)
-                    .setProviderEventId(route.path("id").asText(null)).setStatus(route.path("opCode").asText())
-                    .setContent(content).setLocation(route.path("acceptAddress").asText())
-                    .setOperateTime(time).setRawData(JsonUtils.toJsonString(route)));
+            String status = route.path("opCode").asText();
+            String location = route.path("acceptAddress").asText();
+            String providerEventId = route.path("id").asText(null);
+            if (StrUtil.isBlank(providerEventId)) {
+                providerEventId = "poll-" + DigestUtil.sha256Hex(String.join("\u0000", waybill.getWaybillNo(),
+                        time.toString(), status, content, location));
+            }
+            if (traceMapper.selectByWaybillIdAndProviderEventId(id, providerEventId) != null) {
+                continue;
+            }
+            try {
+                traceMapper.insert(new TradeLogisticsTraceDO().setWaybillId(id)
+                        .setProviderEventId(providerEventId).setStatus(status).setContent(content)
+                        .setLocation(location).setOperateTime(time).setRawData(JsonUtils.toJsonString(route)));
+            } catch (DuplicateKeyException ignored) {
+                // 路由回调与主动查询可能并发写入；唯一键负责最终幂等。
+            }
         }
         waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(id).setLastSyncTime(LocalDateTime.now()));
         return traceMapper.selectListByWaybillId(id).stream().map(this::toTraceResp).toList();

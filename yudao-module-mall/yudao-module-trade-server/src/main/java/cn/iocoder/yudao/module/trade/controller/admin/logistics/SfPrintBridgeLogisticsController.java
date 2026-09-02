@@ -59,8 +59,11 @@ public class SfPrintBridgeLogisticsController {
     @PostMapping("/diagnostics/test-payload")
     @Operation(summary = "创建只用于浏览器 JSSDK 测试打印的短时效标签")
     @PreAuthorize("@ss.hasPermission('trade:logistics:diagnostics')")
-    public CommonResult<String> createDiagnosticPayload() {
-        return success(managementService.createDiagnosticPayload());
+    public CommonResult<String> createDiagnosticPayload(
+            @Valid @RequestBody(required = false) LogisticsDiagnosticPayloadReqVO request) {
+        LogisticsDiagnosticPayloadReqVO effective = request == null ? new LogisticsDiagnosticPayloadReqVO() : request;
+        return success(managementService.createDiagnosticPayload(effective.getPaperWidthMm(),
+                effective.getPaperHeightMm()));
     }
 
     @GetMapping("/pending")

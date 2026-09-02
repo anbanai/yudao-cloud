@@ -294,6 +294,27 @@ class LogisticsWaybillServiceImplTest {
         assertThat(captor.getValue().getContent()).isEqualTo("已揽收");
     }
 
+    @Test
+    void syncTrace_existingProviderEventIsNotDeletedOrInsertedAgain() {
+        TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setAccountId(1L)
+                .setWaybillNo("SF001").setStatus(LogisticsWaybillStatusEnum.CREATED.name());
+        when(waybillMapper.selectById(3L)).thenReturn(waybill);
+        when(accountMapper.selectById(1L)).thenReturn(account());
+        when(sfClient.queryTrace(any(), eq("SF001"))).thenReturn(JsonUtils.parseTree("""
+                {"routes":[
+                  {"id":"ROUTE-1","acceptTime":"2026-09-01 10:00:00","remark":"已揽收","opCode":"50"}
+                ]}
+                """));
+        when(traceMapper.selectByWaybillIdAndProviderEventId(3L, "ROUTE-1"))
+                .thenReturn(new TradeLogisticsTraceDO().setId(9L));
+        when(traceMapper.selectListByWaybillId(3L)).thenReturn(List.of());
+
+        service.syncTrace(3L);
+
+        verify(traceMapper, never()).delete(TradeLogisticsTraceDO::getWaybillId, 3L);
+        verify(traceMapper, never()).insert(any(TradeLogisticsTraceDO.class));
+    }
+
     private TradeLogisticsAccountDO account() {
         return new TradeLogisticsAccountDO().setId(1L).setLogisticsId(8L).setStatus(0)
                 .setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);

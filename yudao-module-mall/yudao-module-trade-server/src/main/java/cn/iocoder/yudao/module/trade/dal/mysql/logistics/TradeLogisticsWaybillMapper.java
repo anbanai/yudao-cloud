@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.dal.mysql.logistics;
 
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsWaybillDO;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -32,6 +33,16 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
 
     default TradeLogisticsWaybillDO selectByProviderOrderNo(String providerOrderNo) {
         return selectOne(TradeLogisticsWaybillDO::getProviderOrderNo, providerOrderNo);
+    }
+
+    @TenantIgnore
+    default List<TradeLogisticsWaybillDO> selectForRoutePushIgnoreTenant(String waybillNo,
+                                                                        String providerOrderNo) {
+        return selectList(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
+                .eq(TradeLogisticsWaybillDO::getWaybillNo, waybillNo)
+                .eq(TradeLogisticsWaybillDO::getProviderOrderNo, providerOrderNo)
+                .eq(TradeLogisticsWaybillDO::getStatus, "CREATED")
+                .last("LIMIT 2"));
     }
 
     default List<TradeLogisticsWaybillDO> selectListAll() {

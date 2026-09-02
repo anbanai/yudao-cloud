@@ -41,22 +41,25 @@ class SfLogisticsAccountSaveReqVOTest {
 
     @Test
     void validateRejectsUnsupportedPaperOrDpi() {
-        assertHasViolation(validRequest().setPaperWidthMm(80), "paperWidthMm");
-        assertHasViolation(validRequest().setPaperHeightMm(100), "paperHeightMm");
+        assertThat(validator.validate(validRequest().setPaperWidthMm(80))).isNotEmpty();
+        assertThat(validator.validate(validRequest().setPaperHeightMm(100))).isNotEmpty();
+        assertThat(validator.validate(validRequest().setPaperWidthMm(76).setPaperHeightMm(150))).isNotEmpty();
+        assertThat(validator.validate(validRequest().setPaperWidthMm(100).setPaperHeightMm(130))).isNotEmpty();
         assertHasViolation(validRequest().setDpi(300), "dpi");
     }
 
     @Test
-    void validateAcceptsV1PrintSpecification() {
-        assertThat(validator.validate(validRequest())).isEmpty();
+    void validateAcceptsSupportedPrintSpecifications() {
+        assertThat(validator.validate(validRequest().setPaperWidthMm(76).setPaperHeightMm(130))).isEmpty();
+        assertThat(validator.validate(validRequest().setPaperWidthMm(100).setPaperHeightMm(150))).isEmpty();
     }
 
     private static SfLogisticsAccountSaveReqVO validRequest() {
         return new SfLogisticsAccountSaveReqVO().setName("顺丰月结账号").setLogisticsId(1L)
                 .setEndpoint("https://sfapi.sf-express.com/std/service").setServiceCode("1")
-                .setTemplateCode("fm_100150").setSenderName("仓库").setSenderPhone("13800138000")
+                .setTemplateCode("fm_76130").setSenderName("仓库").setSenderPhone("13800138000")
                 .setSenderProvince("四川省").setSenderCity("成都市").setSenderAddress("高新区 1 号")
-                .setDefaultWeightKg(BigDecimal.ONE).setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
+                .setDefaultWeightKg(BigDecimal.ONE).setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203);
     }
 
     private static void assertHasViolation(Object target, String field) {

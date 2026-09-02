@@ -16,6 +16,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LogisticsLabelNormalizerTest {
 
     @Test
+    void normalizePdf_rendersExact76x130PixelsAt203Dpi() throws Exception {
+        byte[] pdf = createPdf(76, 130);
+
+        byte[] png = new LogisticsLabelNormalizer().normalizePdf(pdf, 76, 130, 203);
+
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(png));
+        assertThat(image.getWidth()).isEqualTo(607);
+        assertThat(image.getHeight()).isEqualTo(1039);
+    }
+
+    @Test
     void normalizePdf_rendersExact100x150PixelsAt203Dpi() throws Exception {
         byte[] pdf = createPdf(100, 150);
 

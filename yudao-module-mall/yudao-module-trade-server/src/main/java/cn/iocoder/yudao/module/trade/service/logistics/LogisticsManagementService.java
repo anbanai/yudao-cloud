@@ -10,5 +10,5 @@ public interface LogisticsManagementService {
     List<LogisticsPrintDeviceRespVO> getDevices();
     LogisticsPrintDeviceRespVO saveDevice(LogisticsPrintDeviceSaveReqVO request);
     LogisticsPrintDeviceRespVO rotateDeviceToken(Long id);
-    String createDiagnosticPayload();
+    String createDiagnosticPayload(int paperWidthMm, int paperHeightMm);
 }
