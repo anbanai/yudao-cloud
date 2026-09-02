@@ -119,6 +119,30 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     }
 
     /**
+     * PolarDB 热点行优化：更新 SPU 库存（增加）。
+     *
+     * @param id        SPU 编号
+     * @param incrCount 增加库存数量（正数）
+     * @return 更新条数
+     */
+    @Update("UPDATE /*+ COMMIT_ON_SUCCESS ROLLBACK_ON_FAIL */ product_spu "
+            + "SET stock = stock + #{incrCount}, sales_count = sales_count - #{incrCount} "
+            + "WHERE id = #{id}")
+    int updateStockIncrHotspot(@Param("id") Long id, @Param("incrCount") Integer incrCount);
+
+    /**
+     * PolarDB 热点行优化：更新 SPU 库存（减少）。
+     *
+     * @param id    SPU 编号
+     * @param count 减少库存数量（正数）
+     * @return 更新条数
+     */
+    @Update("UPDATE /*+ COMMIT_ON_SUCCESS ROLLBACK_ON_FAIL */ product_spu "
+            + "SET stock = stock - #{count}, sales_count = sales_count + #{count} "
+            + "WHERE id = #{id}")
+    int updateStockDecrHotspot(@Param("id") Long id, @Param("count") Integer count);
+
+    /**
      * 添加后台 Tab 选项的查询条件
      *
      * @param tabType 标签类型

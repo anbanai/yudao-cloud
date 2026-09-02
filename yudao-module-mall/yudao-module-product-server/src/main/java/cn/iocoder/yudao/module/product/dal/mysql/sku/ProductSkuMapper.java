@@ -69,4 +69,28 @@ public interface ProductSkuMapper extends BaseMapperX<ProductSkuDO> {
         return update(null, updateWrapper);
     }
 
+    /**
+     * PolarDB 热点行优化：更新 SKU 库存（增加）。
+     *
+     * @param id        编号
+     * @param incrCount 增加库存数量（正数）
+     * @return 更新条数
+     */
+    @Update("UPDATE /*+ COMMIT_ON_SUCCESS ROLLBACK_ON_FAIL */ product_sku "
+            + "SET stock = stock + #{incrCount}, sales_count = sales_count - #{incrCount} "
+            + "WHERE id = #{id}")
+    int updateStockIncrHotspot(@Param("id") Long id, @Param("incrCount") Integer incrCount);
+
+    /**
+     * PolarDB 热点行优化：更新 SKU 库存（减少）。
+     *
+     * @param id    编号
+     * @param count 减少库存数量（正数）
+     * @return 更新条数
+     */
+    @Update("UPDATE /*+ COMMIT_ON_SUCCESS ROLLBACK_ON_FAIL */ product_sku "
+            + "SET stock = stock - #{count}, sales_count = sales_count + #{count} "
+            + "WHERE id = #{id} AND stock >= #{count}")
+    int updateStockDecrHotspot(@Param("id") Long id, @Param("count") Integer count);
+
 }

@@ -53,3 +53,7 @@ application-my.yaml
 /yudao-ui-app/unpackage/
 .DS_Store
 **/.DS_Store
+/docs/performance/
+/docs/reports/
+/tmp/
+/tools/
