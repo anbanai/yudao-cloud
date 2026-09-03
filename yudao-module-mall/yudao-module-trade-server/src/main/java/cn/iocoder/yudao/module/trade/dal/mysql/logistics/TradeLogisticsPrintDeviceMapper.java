@@ -46,7 +46,6 @@ public interface TradeLogisticsPrintDeviceMapper extends BaseMapperX<TradeLogist
     default int bindPendingDevice(Long id, String deviceCode, String deviceName) {
         return update(null, new LambdaUpdateWrapper<TradeLogisticsPrintDeviceDO>()
                 .eq(TradeLogisticsPrintDeviceDO::getId, id)
-                .eq(TradeLogisticsPrintDeviceDO::getDeviceCode, deviceCode)
                 .eq(TradeLogisticsPrintDeviceDO::getEnrollmentKey, "ACTIVE")
                 .set(TradeLogisticsPrintDeviceDO::getDeviceCode, deviceCode)
                 .set(TradeLogisticsPrintDeviceDO::getDeviceName, deviceName)
