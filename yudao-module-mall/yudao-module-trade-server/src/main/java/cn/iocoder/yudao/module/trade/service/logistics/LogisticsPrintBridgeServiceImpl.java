@@ -64,9 +64,8 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
 
     @Override
     public TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode, String deviceName) {
-        // PrintBridge 的官方配置导入协议不会迁移 device_id/device_name。设备 Token 本身是
-        // 服务端为单台设备生成的秘密，因此在缺少可选设备头时仍可安全完成认证；如果设备头存在，
-        // 继续严格校验，避免一个 Token 被错误设备复用。
+        // PrintBridge 的官方配置导入协议不会迁移 device_id/device_name。首次连接使用短时效的
+        // 设备专属 Token 采纳本机已有身份；绑定完成后，如果设备头存在则继续严格校验。
         if (StrUtil.isBlank(token) || token.length() > 512 || (deviceCode != null && deviceCode.length() > 128)) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
@@ -80,8 +79,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED, "PrintBridge 配置已过期，请重新下载");
             }
             String adoptedDeviceCode = StrUtil.blankToDefault(deviceCode, device.getDeviceCode());
-            if (StrUtil.isBlank(adoptedDeviceCode) || (StrUtil.isNotBlank(deviceCode)
-                    && !StrUtil.equals(device.getDeviceCode(), deviceCode))) {
+            if (StrUtil.isBlank(adoptedDeviceCode)) {
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
             }
             String adoptedName = StrUtil.blankToDefault(StrUtil.sub(deviceName, 0, 128), "PrintBridge 设备");

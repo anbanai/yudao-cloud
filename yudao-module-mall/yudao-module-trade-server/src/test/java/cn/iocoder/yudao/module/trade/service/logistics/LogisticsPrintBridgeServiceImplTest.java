@@ -115,16 +115,20 @@ class LogisticsPrintBridgeServiceImplTest {
     }
 
     @Test
-    void authenticate_pendingTokenRejectsDifferentDeviceIdentity() {
+    void authenticate_pendingTokenAdoptsExistingPrintBridgeDeviceIdentity() {
         TradeLogisticsPrintDeviceDO pending = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
                 .setDeviceCode("configured-device-id").setDeviceName("打印工作站-123456").setStatus(0)
                 .setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now());
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
                 .thenReturn(pending);
+        when(deviceMapper.bindPendingDevice(9L, "existing-device-id", "仓库电脑"))
+                .thenReturn(1);
 
-        assertThatThrownBy(() -> service.authenticate("secret-token", "different-device-id", "另一台电脑"))
-                .isInstanceOf(ServiceException.class);
-        verify(deviceMapper, never()).bindPendingDevice(any(), any(), any());
+        TradeLogisticsPrintDeviceDO actual = service.authenticate(
+                "secret-token", "existing-device-id", "仓库电脑");
+
+        assertThat(actual.getDeviceCode()).isEqualTo("existing-device-id");
+        verify(deviceMapper).bindPendingDevice(9L, "existing-device-id", "仓库电脑");
     }
 
     @Test
