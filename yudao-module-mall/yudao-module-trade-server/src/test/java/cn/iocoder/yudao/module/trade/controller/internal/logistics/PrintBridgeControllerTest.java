@@ -36,4 +36,18 @@ class PrintBridgeControllerTest {
         verify(service, never()).report(any(), any());
     }
 
+    @Test
+    void pull_allowsOfficialConfigImportWithoutOptionalDeviceHeaders() {
+        LogisticsPrintBridgeService service = mock(LogisticsPrintBridgeService.class);
+        TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO().setId(1L);
+        when(service.authenticate("secret", null, null)).thenReturn(device);
+        when(service.pull(device, null)).thenReturn(null);
+        PrintBridgeController controller = new PrintBridgeController();
+        ReflectionTestUtils.setField(controller, "service", service);
+
+        assertThat(controller.pull("Bearer secret", null, null, false).getStatusCode().value())
+                .isEqualTo(204);
+        verify(service).authenticate("secret", null, null);
+    }
+
 }

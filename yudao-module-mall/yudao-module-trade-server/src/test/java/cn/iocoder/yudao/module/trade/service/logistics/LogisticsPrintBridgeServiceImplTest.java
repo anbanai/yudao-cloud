@@ -89,6 +89,32 @@ class LogisticsPrintBridgeServiceImplTest {
     }
 
     @Test
+    void authenticate_firstPollWithoutOptionalDeviceHeadersUsesGeneratedIdentity() {
+        TradeLogisticsPrintDeviceDO pending = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
+                .setDeviceCode("generated-device-id").setDeviceName("打印工作站-123456").setStatus(0)
+                .setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now());
+        when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
+                .thenReturn(pending);
+        when(deviceMapper.bindPendingDevice(9L, "generated-device-id", "PrintBridge 设备"))
+                .thenReturn(1);
+
+        TradeLogisticsPrintDeviceDO actual = service.authenticate("secret-token", null, null);
+
+        assertThat(actual.getDeviceCode()).isEqualTo("generated-device-id");
+        verify(deviceMapper).bindPendingDevice(9L, "generated-device-id", "PrintBridge 设备");
+    }
+
+    @Test
+    void authenticate_boundTokenAllowsMissingOptionalDeviceHeader() {
+        TradeLogisticsPrintDeviceDO bound = new TradeLogisticsPrintDeviceDO()
+                .setDeviceCode("bound-device").setStatus(0);
+        when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
+                .thenReturn(bound);
+
+        assertThat(service.authenticate("secret-token", null, null)).isSameAs(bound);
+    }
+
+    @Test
     void authenticate_pendingTokenRejectsDifferentDeviceIdentity() {
         TradeLogisticsPrintDeviceDO pending = new TradeLogisticsPrintDeviceDO().setId(9L).setTenantId(3L)
                 .setDeviceCode("configured-device-id").setDeviceName("打印工作站-123456").setStatus(0)

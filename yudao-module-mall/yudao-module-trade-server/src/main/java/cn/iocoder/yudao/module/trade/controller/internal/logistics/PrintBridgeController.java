@@ -27,7 +27,7 @@ public class PrintBridgeController {
     @GetMapping
     public ResponseEntity<PrintBridgeTaskRespVO> pull(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestHeader("X-PrintBridge-Device-Id") String deviceCode,
+            @RequestHeader(value = "X-PrintBridge-Device-Id", required = false) String deviceCode,
             @RequestHeader(value = "X-PrintBridge-Device-Name", required = false) String deviceName,
             @RequestHeader(value = "X-PrintBridge-Test", required = false) Boolean test) {
         TradeLogisticsPrintDeviceDO device = service.authenticate(bearerToken(authorization), deviceCode, deviceName);
@@ -41,7 +41,7 @@ public class PrintBridgeController {
     @PostMapping
     public ResponseEntity<Void> report(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestHeader("X-PrintBridge-Device-Id") String deviceCode,
+            @RequestHeader(value = "X-PrintBridge-Device-Id", required = false) String deviceCode,
             @RequestHeader(value = "X-PrintBridge-Device-Name", required = false) String deviceName,
             @RequestHeader(value = "X-PrintBridge-Test", required = false) Boolean test,
             @Valid @RequestBody PrintBridgeStatusReqVO request) {

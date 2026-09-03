@@ -64,8 +64,10 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
 
     @Override
     public TradeLogisticsPrintDeviceDO authenticate(String token, String deviceCode, String deviceName) {
-        if (StrUtil.isBlank(token) || token.length() > 512 || StrUtil.isBlank(deviceCode)
-                || deviceCode.length() > 128) {
+        // PrintBridge 的官方配置导入协议不会迁移 device_id/device_name。设备 Token 本身是
+        // 服务端为单台设备生成的秘密，因此在缺少可选设备头时仍可安全完成认证；如果设备头存在，
+        // 继续严格校验，避免一个 Token 被错误设备复用。
+        if (StrUtil.isBlank(token) || token.length() > 512 || (deviceCode != null && deviceCode.length() > 128)) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
         TradeLogisticsPrintDeviceDO device = deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash(token));
@@ -77,13 +79,15 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
                     || device.getTokenCreatedTime().isBefore(LocalDateTime.now().minusMinutes(ENROLLMENT_TTL_MINUTES))) {
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED, "PrintBridge 配置已过期，请重新下载");
             }
-            if (!StrUtil.equals(device.getDeviceCode(), deviceCode)) {
+            String adoptedDeviceCode = StrUtil.blankToDefault(deviceCode, device.getDeviceCode());
+            if (StrUtil.isBlank(adoptedDeviceCode) || (StrUtil.isNotBlank(deviceCode)
+                    && !StrUtil.equals(device.getDeviceCode(), deviceCode))) {
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
             }
             String adoptedName = StrUtil.blankToDefault(StrUtil.sub(deviceName, 0, 128), "PrintBridge 设备");
             try {
-                if (deviceMapper.bindPendingDevice(device.getId(), deviceCode, adoptedName) > 0) {
-                    device.setDeviceCode(deviceCode).setDeviceName(adoptedName);
+                if (deviceMapper.bindPendingDevice(device.getId(), adoptedDeviceCode, adoptedName) > 0) {
+                    device.setDeviceCode(adoptedDeviceCode).setDeviceName(adoptedName);
                 } else {
                     device = deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash(token));
                 }
@@ -91,7 +95,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
             }
         }
-        if (!StrUtil.equals(device.getDeviceCode(), deviceCode)) {
+        if (StrUtil.isNotBlank(deviceCode) && !StrUtil.equals(device.getDeviceCode(), deviceCode)) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
         return device;
@@ -106,7 +110,8 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     private PrintBridgeTaskRespVO pullInTenant(TradeLogisticsPrintDeviceDO device, String deviceName) {
         LocalDateTime now = LocalDateTime.now();
         deviceMapper.updateById(new TradeLogisticsPrintDeviceDO().setId(device.getId())
-                .setDeviceName(StrUtil.sub(deviceName, 0, 128)).setLastPollTime(now));
+                .setDeviceName(StrUtil.blankToDefault(StrUtil.sub(deviceName, 0, 128), device.getDeviceName()))
+                .setLastPollTime(now));
         TradeLogisticsPrintTaskDO task = taskMapper.selectClaimable(device.getId(), now);
         if (task == null) {
             return null;
