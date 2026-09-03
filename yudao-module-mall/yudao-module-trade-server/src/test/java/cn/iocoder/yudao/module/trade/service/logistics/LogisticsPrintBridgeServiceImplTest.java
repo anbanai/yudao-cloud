@@ -79,13 +79,14 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setTokenCreatedTime(LocalDateTime.now());
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
                 .thenReturn(pending);
-        when(deviceMapper.bindPendingDevice(9L, "generated-device-id", "仓库电脑"))
+        when(deviceMapper.bindPendingDevice(9L, "generated-device-id", "packing-station"))
                 .thenReturn(1);
 
-        TradeLogisticsPrintDeviceDO actual = service.authenticate("secret-token", "generated-device-id", "仓库电脑");
+        TradeLogisticsPrintDeviceDO actual = service.authenticate(
+                "secret-token", "generated-device-id", "packing-station");
 
         assertThat(actual.getDeviceCode()).isEqualTo("generated-device-id");
-        assertThat(actual.getDeviceName()).isEqualTo("仓库电脑");
+        assertThat(actual.getDeviceName()).isEqualTo("packing-station");
     }
 
     @Test
@@ -121,14 +122,14 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now());
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
                 .thenReturn(pending);
-        when(deviceMapper.bindPendingDevice(9L, "existing-device-id", "仓库电脑"))
+        when(deviceMapper.bindPendingDevice(9L, "existing-device-id", "packing-station"))
                 .thenReturn(1);
 
         TradeLogisticsPrintDeviceDO actual = service.authenticate(
-                "secret-token", "existing-device-id", "仓库电脑");
+                "secret-token", "existing-device-id", "packing-station");
 
         assertThat(actual.getDeviceCode()).isEqualTo("existing-device-id");
-        verify(deviceMapper).bindPendingDevice(9L, "existing-device-id", "仓库电脑");
+        verify(deviceMapper).bindPendingDevice(9L, "existing-device-id", "packing-station");
     }
 
     @Test
@@ -208,6 +209,18 @@ class LogisticsPrintBridgeServiceImplTest {
         var response = service.pull(device, "仓库电脑");
 
         assertThat(response.getPrinterName()).isEqualTo("Deli GS050DY");
+    }
+
+    @Test
+    void pull_ignoresNonAsciiDeviceNameHeader() {
+        TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO()
+                .setId(1L).setTenantId(9L).setStatus(0).setDeviceName("PrintBridge device");
+        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(null);
+
+        service.pull(device, "不忍独享");
+
+        verify(deviceMapper).updateById(argThat((TradeLogisticsPrintDeviceDO updated) ->
+                "PrintBridge device".equals(updated.getDeviceName())));
     }
 
     @Test

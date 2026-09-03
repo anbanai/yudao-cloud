@@ -82,7 +82,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             if (StrUtil.isBlank(adoptedDeviceCode)) {
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
             }
-            String adoptedName = StrUtil.blankToDefault(StrUtil.sub(deviceName, 0, 128), "PrintBridge 设备");
+            String adoptedName = StrUtil.blankToDefault(sanitizeHeaderDeviceName(deviceName), "PrintBridge 设备");
             try {
                 if (deviceMapper.bindPendingDevice(device.getId(), adoptedDeviceCode, adoptedName) > 0) {
                     device.setDeviceCode(adoptedDeviceCode).setDeviceName(adoptedName);
@@ -108,7 +108,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     private PrintBridgeTaskRespVO pullInTenant(TradeLogisticsPrintDeviceDO device, String deviceName) {
         LocalDateTime now = LocalDateTime.now();
         deviceMapper.updateById(new TradeLogisticsPrintDeviceDO().setId(device.getId())
-                .setDeviceName(StrUtil.blankToDefault(StrUtil.sub(deviceName, 0, 128), device.getDeviceName()))
+                .setDeviceName(StrUtil.blankToDefault(sanitizeHeaderDeviceName(deviceName), device.getDeviceName()))
                 .setLastPollTime(now));
         TradeLogisticsPrintTaskDO task = taskMapper.selectClaimable(device.getId(), now);
         if (task == null) {
@@ -138,6 +138,20 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     private static boolean isPending(TradeLogisticsPrintDeviceDO device) {
         return StrUtil.equals(device.getEnrollmentKey(), "ACTIVE")
                 || StrUtil.startWith(device.getDeviceCode(), "pending-");
+    }
+
+    private static String sanitizeHeaderDeviceName(String value) {
+        String candidate = StrUtil.trim(value);
+        if (StrUtil.isBlank(candidate)) {
+            return null;
+        }
+        for (int i = 0; i < candidate.length(); i++) {
+            char character = candidate.charAt(i);
+            if (character < 0x20 || character > 0x7e) {
+                return null;
+            }
+        }
+        return StrUtil.sub(candidate, 0, 128);
     }
 
     @Override
