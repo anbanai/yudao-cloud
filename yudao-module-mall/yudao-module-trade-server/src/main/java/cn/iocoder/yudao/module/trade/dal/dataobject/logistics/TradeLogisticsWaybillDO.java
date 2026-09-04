@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.trade.dal.dataobject.logistics;
 
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -18,6 +20,8 @@ public class TradeLogisticsWaybillDO extends TenantBaseDO {
     @TableId
     private Long id;
     private Long orderId;
+    @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
+    private Long activeOrderId;
     private String orderNo;
     private Long accountId;
     private Long logisticsId;

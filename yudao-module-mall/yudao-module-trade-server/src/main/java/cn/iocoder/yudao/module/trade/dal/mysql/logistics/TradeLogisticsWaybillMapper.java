@@ -34,7 +34,7 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
     default List<TradeLogisticsWaybillDO> selectListWithLabelByOrderIdsAndStatuses(
             Collection<Long> orderIds, Collection<String> statuses) {
         return selectList(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
-                .in(TradeLogisticsWaybillDO::getOrderId, orderIds)
+                .in(TradeLogisticsWaybillDO::getActiveOrderId, orderIds)
                 .in(TradeLogisticsWaybillDO::getStatus, statuses)
                 .isNotNull(TradeLogisticsWaybillDO::getLabelFileId));
     }

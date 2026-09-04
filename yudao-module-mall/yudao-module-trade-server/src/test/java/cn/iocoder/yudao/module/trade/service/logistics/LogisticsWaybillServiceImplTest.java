@@ -22,6 +22,8 @@ import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -242,12 +244,49 @@ class LogisticsWaybillServiceImplTest {
         TradeOrderDO available = new TradeOrderDO().setId(11L).setNo("T11");
         when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(blocked, available));
         when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
-                .thenReturn(List.of(new TradeLogisticsWaybillDO().setOrderId(10L)
+                .thenReturn(List.of(new TradeLogisticsWaybillDO().setId(20L).setOrderId(10L)
                         .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
-
+        when(taskMapper.selectListByWaybillIds(List.of(20L)))
+                .thenReturn(List.of(
+                        new TradeLogisticsPrintTaskDO().setId(30L).setWaybillId(20L)
+                                .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name()),
+                        new TradeLogisticsPrintTaskDO().setId(29L).setWaybillId(20L)
+                                .setStatus(LogisticsPrintTaskStatusEnum.FAILED.name())));
         var result = service.getPendingOrders();
 
         assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(11L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"FAILED", "UNKNOWN", "CANCELLED"})
+    void getPendingOrders_keepsOrderWhenLatestPrintTaskNeedsManualRecovery(String latestStatus) {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10");
+        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(order));
+        when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
+                .thenReturn(List.of(new TradeLogisticsWaybillDO().setId(20L).setOrderId(10L)
+                        .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
+        when(taskMapper.selectListByWaybillIds(List.of(20L)))
+                .thenReturn(List.of(
+                        new TradeLogisticsPrintTaskDO().setId(31L).setWaybillId(20L).setStatus(latestStatus),
+                        new TradeLogisticsPrintTaskDO().setId(30L).setWaybillId(20L)
+                                .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())));
+        var result = service.getPendingOrders();
+
+        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(10L);
+    }
+
+    @Test
+    void getPendingOrders_keepsOrderWhenLabelHasNoPrintTask() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10");
+        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(order));
+        when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
+                .thenReturn(List.of(new TradeLogisticsWaybillDO().setId(20L).setOrderId(10L)
+                        .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
+        when(taskMapper.selectListByWaybillIds(List.of(20L))).thenReturn(List.of());
+
+        var result = service.getPendingOrders();
+
+        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(10L);
     }
 
     @Test

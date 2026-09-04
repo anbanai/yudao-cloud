@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Mapper
@@ -42,6 +43,12 @@ public interface TradeLogisticsPrintTaskMapper extends BaseMapperX<TradeLogistic
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsPrintTaskDO>()
                 .eq(TradeLogisticsPrintTaskDO::getWaybillId, waybillId)
                 .orderByDesc(TradeLogisticsPrintTaskDO::getId).last("LIMIT 1 FOR UPDATE"));
+    }
+
+    default List<TradeLogisticsPrintTaskDO> selectListByWaybillIds(Collection<Long> waybillIds) {
+        return selectList(new LambdaQueryWrapperX<TradeLogisticsPrintTaskDO>()
+                .in(TradeLogisticsPrintTaskDO::getWaybillId, waybillIds)
+                .orderByDesc(TradeLogisticsPrintTaskDO::getId));
     }
 
     default List<TradeLogisticsPrintTaskDO> selectAcceptedExpired(LocalDateTime before) {
