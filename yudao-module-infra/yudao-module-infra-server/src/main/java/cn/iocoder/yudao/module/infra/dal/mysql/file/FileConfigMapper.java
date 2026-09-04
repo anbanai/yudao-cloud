@@ -5,12 +5,14 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.config.FileConfigPageReqVO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileConfigDO;
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
 @Mapper
+@InterceptorIgnore(tenantLine = "true", dataPermission = "true")
 public interface FileConfigMapper extends BaseMapperX<FileConfigDO> {
 
     default PageResult<FileConfigDO> selectPage(FileConfigPageReqVO reqVO) {
