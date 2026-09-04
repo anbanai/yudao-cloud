@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.infra.api.file;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateReqDTO;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.module.infra.enums.ApiConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -58,6 +59,16 @@ public interface FileApi {
     @Operation(summary = "保存文件，并返回文件的访问路径")
     CommonResult<String> createFile(@Valid @RequestBody FileCreateReqDTO createReqDTO);
 
+    default FileCreateRespDTO createPrivateFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
+                                                String name, String directory, String type) {
+        return createPrivateFile(new FileCreateReqDTO().setName(name).setDirectory(directory)
+                .setType(type).setContent(content)).getCheckedData();
+    }
+
+    @PostMapping(PREFIX + "/create-private")
+    @Operation(summary = "保存私有文件，并返回文件记录")
+    CommonResult<FileCreateRespDTO> createPrivateFile(@Valid @RequestBody FileCreateReqDTO createReqDTO);
+
     /**
      * 生成文件预签名地址，用于读取
      *
@@ -70,11 +81,27 @@ public interface FileApi {
     CommonResult<String> presignGetUrl(@NotEmpty(message = "URL 不能为空") @RequestParam("url") String url,
                                        Integer expirationSeconds);
 
+    @GetMapping(PREFIX + "/presigned-url-by-id")
+    @Operation(summary = "按文件编号生成预签名读取地址")
+    CommonResult<String> presignGetUrl(@RequestParam("id") Long fileId,
+                                       @RequestParam(value = "expirationSeconds", required = false)
+                                       Integer expirationSeconds);
+
     /**
-     * 判断主文件存储是否为 HTTPS 私有 S3，并支持短时效下载签名。
+     * 判断公开默认文件存储是否为 HTTPS 私有 S3，并支持短时效下载签名。
+     *
+     * @deprecated 公开默认与私有默认拆分后，请使用 {@link #isPrivateMasterSupported()}。
      */
+    @Deprecated
     @GetMapping(PREFIX + "/private-presigned-get-supported")
     @Operation(summary = "判断主文件存储是否支持私有 HTTPS 预签名下载")
     CommonResult<Boolean> isPrivatePresignedGetSupported();
+
+    /**
+     * 判断私有默认文件存储是否支持 HTTPS 预签名下载。
+     */
+    @GetMapping(PREFIX + "/private-master-supported")
+    @Operation(summary = "判断私有默认存储是否支持 HTTPS 预签名下载")
+    CommonResult<Boolean> isPrivateMasterSupported();
 
 }

@@ -56,6 +56,18 @@ public interface ErrorCodeConstants {
     // ========== 文件配置 1-001-006-000 ==========
     ErrorCode FILE_CONFIG_NOT_EXISTS = new ErrorCode(1_001_006_000, "文件配置不存在");
     ErrorCode FILE_CONFIG_DELETE_FAIL_MASTER = new ErrorCode(1_001_006_001, "该文件配置不允许删除，原因：它是主配置，删除会导致无法上传文件");
+    ErrorCode FILE_CONFIG_PRIVATE_MASTER_UNSUPPORTED = new ErrorCode(1_001_006_002,
+            "该私有文件配置不支持 HTTPS 预签名下载，无法设为私有默认存储");
+    ErrorCode FILE_CONFIG_UPDATE_FAIL_MASTER_VISIBILITY = new ErrorCode(1_001_006_003,
+            "默认文件配置不能直接修改公开/私有属性，请先切换该类型的默认存储");
+    ErrorCode FILE_PUBLIC_MASTER_NOT_EXISTS = new ErrorCode(1_001_006_004, "未配置公开默认存储");
+    ErrorCode FILE_PRIVATE_MASTER_NOT_EXISTS = new ErrorCode(1_001_006_005, "请在文件配置中设置私有默认存储");
+    ErrorCode FILE_CONFIG_DELETE_FAIL_PRIVATE_FILE_EXISTS = new ErrorCode(1_001_006_006,
+            "该私有文件配置仍被文件引用，删除后历史文件将无法下载");
+    ErrorCode FILE_CONFIG_UPDATE_FAIL_PRIVATE_FILE_REFERENCED = new ErrorCode(1_001_006_007,
+            "该私有文件配置仍被历史文件引用，只允许更新访问凭证；如需更换存储位置，请新建配置");
+    ErrorCode FILE_CONFIG_UPDATE_FAIL_STORAGE = new ErrorCode(1_001_006_008,
+            "文件配置的存储类型不允许修改，请新建配置");
 
     // ========== 数据源配置 1-001-007-000 ==========
     ErrorCode DATA_SOURCE_CONFIG_NOT_EXISTS = new ErrorCode(1_001_007_000, "数据源配置不存在");

@@ -53,10 +53,18 @@ public abstract class AbstractFileClient<Config extends FileClientConfig> implem
             return;
         }
         log.info("[refresh][配置({})发生变化，重新初始化]", config);
+        Config previousConfig = this.config;
+        Config previousOriginalConfig = this.originalConfig;
         this.config = config;
-        this.originalConfig = config;
-        // 初始化
-        this.init();
+        try {
+            // 初始化成功后再提交原始配置，失败时保留旧配置以便后续重试
+            this.init();
+            this.originalConfig = config;
+        } catch (RuntimeException | Error exception) {
+            this.config = previousConfig;
+            this.originalConfig = previousOriginalConfig;
+            throw exception;
+        }
     }
 
     @Override

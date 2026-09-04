@@ -60,6 +60,13 @@ public class FileConfigDO extends BaseDO {
      * 由于我们可以配置多个文件配置，默认情况下，使用主配置进行文件的上传
      */
     private Boolean master;
+    /**
+     * 是否为私有访问存储。
+     *
+     * 该值由 {@link #config} 自动派生，不接受管理端单独设置。
+     */
+    @TableField("`private`")
+    private Boolean privateStorage;
 
     /**
      * 支付渠道配置

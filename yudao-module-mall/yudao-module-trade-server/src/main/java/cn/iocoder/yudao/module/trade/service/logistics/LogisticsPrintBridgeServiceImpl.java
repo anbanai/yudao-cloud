@@ -123,10 +123,10 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
                     .setLeaseExpireTime(now.plusSeconds(60));
             taskMapper.updateById(task);
         }
-        if (!isPrivatePresignedStorage()) {
+        if (task.getLabelFileId() == null) {
             throw exception(LOGISTICS_PRIVATE_STORAGE_REQUIRED);
         }
-        String fileUrl = fileApi.presignGetUrl(task.getLabelUrl(), LABEL_URL_EXPIRATION_SECONDS).getCheckedData();
+        String fileUrl = fileApi.presignGetUrl(task.getLabelFileId(), LABEL_URL_EXPIRATION_SECONDS).getCheckedData();
         validateTemporaryHttpsUrl(fileUrl);
         return new PrintBridgeTaskRespVO().setType("print").setRequestId(task.getRequestId())
                 .setJobId(task.getJobId()).setFormat(task.getFormat()).setFileUrl(fileUrl)
@@ -275,11 +275,6 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             case "unknown" -> LogisticsPrintTaskStatusEnum.UNKNOWN;
             default -> throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
         };
-    }
-
-    private boolean isPrivatePresignedStorage() {
-        var result = fileApi.isPrivatePresignedGetSupported();
-        return result != null && Boolean.TRUE.equals(result.getData());
     }
 
     private static void validateTemporaryHttpsUrl(String url) {

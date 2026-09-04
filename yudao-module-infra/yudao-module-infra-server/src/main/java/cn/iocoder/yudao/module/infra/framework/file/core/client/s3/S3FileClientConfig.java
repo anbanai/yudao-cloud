@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.infra.framework.file.core.client.s3;
 
+import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.http.HttpUtil;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.FileClientConfig;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
@@ -8,6 +10,8 @@ import org.hibernate.validator.constraints.URL;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
+
+import java.util.Objects;
 
 /**
  * S3 文件客户端的配置类
@@ -103,6 +107,64 @@ public class S3FileClientConfig implements FileClientConfig {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public boolean isPrivateAccess() {
+        return BooleanUtil.isFalse(enablePublicAccess);
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isPrivatePresignedGetSupported() {
+        if (!isPrivateAccess()) {
+            return false;
+        }
+        String effectiveDomain = buildEffectiveDomain();
+        return HttpUtil.isHttps(effectiveDomain)
+                && HttpUtil.isHttps(buildEffectivePresignerEndpoint(effectiveDomain));
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isSameStorageLocation(FileClientConfig other) {
+        if (!(other instanceof S3FileClientConfig)) {
+            return false;
+        }
+        S3FileClientConfig that = (S3FileClientConfig) other;
+        return Objects.equals(endpoint, that.endpoint)
+                && Objects.equals(domain, that.domain)
+                && Objects.equals(bucket, that.bucket)
+                && Objects.equals(enablePathStyleAccess, that.enablePathStyleAccess)
+                && Objects.equals(enablePublicAccess, that.enablePublicAccess)
+                && Objects.equals(region, that.region);
+    }
+
+    private String buildEffectiveDomain() {
+        if (StrUtil.isNotEmpty(domain)) {
+            return domain;
+        }
+        if (HttpUtil.isHttp(endpoint) || HttpUtil.isHttps(endpoint)) {
+            return StrUtil.format("{}/{}", endpoint, bucket);
+        }
+        return StrUtil.format("https://{}.{}", bucket, endpoint);
+    }
+
+    private String buildEffectiveEndpoint() {
+        if (HttpUtil.isHttp(endpoint) || HttpUtil.isHttps(endpoint)) {
+            return endpoint;
+        }
+        return StrUtil.format("https://{}", endpoint);
+    }
+
+    private String buildEffectivePresignerEndpoint(String effectiveDomain) {
+        if (StrUtil.contains(endpoint, ENDPOINT_ALIYUN) || StrUtil.contains(endpoint, ENDPOINT_QINIU)) {
+            return buildEffectiveEndpoint();
+        }
+        if (Boolean.TRUE.equals(enablePathStyleAccess)) {
+            return StrUtil.removeSuffix(effectiveDomain, StrUtil.format("/{}", bucket));
+        }
+        return StrUtil.replace(effectiveDomain, StrUtil.format("://{}.", bucket), "://");
     }
 
 }

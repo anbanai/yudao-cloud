@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `waybill_no` varchar(64) DEFAULT NULL,
   `status` varchar(16) NOT NULL COMMENT 'CREATING/CREATED/UNKNOWN/FAILED/CANCELLING/CANCEL_UNKNOWN/CANCELLED',
   `active_order_id` bigint GENERATED ALWAYS AS (CASE WHEN `deleted` = b'0' AND `status` <> 'CANCELLED' THEN `order_id` ELSE NULL END) STORED,
+  `label_file_id` bigint DEFAULT NULL COMMENT 'infra_file.id',
   `label_url` varchar(1024) DEFAULT NULL,
   `label_content_type` varchar(32) DEFAULT NULL,
   `label_checksum` varchar(64) DEFAULT NULL,
@@ -147,6 +148,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   `device_id` bigint NOT NULL,
   `status` varchar(16) NOT NULL COMMENT 'PENDING/DISPATCHED/ACCEPTED/SUCCESS/FAILED/UNKNOWN/CANCELLED',
   `format` varchar(16) NOT NULL DEFAULT 'image',
+  `label_file_id` bigint DEFAULT NULL COMMENT 'infra_file.id',
   `label_url` varchar(1024) NOT NULL,
   `checksum` varchar(64) NOT NULL,
   `paper_width_mm` int NOT NULL DEFAULT 76,
@@ -168,6 +170,51 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   KEY `idx_logistics_task_pull` (`tenant_id`,`device_id`,`status`,`lease_expire_time`),
   KEY `idx_logistics_task_waybill` (`tenant_id`,`waybill_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='持久化打印任务';
+
+-- 兼容已经执行过旧版脚本的数据库：保存文件编号后可始终按原存储配置签名。
+SET @logistics_waybill_label_file_id_count = (
+  SELECT COUNT(*) FROM `information_schema`.`columns`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_waybill'
+    AND `column_name` = 'label_file_id'
+);
+SET @logistics_waybill_label_file_id_sql = IF(
+  @logistics_waybill_label_file_id_count = 0,
+  'ALTER TABLE `trade_logistics_waybill` ADD COLUMN `label_file_id` bigint DEFAULT NULL COMMENT ''infra_file.id'' AFTER `active_order_id`',
+  'SELECT 1'
+);
+PREPARE logistics_waybill_label_file_id_stmt FROM @logistics_waybill_label_file_id_sql;
+EXECUTE logistics_waybill_label_file_id_stmt;
+DEALLOCATE PREPARE logistics_waybill_label_file_id_stmt;
+
+SET @logistics_task_label_file_id_count = (
+  SELECT COUNT(*) FROM `information_schema`.`columns`
+  WHERE `table_schema` = DATABASE()
+    AND `table_name` = 'trade_logistics_print_task'
+    AND `column_name` = 'label_file_id'
+);
+SET @logistics_task_label_file_id_sql = IF(
+  @logistics_task_label_file_id_count = 0,
+  'ALTER TABLE `trade_logistics_print_task` ADD COLUMN `label_file_id` bigint DEFAULT NULL COMMENT ''infra_file.id'' AFTER `format`',
+  'SELECT 1'
+);
+PREPARE logistics_task_label_file_id_stmt FROM @logistics_task_label_file_id_sql;
+EXECUTE logistics_task_label_file_id_stmt;
+DEALLOCATE PREPARE logistics_task_label_file_id_stmt;
+
+UPDATE `trade_logistics_waybill` w
+SET w.`label_file_id` = (
+  SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f
+  WHERE f.`url` = w.`label_url` AND f.`deleted` = b'0'
+)
+WHERE w.`label_file_id` IS NULL AND w.`label_url` IS NOT NULL;
+
+UPDATE `trade_logistics_print_task` t
+SET t.`label_file_id` = COALESCE(
+  (SELECT w.`label_file_id` FROM `trade_logistics_waybill` w WHERE w.`id` = t.`waybill_id`),
+  (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f WHERE f.`url` = t.`label_url` AND f.`deleted` = b'0')
+)
+WHERE t.`label_file_id` IS NULL;
 
 CREATE TABLE IF NOT EXISTS `trade_logistics_print_event` (
   `id` bigint NOT NULL AUTO_INCREMENT,

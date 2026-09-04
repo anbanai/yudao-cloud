@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.trade.service.logistics;
 
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPendingOrderRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
@@ -136,6 +138,43 @@ class LogisticsWaybillServiceImplTest {
         assertThat(result.getJobId()).isEqualTo("JOB-1");
         assertThat(result).extracting("reused").isEqualTo(true);
         verifyNoInteractions(sfClient);
+    }
+
+    @Test
+    void createWaybill_createdWithoutTaskUsesPrivateStorageWithoutCreatingSfOrderAgain() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        TradeLogisticsAccountDO account = account();
+        TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L)
+                .setOrderNo("T10").setAccountId(account.getId()).setWaybillNo("SF1164862794041")
+                .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setDeliveryStatus("PENDING");
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+        when(accountMapper.selectDefaultEnabled()).thenReturn(account);
+        when(accountMapper.selectById(account.getId())).thenReturn(account);
+        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
+        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
+        when(waybillMapper.selectByIdForUpdate(3L)).thenReturn(waybill);
+        when(fileApi.isPrivateMasterSupported()).thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
+        when(sfClient.getLabel(account, "SF1164862794041")).thenReturn(new byte[]{1});
+        when(labelNormalizer.normalizePdf(any(), eq(100), eq(150), eq(203))).thenReturn(new byte[]{2, 3});
+        when(fileApi.createPrivateFile(any(), eq("SF1164862794041.png"),
+                eq("trade/logistics/9/labels"), eq("image/png")))
+                .thenReturn(new FileCreateRespDTO().setId(99L).setUrl("https://files.example/label.png"));
+
+        TenantContextHolder.setTenantId(9L);
+        try {
+            var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+
+            assertThat(result.getJobId()).startsWith("JOB-");
+            assertThat(waybill.getLabelFileId()).isEqualTo(99L);
+            ArgumentCaptor<TradeLogisticsPrintTaskDO> taskCaptor =
+                    ArgumentCaptor.forClass(TradeLogisticsPrintTaskDO.class);
+            verify(taskMapper).insert(taskCaptor.capture());
+            assertThat(taskCaptor.getValue().getLabelFileId()).isEqualTo(99L);
+            verify(sfClient, never()).createWaybill(any(), anyString(), any(), anyList(), anyMap());
+        } finally {
+            TenantContextHolder.clear();
+        }
     }
 
     @Test

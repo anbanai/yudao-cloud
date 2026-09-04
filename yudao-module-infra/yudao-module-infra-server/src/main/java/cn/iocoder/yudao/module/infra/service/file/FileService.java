@@ -37,6 +37,12 @@ public interface FileService {
                       String name, String directory, String type);
 
     /**
+     * 保存私有文件，并返回持久化记录。
+     */
+    FileDO createPrivateFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
+                             String name, String directory, String type);
+
+    /**
      * 生成文件预签名地址信息，用于上传
      *
      * @param name      文件名
@@ -54,7 +60,18 @@ public interface FileService {
      */
     String presignGetUrl(String url, Integer expirationSeconds);
 
+    String presignGetUrl(Long fileId, Integer expirationSeconds);
+
+    /**
+     * @deprecated 公开默认与私有默认拆分后，请使用 {@link #isPrivateMasterSupported()}。
+     */
+    @Deprecated
     boolean isPrivatePresignedGetSupported();
+
+    /**
+     * 判断私有默认存储是否支持 HTTPS 预签名下载。
+     */
+    boolean isPrivateMasterSupported();
 
     /**
      * 创建文件

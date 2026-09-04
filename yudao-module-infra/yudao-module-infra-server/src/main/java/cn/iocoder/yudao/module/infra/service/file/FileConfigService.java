@@ -91,4 +91,18 @@ public interface FileConfigService {
      */
     FileClient getMasterFileClient();
 
+    /**
+     * 获得私有 Master 文件客户端。
+     *
+     * @return 文件客户端；未配置时返回 {@code null}
+     */
+    FileClient getPrivateMasterFileClient();
+
+    /**
+     * 在当前事务内使用共享锁获得私有 Master 文件客户端。
+     *
+     * @return 文件客户端；未配置时返回 {@code null}
+     */
+    FileClient getPrivateMasterFileClientForShare();
+
 }

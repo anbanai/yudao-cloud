@@ -25,6 +25,7 @@ public class TradeLogisticsWaybillDO extends TenantBaseDO {
     private String providerOrderNo;
     private String waybillNo;
     private String status;
+    private Long labelFileId;
     private String labelUrl;
     private String labelContentType;
     private String labelChecksum;

@@ -24,6 +24,7 @@ import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServic
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.*;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PATH_INVALID;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PUBLIC_MASTER_NOT_EXISTS;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
@@ -144,6 +145,62 @@ public class FileServiceImplTest extends BaseDbUnitTest {
         assertEquals(url, file.getUrl());
         assertEquals(type, file.getType());
         assertEquals(content.length, file.getSize());
+    }
+
+    @Test
+    public void testCreateFile_missingPublicMaster() {
+        when(fileConfigService.getMasterFileClient()).thenReturn(null);
+
+        assertServiceException(() -> fileService.createFile(new byte[]{1}, "test.png", "public", "image/png"),
+                FILE_PUBLIC_MASTER_NOT_EXISTS);
+    }
+
+    @Test
+    public void testCreatePrivateFile_usesPrivateMasterAndStoresCanonicalUrl() throws Exception {
+        byte[] content = ResourceUtil.readBytes("file/erweima.jpg");
+        FileClient privateClient = mock(FileClient.class);
+        when(fileConfigService.getPrivateMasterFileClientForShare()).thenReturn(privateClient);
+        when(privateClient.getId()).thenReturn(20L);
+        when(privateClient.isPrivatePresignedGetSupported()).thenReturn(true);
+        when(privateClient.upload(same(content), anyString(), eq("image/png")))
+                .thenReturn("https://files.example.com/private/label.png?signature=secret&expires=900");
+
+        FileDO result = fileService.createPrivateFile(content, "label.png", "trade/logistics/9/labels", "image/png");
+
+        assertNotNull(result.getId());
+        assertEquals(20L, result.getConfigId());
+        assertEquals("https://files.example.com/private/label.png", result.getUrl());
+        assertEquals(result.getUrl(), fileMapper.selectById(result.getId()).getUrl());
+        verify(fileConfigService, never()).getMasterFileClient();
+    }
+
+    @Test
+    public void testPresignGetUrlByFileId_usesOriginalFileConfiguration() {
+        FileDO file = randomPojo(FileDO.class, o -> o.setConfigId(20L)
+                .setPath("trade/logistics/9/labels/label.png")
+                .setUrl("https://files.example.com/private/label.png"));
+        fileMapper.insert(file);
+        FileClient originalClient = mock(FileClient.class);
+        when(fileConfigService.getFileClient(20L)).thenReturn(originalClient);
+        when(originalClient.presignGetUrl(file.getUrl(), 900))
+                .thenReturn("https://files.example.com/private/label.png?signature=new&expires=900");
+
+        String result = fileService.presignGetUrl(file.getId(), 900);
+
+        assertEquals("https://files.example.com/private/label.png?signature=new&expires=900", result);
+        verify(fileConfigService, never()).getPrivateMasterFileClient();
+    }
+
+    @Test
+    public void testPresignGetUrlByFileId_defaultsToFifteenMinutes() {
+        FileDO file = randomPojo(FileDO.class, o -> o.setConfigId(20L)
+                .setUrl("https://files.example.com/private/label.png"));
+        fileMapper.insert(file);
+        FileClient originalClient = mock(FileClient.class);
+        when(fileConfigService.getFileClient(20L)).thenReturn(originalClient);
+        when(originalClient.presignGetUrl(file.getUrl(), 900)).thenReturn("signed-url");
+
+        assertEquals("signed-url", fileService.presignGetUrl(file.getId(), null));
     }
 
     @Test

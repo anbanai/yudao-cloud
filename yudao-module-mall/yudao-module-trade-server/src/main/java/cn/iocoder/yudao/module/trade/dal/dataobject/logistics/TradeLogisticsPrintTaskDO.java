@@ -24,6 +24,7 @@ public class TradeLogisticsPrintTaskDO extends TenantBaseDO {
     private Long deviceId;
     private String status;
     private String format;
+    private Long labelFileId;
     private String labelUrl;
     private String checksum;
     private Integer paperWidthMm;

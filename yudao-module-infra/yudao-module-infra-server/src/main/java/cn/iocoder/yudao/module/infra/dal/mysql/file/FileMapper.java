@@ -15,6 +15,10 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface FileMapper extends BaseMapperX<FileDO> {
 
+    default Long selectCountByConfigId(Long configId) {
+        return selectCount(FileDO::getConfigId, configId);
+    }
+
     default PageResult<FileDO> selectPage(FilePageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<FileDO>()
                 .likeIfPresent(FileDO::getPath, reqVO.getPath())

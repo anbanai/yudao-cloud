@@ -6,6 +6,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPendingOrderRespVO;
@@ -153,7 +154,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                                                         TradeLogisticsAccountDO account,
                                                         TradeLogisticsPrintDeviceDO device) {
         try {
-            var privateStorage = fileApi.isPrivatePresignedGetSupported();
+            var privateStorage = fileApi.isPrivateMasterSupported();
             if (privateStorage == null || !Boolean.TRUE.equals(privateStorage.getData())) {
                 throw exception(LOGISTICS_PRIVATE_STORAGE_REQUIRED);
             }
@@ -161,9 +162,11 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             byte[] png = labelNormalizer.normalizePdf(pdf, account.getPaperWidthMm(), account.getPaperHeightMm(),
                     account.getDpi());
             String checksum = DigestUtil.sha256Hex(png);
-            String labelUrl = fileApi.createFile(png, waybill.getWaybillNo() + ".png",
-                    "trade/logistics/labels", "image/png");
-            return inTransaction(() -> persistLabelAndTask(waybill, account, device, labelUrl, checksum, png.length));
+            Long tenantId = TenantContextHolder.getRequiredTenantId();
+            FileCreateRespDTO labelFile = fileApi.createPrivateFile(png, waybill.getWaybillNo() + ".png",
+                    "trade/logistics/" + tenantId + "/labels", "image/png");
+            return inTransaction(() -> persistLabelAndTask(waybill, account, device, labelFile,
+                    checksum, png.length));
         } catch (RuntimeException exception) {
             inTransaction(() -> {
                 TradeLogisticsWaybillDO current = waybillMapper.selectByIdForUpdate(waybill.getId());
@@ -180,14 +183,15 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     private LogisticsWaybillRespVO persistLabelAndTask(TradeLogisticsWaybillDO waybill,
                                                         TradeLogisticsAccountDO account,
                                                         TradeLogisticsPrintDeviceDO device,
-                                                        String labelUrl, String checksum, int labelSize) {
+                                                        FileCreateRespDTO labelFile, String checksum, int labelSize) {
         TradeLogisticsWaybillDO current = waybillMapper.selectByIdForUpdate(waybill.getId());
         if (current == null) current = waybill;
         TradeLogisticsPrintTaskDO existingTask = taskMapper.selectLatestByWaybillId(waybill.getId());
         if (existingTask != null) {
             return toResp(current, existingTask).setReused(true);
         }
-        current.setLabelUrl(labelUrl).setLabelContentType("image/png").setLabelChecksum(checksum)
+        current.setLabelFileId(labelFile.getId()).setLabelUrl(labelFile.getUrl())
+                .setLabelContentType("image/png").setLabelChecksum(checksum)
                 .setLabelSize((long) labelSize).setTemplateCode(account.getTemplateCode())
                 .setPaperWidthMm(account.getPaperWidthMm()).setPaperHeightMm(account.getPaperHeightMm())
                 .setDpi(account.getDpi()).setErrorCode(null).setErrorMessage(null);
@@ -232,7 +236,8 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                 .setJobId("JOB-" + IdUtil.fastSimpleUUID()).setOrderId(waybill.getOrderId())
                 .setWaybillId(waybill.getId()).setDeviceId(device.getId())
                 .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name()).setFormat("image")
-                .setLabelUrl(waybill.getLabelUrl()).setChecksum(waybill.getLabelChecksum())
+                .setLabelFileId(waybill.getLabelFileId()).setLabelUrl(waybill.getLabelUrl())
+                .setChecksum(waybill.getLabelChecksum())
                 .setPaperWidthMm(waybill.getPaperWidthMm()).setPaperHeightMm(waybill.getPaperHeightMm())
                 .setDpi(waybill.getDpi()).setCopies(1).setTestFlag(false);
     }

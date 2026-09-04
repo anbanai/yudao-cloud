@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.service.logistics;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.trade.controller.internal.logistics.vo.PrintBridgeStatusReqVO;
+import cn.iocoder.yudao.module.trade.controller.internal.logistics.vo.PrintBridgeTaskRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintDeviceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintEventDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintTaskDO;
@@ -179,12 +180,10 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setId(1L).setTenantId(9L).setStatus(0);
         TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setDeviceId(1L)
                 .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
-                .setFormat("image").setLabelUrl("http://files.example/label.png")
+                .setFormat("image").setLabelFileId(99L).setLabelUrl("http://files.example/label.png")
                 .setPaperWidthMm(100).setPaperHeightMm(150).setCopies(1);
         when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
-        when(fileApi.isPrivatePresignedGetSupported())
-                .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
-        when(fileApi.presignGetUrl(task.getLabelUrl(), 900))
+        when(fileApi.presignGetUrl(99L, 900))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(task.getLabelUrl()));
 
         assertThatThrownBy(() -> service.pull(device, "packing-01"))
@@ -197,18 +196,35 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setId(1L).setTenantId(9L).setStatus(0).setPrinterName("Deli GS050DY");
         TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setDeviceId(1L)
                 .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
-                .setFormat("image").setLabelUrl("private://label.png")
+                .setFormat("image").setLabelFileId(99L).setLabelUrl("private://label.png")
                 .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
         when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
-        when(fileApi.isPrivatePresignedGetSupported())
-                .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
-        when(fileApi.presignGetUrl(task.getLabelUrl(), 900))
+        when(fileApi.presignGetUrl(99L, 900))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
                         "https://files.example/label.png?signature=x&expires=1"));
 
         var response = service.pull(device, "仓库电脑");
 
         assertThat(response.getPrinterName()).isEqualTo("Deli GS050DY");
+    }
+
+    @Test
+    void pull_usesTaskFileStorageWhenPrivateMasterWasSwitched() {
+        TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO()
+                .setId(1L).setTenantId(9L).setStatus(0);
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setDeviceId(1L)
+                .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
+                .setFormat("image").setLabelFileId(99L).setLabelUrl("private://label.png")
+                .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
+        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
+        when(fileApi.presignGetUrl(99L, 900))
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
+                        "https://files.example/label.png?signature=x&expires=1"));
+
+        PrintBridgeTaskRespVO response = service.pull(device, "packing-01");
+
+        assertThat(response.getJobId()).isEqualTo("JOB-1");
+        verify(fileApi).presignGetUrl(99L, 900);
     }
 
     @Test

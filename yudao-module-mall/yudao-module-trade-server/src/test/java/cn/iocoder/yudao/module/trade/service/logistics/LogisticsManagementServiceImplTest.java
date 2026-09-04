@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.trade.service.logistics;
 
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.SfLogisticsAccountSaveReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintDeviceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsAccountDO;
@@ -198,16 +200,23 @@ class LogisticsManagementServiceImplTest {
 
     @Test
     void createDiagnosticPayloadUsesRequested76x130Specification() throws Exception {
-        doReturn("private://diagnostic").when(fileApi).createFile(any(byte[].class),
-                eq("printbridge-test-76x130.png"), eq("trade/logistics/diagnostics"), eq("image/png"));
-        when(fileApi.presignGetUrl("private://diagnostic", 15 * 60))
+        doReturn(new FileCreateRespDTO().setId(88L).setUrl("https://files.example/diagnostic"))
+                .when(fileApi).createPrivateFile(any(byte[].class), eq("printbridge-test-76x130.png"),
+                        eq("trade/logistics/9/diagnostics"), eq("image/png"));
+        when(fileApi.presignGetUrl(88L, 15 * 60))
                 .thenReturn(success("https://files.example.test/diagnostic?signature=x&expires=1"));
 
-        String url = service.createDiagnosticPayload(76, 130);
+        TenantContextHolder.setTenantId(9L);
+        String url;
+        try {
+            url = service.createDiagnosticPayload(76, 130);
+        } finally {
+            TenantContextHolder.clear();
+        }
 
         var contentCaptor = org.mockito.ArgumentCaptor.forClass(byte[].class);
-        org.mockito.Mockito.verify(fileApi).createFile(contentCaptor.capture(),
-                eq("printbridge-test-76x130.png"), eq("trade/logistics/diagnostics"), eq("image/png"));
+        org.mockito.Mockito.verify(fileApi).createPrivateFile(contentCaptor.capture(),
+                eq("printbridge-test-76x130.png"), eq("trade/logistics/9/diagnostics"), eq("image/png"));
         BufferedImage image = ImageIO.read(new ByteArrayInputStream(contentCaptor.getValue()));
         assertThat(image.getWidth()).isEqualTo(607);
         assertThat(image.getHeight()).isEqualTo(1039);

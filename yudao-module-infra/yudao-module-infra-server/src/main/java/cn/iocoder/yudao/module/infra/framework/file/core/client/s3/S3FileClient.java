@@ -137,9 +137,7 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
 
     @Override
     public boolean isPrivatePresignedGetSupported() {
-        return BooleanUtil.isFalse(config.getEnablePublicAccess())
-                && HttpUtil.isHttps(config.getDomain())
-                && HttpUtil.isHttps(buildPresignerEndpoint());
+        return config.isPrivatePresignedGetSupported();
     }
 
     private String extractObjectPath(String value) {

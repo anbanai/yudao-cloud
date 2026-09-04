@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.trade.service.logistics;
 
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.*;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsAccountDO;
@@ -162,10 +164,10 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
         } finally { graphics.dispose(); }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(image, "png", output);
-        String url = fileApi.createFile(output.toByteArray(),
+        FileCreateRespDTO file = fileApi.createPrivateFile(output.toByteArray(),
                 "printbridge-test-" + paperWidthMm + "x" + paperHeightMm + ".png",
-                "trade/logistics/diagnostics", "image/png");
-        return fileApi.presignGetUrl(url, 15 * 60).getCheckedData();
+                "trade/logistics/" + TenantContextHolder.getRequiredTenantId() + "/diagnostics", "image/png");
+        return fileApi.presignGetUrl(file.getId(), 15 * 60).getCheckedData();
     }
 
     private SfLogisticsAccountRespVO toAccountResp(TradeLogisticsAccountDO account) {

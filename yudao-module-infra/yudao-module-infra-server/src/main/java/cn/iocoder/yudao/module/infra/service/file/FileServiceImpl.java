@@ -21,12 +21,15 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 import static cn.hutool.core.date.DatePattern.PURE_DATE_PATTERN;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PRIVATE_MASTER_NOT_EXISTS;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PUBLIC_MASTER_NOT_EXISTS;
 
 /**
  * 文件 Service 实现类
@@ -35,6 +38,8 @@ import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EX
  */
 @Service
 public class FileServiceImpl implements FileService {
+
+    private static final int PRIVATE_GET_URL_EXPIRATION_SECONDS = 15 * 60;
 
     /**
      * 上传文件的前缀，是否包含日期（yyyyMMdd）
@@ -71,6 +76,23 @@ public class FileServiceImpl implements FileService {
     @Override
     @SneakyThrows
     public String createFile(byte[] content, String name, String directory, String type) {
+        FileClient client = getPublicMasterFileClient();
+        return createFile(client, content, name, directory, type, false).getUrl();
+    }
+
+    @Override
+    @SneakyThrows
+    @Transactional(rollbackFor = Exception.class)
+    public FileDO createPrivateFile(byte[] content, String name, String directory, String type) {
+        FileClient client = fileConfigService.getPrivateMasterFileClientForShare();
+        if (client == null || !client.isPrivatePresignedGetSupported()) {
+            throw exception(FILE_PRIVATE_MASTER_NOT_EXISTS);
+        }
+        return createFile(client, content, name, directory, type, true);
+    }
+
+    private FileDO createFile(FileClient client, byte[] content, String name, String directory, String type,
+                              boolean removeUrlQuery) throws Exception {
         // 1.1 处理 name 的合法性，禁止携带目录路径
         name = FilePathUtils.validateFileName(name);
 
@@ -93,15 +115,17 @@ public class FileServiceImpl implements FileService {
         // 2.1 生成上传的 path，需要保证唯一
         String path = generateUploadPath(name, directory);
         // 2.2 上传到文件存储器
-        FileClient client = fileConfigService.getMasterFileClient();
-        Assert.notNull(client, "客户端(master) 不能为空");
         String url = client.upload(content, path, type);
+        if (removeUrlQuery) {
+            url = HttpUtils.removeUrlQuery(url);
+        }
 
         // 3. 保存到数据库
-        fileMapper.insert(new FileDO().setConfigId(client.getId())
+        FileDO file = new FileDO().setConfigId(client.getId())
                 .setName(name).setPath(path).setUrl(url)
-                .setType(type).setSize((long) content.length));
-        return url;
+                .setType(type).setSize((long) content.length);
+        fileMapper.insert(file);
+        return file;
     }
 
     @VisibleForTesting
@@ -152,7 +176,7 @@ public class FileServiceImpl implements FileService {
         String path = generateUploadPath(name, directory);
 
         // 2. 获取文件预签名地址
-        FileClient fileClient = fileConfigService.getMasterFileClient();
+        FileClient fileClient = getPublicMasterFileClient();
         String uploadUrl = fileClient.presignPutUrl(path);
         String visitUrl = fileClient.presignGetUrl(path, null);
         return new FilePresignedUrlRespVO().setConfigId(fileClient.getId())
@@ -161,13 +185,38 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public String presignGetUrl(String url, Integer expirationSeconds) {
-        FileClient fileClient = fileConfigService.getMasterFileClient();
+        FileClient fileClient = getPublicMasterFileClient();
         return fileClient.presignGetUrl(url, expirationSeconds);
+    }
+
+    private FileClient getPublicMasterFileClient() {
+        FileClient client = fileConfigService.getMasterFileClient();
+        if (client == null) {
+            throw exception(FILE_PUBLIC_MASTER_NOT_EXISTS);
+        }
+        return client;
+    }
+
+    @Override
+    public String presignGetUrl(Long fileId, Integer expirationSeconds) {
+        FileDO file = validateFileExists(fileId);
+        FileClient fileClient = fileConfigService.getFileClient(file.getConfigId());
+        Assert.notNull(fileClient, "客户端({}) 不能为空", file.getConfigId());
+        int effectiveExpirationSeconds = expirationSeconds != null
+                ? expirationSeconds : PRIVATE_GET_URL_EXPIRATION_SECONDS;
+        return fileClient.presignGetUrl(file.getUrl(), effectiveExpirationSeconds);
     }
 
     @Override
     public boolean isPrivatePresignedGetSupported() {
         FileClient fileClient = fileConfigService.getMasterFileClient();
+        return fileClient != null && fileClient.isPrivatePresignedGetSupported();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isPrivateMasterSupported() {
+        FileClient fileClient = fileConfigService.getPrivateMasterFileClientForShare();
         return fileClient != null && fileClient.isPrivatePresignedGetSupported();
     }
 
