@@ -202,17 +202,21 @@ PREPARE logistics_task_label_file_id_stmt FROM @logistics_task_label_file_id_sql
 EXECUTE logistics_task_label_file_id_stmt;
 DEALLOCATE PREPARE logistics_task_label_file_id_stmt;
 
+-- infra_file 与物流表可能使用不同 collation；历史 URL 必须按二进制精确匹配。
 UPDATE `trade_logistics_waybill` w
 SET w.`label_file_id` = (
   SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f
-  WHERE f.`url` = w.`label_url` AND f.`deleted` = b'0'
+  WHERE CONVERT(f.`url` USING binary) = CONVERT(w.`label_url` USING binary)
+    AND f.`deleted` = b'0'
 )
 WHERE w.`label_file_id` IS NULL AND w.`label_url` IS NOT NULL;
 
 UPDATE `trade_logistics_print_task` t
 SET t.`label_file_id` = COALESCE(
   (SELECT w.`label_file_id` FROM `trade_logistics_waybill` w WHERE w.`id` = t.`waybill_id`),
-  (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f WHERE f.`url` = t.`label_url` AND f.`deleted` = b'0')
+  (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f
+   WHERE CONVERT(f.`url` USING binary) = CONVERT(t.`label_url` USING binary)
+     AND f.`deleted` = b'0')
 )
 WHERE t.`label_file_id` IS NULL;
 

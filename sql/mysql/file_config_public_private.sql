@@ -109,9 +109,10 @@ EXECUTE print_task_label_file_id_stmt;
 DEALLOCATE PREPARE print_task_label_file_id_stmt;
 
 -- 旧版物流也写入 infra_file；按完全一致的历史 URL 找回文件编号。
+-- 两表可能来自不同建表年代并使用不同 collation，因此按二进制比较，避免迁移因 collation 冲突中断。
 SET @waybill_label_file_backfill_sql = IF(
   @waybill_table_count > 0,
-  'UPDATE `trade_logistics_waybill` w SET w.`label_file_id` = (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f WHERE f.`url` = w.`label_url` AND f.`deleted` = b''0'') WHERE w.`label_file_id` IS NULL AND w.`label_url` IS NOT NULL',
+  'UPDATE `trade_logistics_waybill` w SET w.`label_file_id` = (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f WHERE CONVERT(f.`url` USING binary) = CONVERT(w.`label_url` USING binary) AND f.`deleted` = b''0'') WHERE w.`label_file_id` IS NULL AND w.`label_url` IS NOT NULL',
   'SELECT 1'
 );
 PREPARE waybill_label_file_backfill_stmt FROM @waybill_label_file_backfill_sql;
@@ -120,7 +121,7 @@ DEALLOCATE PREPARE waybill_label_file_backfill_stmt;
 
 SET @print_task_label_file_backfill_sql = IF(
   @print_task_table_count > 0 AND @waybill_table_count > 0,
-  'UPDATE `trade_logistics_print_task` t SET t.`label_file_id` = COALESCE((SELECT w.`label_file_id` FROM `trade_logistics_waybill` w WHERE w.`id` = t.`waybill_id`), (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f WHERE f.`url` = t.`label_url` AND f.`deleted` = b''0'')) WHERE t.`label_file_id` IS NULL',
+  'UPDATE `trade_logistics_print_task` t SET t.`label_file_id` = COALESCE((SELECT w.`label_file_id` FROM `trade_logistics_waybill` w WHERE w.`id` = t.`waybill_id`), (SELECT CASE WHEN COUNT(*) = 1 THEN MIN(f.`id`) END FROM `infra_file` f WHERE CONVERT(f.`url` USING binary) = CONVERT(t.`label_url` USING binary) AND f.`deleted` = b''0'')) WHERE t.`label_file_id` IS NULL',
   'SELECT 1'
 );
 PREPARE print_task_label_file_backfill_stmt FROM @print_task_label_file_backfill_sql;
