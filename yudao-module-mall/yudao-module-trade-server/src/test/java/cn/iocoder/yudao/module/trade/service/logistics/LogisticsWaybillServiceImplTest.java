@@ -237,6 +237,20 @@ class LogisticsWaybillServiceImplTest {
     }
 
     @Test
+    void getPendingOrders_excludesOrdersWithQueuedSfPrintTask() {
+        TradeOrderDO blocked = new TradeOrderDO().setId(10L).setNo("T10");
+        TradeOrderDO available = new TradeOrderDO().setId(11L).setNo("T11");
+        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(blocked, available));
+        when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
+                .thenReturn(List.of(new TradeLogisticsWaybillDO().setOrderId(10L)
+                        .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
+
+        var result = service.getPendingOrders();
+
+        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(11L);
+    }
+
+    @Test
     void createWaybill_deviceWithoutPrinterIsRejectedBeforeCallingSf() {
         TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
                 .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());

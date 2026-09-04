@@ -261,9 +261,15 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         if (orders.isEmpty()) {
             return List.of();
         }
+        List<Long> orderIds = orders.stream().map(TradeOrderDO::getId).toList();
         Set<Long> blockedOrderIds = wechatWaybillMapper.selectListByOrderIdsAndStatuses(
-                        orders.stream().map(TradeOrderDO::getId).toList(), List.of("CREATING", "CREATED", "UNKNOWN"))
+                        orderIds, List.of("CREATING", "CREATED", "UNKNOWN"))
                 .stream().map(TradeWechatLogisticsWaybillDO::getOrderId).collect(Collectors.toCollection(HashSet::new));
+        blockedOrderIds.addAll(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(orderIds,
+                        List.of(LogisticsWaybillStatusEnum.CREATING.name(), LogisticsWaybillStatusEnum.CREATED.name(),
+                                LogisticsWaybillStatusEnum.UNKNOWN.name(), LogisticsWaybillStatusEnum.CANCELLING.name(),
+                                LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name()))
+                .stream().map(TradeLogisticsWaybillDO::getOrderId).toList());
         return orders.stream().filter(order -> !blockedOrderIds.contains(order.getId())).map(order -> new LogisticsPendingOrderRespVO()
                 .setId(order.getId()).setNo(order.getNo()).setReceiverName(order.getReceiverName())
                 .setReceiverMobile(order.getReceiverMobile()).setProductCount(order.getProductCount())

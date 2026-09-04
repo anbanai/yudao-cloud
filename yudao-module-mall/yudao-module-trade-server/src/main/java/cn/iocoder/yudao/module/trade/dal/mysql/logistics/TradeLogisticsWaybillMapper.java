@@ -6,8 +6,8 @@ import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsWaybillDO;
 import org.apache.ibatis.annotations.Mapper;
 
-import java.util.List;
 import java.util.Collection;
+import java.util.List;
 
 @Mapper
 public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsWaybillDO> {
@@ -29,6 +29,14 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
                 .in(TradeLogisticsWaybillDO::getStatus, List.of("CREATING", "CREATED", "UNKNOWN",
                         "CANCELLING", "CANCEL_UNKNOWN"))
                 .orderByDesc(TradeLogisticsWaybillDO::getId).last("LIMIT 1"));
+    }
+
+    default List<TradeLogisticsWaybillDO> selectListWithLabelByOrderIdsAndStatuses(
+            Collection<Long> orderIds, Collection<String> statuses) {
+        return selectList(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
+                .in(TradeLogisticsWaybillDO::getOrderId, orderIds)
+                .in(TradeLogisticsWaybillDO::getStatus, statuses)
+                .isNotNull(TradeLogisticsWaybillDO::getLabelFileId));
     }
 
     default TradeLogisticsWaybillDO selectByProviderOrderNo(String providerOrderNo) {
