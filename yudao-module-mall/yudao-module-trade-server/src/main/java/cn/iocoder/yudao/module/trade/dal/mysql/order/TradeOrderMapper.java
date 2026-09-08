@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderPageReq
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderPageReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderTypeEnum;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -37,6 +38,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
         return selectList(new LambdaQueryWrapperX<TradeOrderDO>()
                 .eq(TradeOrderDO::getStatus, 10)
                 .eq(TradeOrderDO::getDeliveryType, 1)
+                .eq(TradeOrderDO::getRefundStatus, TradeOrderRefundStatusEnum.NONE.getStatus())
                 .orderByAsc(TradeOrderDO::getCreateTime));
     }
 

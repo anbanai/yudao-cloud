@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -133,12 +134,40 @@ class LogisticsWaybillServiceImplTest {
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
         when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
-        when(taskMapper.selectLatestByWaybillId(3L)).thenReturn(task);
+        when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(task);
 
         var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
 
         assertThat(result.getJobId()).isEqualTo("JOB-1");
         assertThat(result).extracting("reused").isEqualTo(true);
+        verifyNoInteractions(sfClient);
+    }
+
+    @Test
+    void createWaybill_failedTaskCreatesFreshPrintTaskWithoutCallingSfAgain() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L)
+                .setOrderNo("T10").setWaybillNo("SF1164867434966")
+                .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)
+                .setLabelUrl("https://files.example/label.png").setLabelChecksum("checksum")
+                .setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
+        TradeLogisticsPrintTaskDO failedTask = new TradeLogisticsPrintTaskDO().setId(4L).setJobId("JOB-FAILED")
+                .setWaybillId(3L).setStatus(LogisticsPrintTaskStatusEnum.FAILED.name());
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+        when(accountMapper.selectDefaultEnabled()).thenReturn(account());
+        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
+        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
+        when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(failedTask);
+
+        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+
+        assertThat(result.getPrintStatus()).isEqualTo(LogisticsPrintTaskStatusEnum.PENDING.name());
+        assertThat(result.getJobId()).isNotEqualTo("JOB-FAILED");
+        assertThat(result).extracting("reused").isEqualTo(false);
+        verify(taskMapper).insert(argThat((TradeLogisticsPrintTaskDO task) -> task.getWaybillId().equals(3L)
+                && task.getLabelFileId().equals(99L)
+                && task.getStatus().equals(LogisticsPrintTaskStatusEnum.PENDING.name())));
         verifyNoInteractions(sfClient);
     }
 
@@ -287,6 +316,20 @@ class LogisticsWaybillServiceImplTest {
         var result = service.getPendingOrders();
 
         assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(10L);
+    }
+
+    @Test
+    void getPendingOrders_limitsWorkbenchToOldestHundredActionableOrders() {
+        List<TradeOrderDO> orders = LongStream.rangeClosed(1, 101)
+                .mapToObj(id -> new TradeOrderDO().setId(id).setNo("T" + id))
+                .toList();
+        when(orderMapper.selectListUndeliveredExpress()).thenReturn(orders);
+
+        var result = service.getPendingOrders();
+
+        assertThat(result).hasSize(100);
+        assertThat(result.get(0).getId()).isEqualTo(1L);
+        assertThat(result.get(99).getId()).isEqualTo(100L);
     }
 
     @Test

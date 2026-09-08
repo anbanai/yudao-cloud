@@ -54,6 +54,8 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 @Service
 public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
+    private static final int PENDING_WORKBENCH_LIMIT = 100;
+
     @Resource private TradeOrderMapper orderMapper;
     @Resource private TradeOrderItemMapper orderItemMapper;
     @Resource private TradeLogisticsAccountMapper accountMapper;
@@ -74,7 +76,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         CreationPreparation preparation = inTransaction(() -> prepareCreation(request));
         TradeLogisticsWaybillDO waybill = preparation.waybill();
         if (preparation.task() != null) {
-            return toResp(waybill, preparation.task()).setReused(true);
+            return toResp(waybill, preparation.task()).setReused(preparation.taskReused());
         }
         TradeLogisticsAccountDO account = preparation.account();
         if (preparation.newRecord() || LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus())) {
@@ -111,7 +113,6 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             waybillMapper.insert(waybill);
             newRecord = true;
         } else {
-            TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillId(waybill.getId());
             if (LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
                 String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId()
                         + "-" + IdUtil.fastSimpleUUID();
@@ -121,13 +122,20 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                         .setStatus(LogisticsWaybillStatusEnum.CREATING.name()).setDeliveryStatus("PENDING");
                 waybillMapper.insert(waybill);
                 newRecord = true;
-            } else if (task != null) {
-                return new CreationPreparation(order, account, device, waybill, task, false);
             } else {
+                TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillIdForUpdate(waybill.getId());
+                if (task != null) {
+                    if (LogisticsPrintTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
+                        TradeLogisticsPrintTaskDO retryTask = newTask(waybill, device);
+                        taskMapper.insert(retryTask);
+                        return new CreationPreparation(order, account, device, waybill, retryTask, false, false);
+                    }
+                    return new CreationPreparation(order, account, device, waybill, task, false, true);
+                }
                 account = getAccount(waybill.getAccountId());
             }
         }
-        return new CreationPreparation(order, account, device, waybill, null, newRecord);
+        return new CreationPreparation(order, account, device, waybill, null, newRecord, false);
     }
 
     private void createRemoteWaybill(TradeLogisticsWaybillDO waybill, TradeLogisticsAccountDO account,
@@ -281,7 +289,8 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                     .filter(waybill -> queuedTaskStatuses.contains(latestTaskStatuses.getOrDefault(waybill.getId(), "")))
                     .map(TradeLogisticsWaybillDO::getOrderId).forEach(blockedOrderIds::add);
         }
-        return orders.stream().filter(order -> !blockedOrderIds.contains(order.getId())).map(order -> new LogisticsPendingOrderRespVO()
+        return orders.stream().filter(order -> !blockedOrderIds.contains(order.getId()))
+                .limit(PENDING_WORKBENCH_LIMIT).map(order -> new LogisticsPendingOrderRespVO()
                 .setId(order.getId()).setNo(order.getNo()).setReceiverName(order.getReceiverName())
                 .setReceiverMobile(order.getReceiverMobile()).setProductCount(order.getProductCount())
                 .setPayPrice(order.getPayPrice()).setCreateTime(order.getCreateTime())).toList();
@@ -506,7 +515,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     private record CreationPreparation(TradeOrderDO order, TradeLogisticsAccountDO account,
                                        TradeLogisticsPrintDeviceDO device, TradeLogisticsWaybillDO waybill,
-                                       TradeLogisticsPrintTaskDO task, boolean newRecord) {
+                                       TradeLogisticsPrintTaskDO task, boolean newRecord, boolean taskReused) {
     }
 
     private record CancellationPreparation(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task,

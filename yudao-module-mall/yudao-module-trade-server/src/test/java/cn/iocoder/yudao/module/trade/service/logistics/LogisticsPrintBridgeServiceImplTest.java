@@ -183,7 +183,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setFormat("image").setLabelFileId(99L).setLabelUrl("http://files.example/label.png")
                 .setPaperWidthMm(100).setPaperHeightMm(150).setCopies(1);
         when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
-        when(fileApi.presignGetUrl(99L, 900))
+        when(fileApi.presignGetUrl(99L, 3600))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(task.getLabelUrl()));
 
         assertThatThrownBy(() -> service.pull(device, "packing-01"))
@@ -199,7 +199,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setFormat("image").setLabelFileId(99L).setLabelUrl("private://label.png")
                 .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
         when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
-        when(fileApi.presignGetUrl(99L, 900))
+        when(fileApi.presignGetUrl(99L, 3600))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
                         "https://files.example/label.png?signature=x&expires=1"));
 
@@ -217,14 +217,14 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setFormat("image").setLabelFileId(99L).setLabelUrl("private://label.png")
                 .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
         when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
-        when(fileApi.presignGetUrl(99L, 900))
+        when(fileApi.presignGetUrl(99L, 3600))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
                         "https://files.example/label.png?signature=x&expires=1"));
 
         PrintBridgeTaskRespVO response = service.pull(device, "packing-01");
 
         assertThat(response.getJobId()).isEqualTo("JOB-1");
-        verify(fileApi).presignGetUrl(99L, 900);
+        verify(fileApi).presignGetUrl(99L, 3600);
     }
 
     @Test

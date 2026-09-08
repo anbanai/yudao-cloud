@@ -42,7 +42,7 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 @Service
 public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeService {
 
-    private static final int LABEL_URL_EXPIRATION_SECONDS = 15 * 60;
+    private static final int LABEL_URL_EXPIRATION_SECONDS = 60 * 60;
     private static final int ENROLLMENT_TTL_MINUTES = 10;
 
     @Resource
