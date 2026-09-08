@@ -76,10 +76,8 @@ public class SfLogisticsClient {
     }
 
     private String buildPrintableCargoName(TradeOrderItemDO item) {
-        String price = item.getPrice() == null ? ""
-                : "价格:¥" + BigDecimal.valueOf(item.getPrice(), 2).toPlainString();
-        String count = item.getCount() == null ? "" : "数量:" + item.getCount();
-        String suffix = StrUtil.join(" ", List.of(price, count).stream().filter(StrUtil::isNotBlank).toList());
+        String suffix = item.getPrice() == null || item.getCount() == null ? ""
+                : item.getPrice() + " * " + item.getCount();
         int nameMaxLength = 100 - suffix.length() - (suffix.isEmpty() ? 0 : 1);
         String name = StrUtil.sub(StrUtil.nullToEmpty(item.getSpuName()), 0, Math.max(nameMaxLength, 0));
         return StrUtil.isBlank(name) ? suffix : StrUtil.isBlank(suffix) ? name : name + " " + suffix;

@@ -63,7 +63,7 @@ class SfLogisticsClientTest {
         client.createWaybill(account(), "ORDER-1", order(), List.of(item), Map.of());
 
         JsonNode cargo = payload.getValue().path("cargoDetails").get(0);
-        assertThat(cargo.path("name").asText()).isEqualTo("茶叶 价格:¥357.00 数量:2");
+        assertThat(cargo.path("name").asText()).isEqualTo("茶叶 35700 * 2");
         assertThat(cargo.path("count").asInt()).isEqualTo(2);
     }
 
@@ -81,7 +81,7 @@ class SfLogisticsClientTest {
         String cargoName = payload.getValue().path("cargoDetails").get(0).path("name").asText();
         assertThat(cargoName).hasSize(100)
                 .startsWith("这是一款名称非常长")
-                .endsWith("价格:¥357.00 数量:2");
+                .endsWith("35700 * 2");
     }
 
     @Test
