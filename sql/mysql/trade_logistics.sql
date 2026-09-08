@@ -347,6 +347,29 @@ FROM (SELECT '顺丰账号' name,1 sort,'accounts' path,'ep:key' icon,'mall/trad
 JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.component=p.component AND x.deleted=b'0');
 
+-- 将旧工作台角色迁移到订单列表，只补充查看和顺丰打单所需的最小访问路径。
+INSERT INTO `system_role_menu`
+    (`role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT DISTINCT legacy_role_menu.`role_id`, target_menu.`id`, '1', NOW(), '1', NOW(), b'0',
+                legacy_role_menu.`tenant_id`
+FROM `system_role_menu` legacy_role_menu
+JOIN `system_menu` legacy_menu
+  ON legacy_menu.`id`=legacy_role_menu.`menu_id`
+ AND legacy_menu.`component`='mall/trade/logistics/sf/pending/index'
+JOIN `system_menu` target_menu
+  ON (target_menu.`component`='mall/trade/order/index'
+      OR target_menu.`permission`='trade:order:query')
+ AND target_menu.`deleted`=b'0'
+WHERE legacy_role_menu.`deleted`=b'0'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM `system_role_menu` existing_role_menu
+    WHERE existing_role_menu.`role_id`=legacy_role_menu.`role_id`
+      AND existing_role_menu.`menu_id`=target_menu.`id`
+      AND existing_role_menu.`tenant_id`=legacy_role_menu.`tenant_id`
+      AND existing_role_menu.`deleted`=b'0'
+  );
+
 -- 待发货订单统一从订单列表打单；软删除旧菜单以保留历史角色授权记录。
 UPDATE `system_menu`
 SET `status`=1, `visible`=b'0', `deleted`=b'1', `updater`='1', `update_time`=NOW()
