@@ -61,7 +61,7 @@ public class SfLogisticsClient {
                 receiverArea.city(), receiverArea.district(), order.getReceiverDetailAddress()));
         ArrayNode cargos = request.putArray("cargoDetails");
         for (TradeOrderItemDO item : items) {
-            cargos.addObject().put("name", StrUtil.maxLength(item.getSpuName(), 100))
+            cargos.addObject().put("name", buildPrintableCargoName(item))
                     .put("count", item.getCount()).put("unit", "件");
         }
         JsonNode response;
@@ -73,6 +73,16 @@ public class SfLogisticsClient {
             throw new SfApiException("INVALID_RESPONSE", "顺丰创建运单响应无法解析", true, exception);
         }
         return new WaybillResult(providerOrderNo, findWaybillNo(response), response);
+    }
+
+    private String buildPrintableCargoName(TradeOrderItemDO item) {
+        String price = item.getPrice() == null ? ""
+                : "价格:¥" + BigDecimal.valueOf(item.getPrice(), 2).toPlainString();
+        String count = item.getCount() == null ? "" : "数量:" + item.getCount();
+        String suffix = StrUtil.join(" ", List.of(price, count).stream().filter(StrUtil::isNotBlank).toList());
+        int nameMaxLength = 100 - suffix.length() - (suffix.isEmpty() ? 0 : 1);
+        String name = StrUtil.sub(StrUtil.nullToEmpty(item.getSpuName()), 0, Math.max(nameMaxLength, 0));
+        return StrUtil.isBlank(name) ? suffix : StrUtil.isBlank(suffix) ? name : name + " " + suffix;
     }
 
     public WaybillResult queryByProviderOrderNo(TradeLogisticsAccountDO account, String providerOrderNo) {

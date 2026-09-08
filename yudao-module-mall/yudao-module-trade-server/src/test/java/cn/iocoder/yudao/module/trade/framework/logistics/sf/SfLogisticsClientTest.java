@@ -53,6 +53,38 @@ class SfLogisticsClientTest {
     }
 
     @Test
+    void createWaybillAddsPriceAndCountToPrintableCargoName() {
+        TradeOrderItemDO item = new TradeOrderItemDO().setSkuId(1L).setSpuName("茶叶")
+                .setPrice(35700).setCount(2);
+        ArgumentCaptor<JsonNode> payload = ArgumentCaptor.forClass(JsonNode.class);
+        when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
+                .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
+
+        client.createWaybill(account(), "ORDER-1", order(), List.of(item), Map.of());
+
+        JsonNode cargo = payload.getValue().path("cargoDetails").get(0);
+        assertThat(cargo.path("name").asText()).isEqualTo("茶叶 价格:¥357.00 数量:2");
+        assertThat(cargo.path("count").asInt()).isEqualTo(2);
+    }
+
+    @Test
+    void createWaybillPreservesPriceAndCountWhenCargoNameExceedsLimit() {
+        TradeOrderItemDO item = new TradeOrderItemDO().setSkuId(1L)
+                .setSpuName("这是一款名称非常长需要验证顺丰面单商品名称限制仍然保留金额和数量的测试商品".repeat(4))
+                .setPrice(35700).setCount(2);
+        ArgumentCaptor<JsonNode> payload = ArgumentCaptor.forClass(JsonNode.class);
+        when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
+                .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
+
+        client.createWaybill(account(), "ORDER-1", order(), List.of(item), Map.of());
+
+        String cargoName = payload.getValue().path("cargoDetails").get(0).path("name").asText();
+        assertThat(cargoName).hasSize(100)
+                .startsWith("这是一款名称非常长")
+                .endsWith("价格:¥357.00 数量:2");
+    }
+
+    @Test
     void createWaybillUsesDefaultWeightWhenAnySkuWeightIsMissing() {
         TradeOrderItemDO item = new TradeOrderItemDO().setSkuId(1L).setSpuName("茶叶").setCount(2);
         ArgumentCaptor<JsonNode> payload = ArgumentCaptor.forClass(JsonNode.class);
