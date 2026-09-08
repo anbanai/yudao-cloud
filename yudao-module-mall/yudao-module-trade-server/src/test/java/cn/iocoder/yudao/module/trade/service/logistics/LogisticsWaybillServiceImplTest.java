@@ -5,7 +5,6 @@ import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
-import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPendingOrderRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.*;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -22,8 +21,6 @@ import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -251,85 +247,6 @@ class LogisticsWaybillServiceImplTest {
         assertThat(captor.getValue().getProviderOrderNo()).startsWith("YD-null-10-")
                 .isNotEqualTo(cancelled.getProviderOrderNo());
         assertThat(result.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.FAILED.name());
-    }
-
-    @Test
-    void getPendingOrders_excludesOrdersWithActiveWechatWaybill() {
-        TradeOrderDO blocked = new TradeOrderDO().setId(10L).setNo("T10");
-        TradeOrderDO available = new TradeOrderDO().setId(11L).setNo("T11");
-        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(blocked, available));
-        when(wechatWaybillMapper.selectListByOrderIdsAndStatuses(anyList(), anyList()))
-                .thenReturn(List.of(new TradeWechatLogisticsWaybillDO().setOrderId(10L)
-                        .setStatus(WechatLogisticsWaybillStatusEnum.CREATED.name())));
-
-        var result = service.getPendingOrders();
-
-        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(11L);
-    }
-
-    @Test
-    void getPendingOrders_excludesOrdersWithQueuedSfPrintTask() {
-        TradeOrderDO blocked = new TradeOrderDO().setId(10L).setNo("T10");
-        TradeOrderDO available = new TradeOrderDO().setId(11L).setNo("T11");
-        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(blocked, available));
-        when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
-                .thenReturn(List.of(new TradeLogisticsWaybillDO().setId(20L).setOrderId(10L)
-                        .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
-        when(taskMapper.selectListByWaybillIds(List.of(20L)))
-                .thenReturn(List.of(
-                        new TradeLogisticsPrintTaskDO().setId(30L).setWaybillId(20L)
-                                .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name()),
-                        new TradeLogisticsPrintTaskDO().setId(29L).setWaybillId(20L)
-                                .setStatus(LogisticsPrintTaskStatusEnum.FAILED.name())));
-        var result = service.getPendingOrders();
-
-        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(11L);
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"FAILED", "UNKNOWN", "CANCELLED"})
-    void getPendingOrders_keepsOrderWhenLatestPrintTaskNeedsManualRecovery(String latestStatus) {
-        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10");
-        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(order));
-        when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
-                .thenReturn(List.of(new TradeLogisticsWaybillDO().setId(20L).setOrderId(10L)
-                        .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
-        when(taskMapper.selectListByWaybillIds(List.of(20L)))
-                .thenReturn(List.of(
-                        new TradeLogisticsPrintTaskDO().setId(31L).setWaybillId(20L).setStatus(latestStatus),
-                        new TradeLogisticsPrintTaskDO().setId(30L).setWaybillId(20L)
-                                .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())));
-        var result = service.getPendingOrders();
-
-        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(10L);
-    }
-
-    @Test
-    void getPendingOrders_keepsOrderWhenLabelHasNoPrintTask() {
-        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10");
-        when(orderMapper.selectListUndeliveredExpress()).thenReturn(List.of(order));
-        when(waybillMapper.selectListWithLabelByOrderIdsAndStatuses(anyList(), anyList()))
-                .thenReturn(List.of(new TradeLogisticsWaybillDO().setId(20L).setOrderId(10L)
-                        .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)));
-        when(taskMapper.selectListByWaybillIds(List.of(20L))).thenReturn(List.of());
-
-        var result = service.getPendingOrders();
-
-        assertThat(result).extracting(LogisticsPendingOrderRespVO::getId).containsExactly(10L);
-    }
-
-    @Test
-    void getPendingOrders_limitsWorkbenchToOldestHundredActionableOrders() {
-        List<TradeOrderDO> orders = LongStream.rangeClosed(1, 101)
-                .mapToObj(id -> new TradeOrderDO().setId(id).setNo("T" + id))
-                .toList();
-        when(orderMapper.selectListUndeliveredExpress()).thenReturn(orders);
-
-        var result = service.getPendingOrders();
-
-        assertThat(result).hasSize(100);
-        assertThat(result.get(0).getId()).isEqualTo(1L);
-        assertThat(result.get(99).getId()).isEqualTo(100L);
     }
 
     @Test

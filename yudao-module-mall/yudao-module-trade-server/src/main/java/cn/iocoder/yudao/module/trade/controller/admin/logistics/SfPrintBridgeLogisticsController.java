@@ -69,12 +69,6 @@ public class SfPrintBridgeLogisticsController {
                 effective.getPaperHeightMm()));
     }
 
-    @GetMapping("/pending")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:sf-waybill:query')")
-    public CommonResult<List<LogisticsPendingOrderRespVO>> getPendingOrders() {
-        return success(waybillService.getPendingOrders());
-    }
-
     @PostMapping("/waybills/create")
     @PreAuthorize("@ss.hasAnyPermissions('trade:logistics:sf-waybill:create', 'trade:order:update')")
     public CommonResult<LogisticsWaybillRespVO> createWaybill(

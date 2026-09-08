@@ -9,7 +9,6 @@ import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
-import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPendingOrderRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPrintTaskRespVO;
@@ -40,11 +39,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
@@ -53,8 +49,6 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 
 @Service
 public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
-
-    private static final int PENDING_WORKBENCH_LIMIT = 100;
 
     @Resource private TradeOrderMapper orderMapper;
     @Resource private TradeOrderItemMapper orderItemMapper;
@@ -262,38 +256,6 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     public List<LogisticsWaybillRespVO> getWaybills() {
         return waybillMapper.selectListAll().stream()
                 .map(waybill -> toResp(waybill, taskMapper.selectLatestByWaybillId(waybill.getId()))).toList();
-    }
-
-    @Override
-    public List<LogisticsPendingOrderRespVO> getPendingOrders() {
-        List<TradeOrderDO> orders = orderMapper.selectListUndeliveredExpress();
-        if (orders.isEmpty()) {
-            return List.of();
-        }
-        List<Long> orderIds = orders.stream().map(TradeOrderDO::getId).toList();
-        Set<Long> blockedOrderIds = wechatWaybillMapper.selectListByOrderIdsAndStatuses(
-                        orderIds, List.of("CREATING", "CREATED", "UNKNOWN"))
-                .stream().map(TradeWechatLogisticsWaybillDO::getOrderId).collect(Collectors.toCollection(HashSet::new));
-        List<TradeLogisticsWaybillDO> sfWaybills = waybillMapper.selectListWithLabelByOrderIdsAndStatuses(orderIds,
-                List.of(LogisticsWaybillStatusEnum.CREATING.name(), LogisticsWaybillStatusEnum.CREATED.name(),
-                        LogisticsWaybillStatusEnum.UNKNOWN.name(), LogisticsWaybillStatusEnum.CANCELLING.name(),
-                        LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name()));
-        if (!sfWaybills.isEmpty()) {
-            Map<Long, String> latestTaskStatuses = new HashMap<>();
-            taskMapper.selectListByWaybillIds(sfWaybills.stream().map(TradeLogisticsWaybillDO::getId).toList())
-                    .forEach(task -> latestTaskStatuses.putIfAbsent(task.getWaybillId(), task.getStatus()));
-            Set<String> queuedTaskStatuses = Set.of(LogisticsPrintTaskStatusEnum.PENDING.name(),
-                    LogisticsPrintTaskStatusEnum.DISPATCHED.name(), LogisticsPrintTaskStatusEnum.ACCEPTED.name(),
-                    LogisticsPrintTaskStatusEnum.SUCCESS.name());
-            sfWaybills.stream()
-                    .filter(waybill -> queuedTaskStatuses.contains(latestTaskStatuses.getOrDefault(waybill.getId(), "")))
-                    .map(TradeLogisticsWaybillDO::getOrderId).forEach(blockedOrderIds::add);
-        }
-        return orders.stream().filter(order -> !blockedOrderIds.contains(order.getId()))
-                .limit(PENDING_WORKBENCH_LIMIT).map(order -> new LogisticsPendingOrderRespVO()
-                .setId(order.getId()).setNo(order.getNo()).setReceiverName(order.getReceiverName())
-                .setReceiverMobile(order.getReceiverMobile()).setProductCount(order.getProductCount())
-                .setPayPrice(order.getPayPrice()).setCreateTime(order.getCreateTime())).toList();
     }
 
     @Override

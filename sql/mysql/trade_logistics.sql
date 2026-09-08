@@ -339,14 +339,18 @@ WHERE `name`='顺丰轨迹同步' AND `permission`='trade:logistics:trace:sync' 
 
 INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT p.name,'',2,p.sort,m.id,p.path,p.icon,p.component,p.component_name,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
-FROM (SELECT '待发货工作台' name,1 sort,'pending' path,'ep:box' icon,'mall/trade/logistics/sf/pending/index' component,'TradeSfLogisticsPending' component_name
-      UNION ALL SELECT '顺丰账号',2,'accounts','ep:key','mall/trade/logistics/sf/accounts/index','TradeSfLogisticsAccounts'
-      UNION ALL SELECT '打印设备',3,'devices','ep:monitor','mall/trade/logistics/sf/devices/index','TradeSfLogisticsDevices'
-      UNION ALL SELECT '运单管理',4,'waybills','ep:tickets','mall/trade/logistics/sf/waybills/index','TradeSfLogisticsWaybills'
-      UNION ALL SELECT '打印任务',5,'tasks','ep:list','mall/trade/logistics/sf/tasks/index','TradeSfLogisticsTasks'
-      UNION ALL SELECT '微信物流历史',6,'wechat-history','ep:clock','mall/trade/logistics/wechat/index','TradeWechatLogistics') p
+FROM (SELECT '顺丰账号' name,1 sort,'accounts' path,'ep:key' icon,'mall/trade/logistics/sf/accounts/index' component,'TradeSfLogisticsAccounts' component_name
+      UNION ALL SELECT '打印设备',2,'devices','ep:monitor','mall/trade/logistics/sf/devices/index','TradeSfLogisticsDevices'
+      UNION ALL SELECT '运单管理',3,'waybills','ep:tickets','mall/trade/logistics/sf/waybills/index','TradeSfLogisticsWaybills'
+      UNION ALL SELECT '打印任务',4,'tasks','ep:list','mall/trade/logistics/sf/tasks/index','TradeSfLogisticsTasks'
+      UNION ALL SELECT '微信物流历史',5,'wechat-history','ep:clock','mall/trade/logistics/wechat/index','TradeWechatLogistics') p
 JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.component=p.component AND x.deleted=b'0');
+
+-- 待发货订单统一从订单列表打单；软删除旧菜单以保留历史角色授权记录。
+UPDATE `system_menu`
+SET `status`=1, `visible`=b'0', `deleted`=b'1', `updater`='1', `update_time`=NOW()
+WHERE `component`='mall/trade/logistics/sf/pending/index' AND `deleted`=b'0';
 
 INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT p.name,p.permission,3,p.sort,m.id,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
