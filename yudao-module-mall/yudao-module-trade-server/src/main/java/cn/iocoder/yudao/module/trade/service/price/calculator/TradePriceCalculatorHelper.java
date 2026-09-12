@@ -129,7 +129,15 @@ public class TradePriceCalculatorHelper {
      * @param result 计算结果
      */
     public static void recountAllGivePoint(TradePriceCalculateRespBO result) {
-        result.setGivePoint(getSumValue(result.getItems(), item -> item.getSelected() ? item.getGivePoint() : 0, Integer::sum));
+        if (result.getItems() == null) {
+            result.setGivePoint(0);
+            return;
+        }
+        long givePoint = result.getItems().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getSelected()))
+                .mapToLong(item -> item.getGivePoint() == null ? 0L : Math.max(item.getGivePoint(), 0))
+                .sum();
+        result.setGivePoint((int) Math.min(givePoint, Integer.MAX_VALUE));
     }
 
     /**
@@ -269,8 +277,10 @@ public class TradePriceCalculatorHelper {
         return values;
     }
 
-    private static int getPointWeight(TradePriceCalculateRespBO.OrderItem orderItem) {
-        int weight = orderItem.getPayPrice() - ObjectUtil.defaultIfNull(orderItem.getDeliveryPrice(), 0);
+    private static long getPointWeight(TradePriceCalculateRespBO.OrderItem orderItem) {
+        long payPrice = ObjectUtil.defaultIfNull(orderItem.getPayPrice(), 0);
+        long deliveryPrice = Math.max(ObjectUtil.defaultIfNull(orderItem.getDeliveryPrice(), 0), 0);
+        long weight = payPrice - deliveryPrice;
         Assert.isTrue(weight >= 0, "积分分摊商品金额必须大于等于 0");
         return weight;
     }

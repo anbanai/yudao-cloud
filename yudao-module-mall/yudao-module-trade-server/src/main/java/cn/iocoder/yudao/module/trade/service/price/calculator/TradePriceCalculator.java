@@ -31,7 +31,8 @@ public interface TradePriceCalculator {
     /**
      * 赠送积分，放最后
      *
-     * 放在 {@link #ORDER_DELIVERY} 后面的原因，是运费也会产生费用，需要赠送对应积分
+     * 放在 {@link #ORDER_DELIVERY} 后面的原因，是需要使用优惠及运费计算完成后的商品实付金额。
+     * 其中运费本身不参与消费积分计算。
      */
     int ORDER_POINT_GIVE = 999;
 
