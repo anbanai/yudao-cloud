@@ -103,7 +103,7 @@ public class AfterSaleController {
     @PutMapping("/disagree")
     @Operation(summary = "拒绝售后")
     @PreAuthorize("@ss.hasPermission('trade:after-sale:disagree')")
-    public CommonResult<Boolean> disagreeAfterSale(@RequestBody AfterSaleDisagreeReqVO confirmReqVO) {
+    public CommonResult<Boolean> disagreeAfterSale(@Valid @RequestBody AfterSaleDisagreeReqVO confirmReqVO) {
         afterSaleService.disagreeAfterSale(getLoginUserId(), confirmReqVO);
         return success(true);
     }
@@ -121,7 +121,7 @@ public class AfterSaleController {
     @Operation(summary = "拒绝收货")
     @Parameter(name = "id", description = "售后编号", required = true, example = "1")
     @PreAuthorize("@ss.hasPermission('trade:after-sale:receive')")
-    public CommonResult<Boolean> refuseAfterSale(AfterSaleRefuseReqVO refuseReqVO) {
+    public CommonResult<Boolean> refuseAfterSale(@Valid AfterSaleRefuseReqVO refuseReqVO) {
         afterSaleService.refuseAfterSale(getLoginUserId(), refuseReqVO);
         return success(true);
     }
