@@ -62,23 +62,26 @@ class TradePointGiveCalculatorTest {
     }
 
     @Test
-    void calculate_returnsZeroWhenDisabledOrRateIsZero() {
+    void calculate_givesConsumptionPointsWhenPointDeductionIsDisabled() {
         TradePriceCalculateRespBO disabledResult = priceResult(item(1000, 0, 1000, 0));
         newCalculator(false, 1).calculate(new TradePriceCalculateReqBO(), disabledResult);
-        assertThat(disabledResult.getGivePoint()).isZero();
+        assertThat(disabledResult.getGivePoint()).isEqualTo(10);
+    }
 
+    @Test
+    void calculate_returnsZeroWhenGiveRateIsZero() {
         TradePriceCalculateRespBO zeroRateResult = priceResult(item(1000, 0, 1000, 0));
         newCalculator(true, 0).calculate(new TradePriceCalculateReqBO(), zeroRateResult);
         assertThat(zeroRateResult.getGivePoint()).isZero();
     }
 
     @Test
-    void calculate_keepsFixedPointsWhenConsumptionPointsAreDisabled() {
+    void calculate_addsConsumptionPointsWhenPointDeductionIsDisabled() {
         TradePriceCalculateRespBO result = priceResult(item(1000, 0, 1000, 30));
 
         newCalculator(false, 1).calculate(new TradePriceCalculateReqBO(), result);
 
-        assertThat(result.getGivePoint()).isEqualTo(30);
+        assertThat(result.getGivePoint()).isEqualTo(40);
     }
 
     @Test

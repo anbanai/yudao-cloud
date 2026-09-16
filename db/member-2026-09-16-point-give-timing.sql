@@ -17,6 +17,12 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- 状态由 status 字段表达，清理早期版本写入标题的“待生效”字样。
+UPDATE `member_point_record`
+SET `title` = '订单积分奖励'
+WHERE `biz_type` = 24
+  AND `title` = '订单积分奖励（待生效）';
+
 SET @sql = IF(
     EXISTS (
         SELECT 1
@@ -46,12 +52,6 @@ SET @sql = IF(
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
-
--- 历史流水默认视为已生效，使用创建时间补齐生效时间。
-UPDATE `member_point_record`
-SET `effective_time` = `create_time`
-WHERE `status` = 1
-  AND `effective_time` IS NULL;
 
 SET @sql = IF(
     EXISTS (

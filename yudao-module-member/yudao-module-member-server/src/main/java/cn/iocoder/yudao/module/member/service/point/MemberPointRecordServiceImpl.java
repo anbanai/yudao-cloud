@@ -169,4 +169,45 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
                 MemberPointRecordStatusEnum.CANCELLED.getStatus());
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refundOrderItemPointRecord(Long userId, String orderItemId) {
+        MemberUserDO user = memberUserService.getUserForUpdate(userId);
+        MemberPointRecordDO giveRecord = memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(
+                userId, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), orderItemId);
+        if (giveRecord == null) {
+            return;
+        }
+        if (MemberPointRecordStatusEnum.PENDING.getStatus().equals(giveRecord.getStatus())) {
+            memberPointRecordMapper.updateStatus(giveRecord.getId(), MemberPointRecordStatusEnum.PENDING.getStatus(),
+                    MemberPointRecordStatusEnum.CANCELLED.getStatus());
+            return;
+        }
+        if (!MemberPointRecordStatusEnum.EFFECTIVE.getStatus().equals(giveRecord.getStatus())) {
+            return;
+        }
+        MemberPointBizTypeEnum rollbackBizType = MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM;
+        if (memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(
+                userId, rollbackBizType.getType(), orderItemId) != null) {
+            return;
+        }
+        int point = ObjectUtil.defaultIfNull(giveRecord.getPoint(), 0);
+        if (point <= 0) {
+            return;
+        }
+        int changedPoint = -point;
+        int totalPoint = ObjectUtil.defaultIfNull(user.getPoint(), 0) + changedPoint;
+        if (!memberUserService.updateUserPoint(userId, changedPoint)) {
+            throw exception(USER_POINT_NOT_ENOUGH);
+        }
+        MemberPointRecordDO rollbackRecord = new MemberPointRecordDO()
+                .setUserId(userId).setBizId(orderItemId).setBizType(rollbackBizType.getType())
+                .setTitle(rollbackBizType.getName())
+                .setDescription(StrUtil.format(rollbackBizType.getDescription(), changedPoint))
+                .setPoint(changedPoint).setTotalPoint(totalPoint)
+                .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus())
+                .setEffectiveTime(LocalDateTime.now());
+        memberPointRecordMapper.insert(rollbackRecord);
+    }
+
 }

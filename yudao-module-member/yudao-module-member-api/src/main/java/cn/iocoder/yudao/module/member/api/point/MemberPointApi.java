@@ -63,4 +63,9 @@ public interface MemberPointApi {
                                              @RequestParam("bizType") Integer bizType,
                                              @RequestParam("bizId") String bizId);
 
+    @PostMapping(PREFIX + "/refund-order-item")
+    @Operation(summary = "退回订单项赠送积分")
+    CommonResult<Boolean> refundOrderItemPoint(@RequestParam("userId") Long userId,
+                                               @RequestParam("orderItemId") String orderItemId);
+
 }

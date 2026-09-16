@@ -32,6 +32,7 @@ class MemberPointRecordServiceImplTest {
         verify(mapper).insert(captor.capture());
         assertEquals(12, captor.getValue().getPoint());
         assertEquals(5, captor.getValue().getTotalPoint());
+        assertEquals("订单积分奖励", captor.getValue().getTitle());
         assertEquals(MemberPointRecordStatusEnum.PENDING.getStatus(), captor.getValue().getStatus());
     }
 
@@ -75,6 +76,89 @@ class MemberPointRecordServiceImplTest {
         verify(userService, never()).updateUserPoint(any(), any());
         verify(mapper).updateStatus(7L, MemberPointRecordStatusEnum.PENDING.getStatus(),
                 MemberPointRecordStatusEnum.CANCELLED.getStatus());
+    }
+
+    @Test
+    void refundOrderItemPointRecord_cancelsPendingPointWithoutChangingBalance() {
+        MemberPointRecordMapper mapper = mock(MemberPointRecordMapper.class);
+        MemberUserService userService = mock(MemberUserService.class);
+        MemberPointRecordDO record = new MemberPointRecordDO().setId(7L).setPoint(12)
+                .setStatus(MemberPointRecordStatusEnum.PENDING.getStatus());
+        when(userService.getUserForUpdate(2L)).thenReturn(new MemberUserDO().setPoint(5));
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), "11")).thenReturn(record);
+        MemberPointRecordServiceImpl service = service(mapper, userService);
+
+        service.refundOrderItemPointRecord(2L, "11");
+
+        verify(mapper).updateStatus(7L, MemberPointRecordStatusEnum.PENDING.getStatus(),
+                MemberPointRecordStatusEnum.CANCELLED.getStatus());
+        verify(userService, never()).updateUserPoint(any(), any());
+        verify(mapper, never()).insert(any(MemberPointRecordDO.class));
+    }
+
+    @Test
+    void refundOrderItemPointRecord_deductsEffectivePointUsingRecordedAmount() {
+        MemberPointRecordMapper mapper = mock(MemberPointRecordMapper.class);
+        MemberUserService userService = mock(MemberUserService.class);
+        MemberPointRecordDO record = new MemberPointRecordDO().setId(7L).setPoint(12)
+                .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus());
+        when(userService.getUserForUpdate(2L)).thenReturn(new MemberUserDO().setPoint(5));
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), "11")).thenReturn(record);
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM.getType(), "11")).thenReturn(null);
+        when(userService.updateUserPoint(2L, -12)).thenReturn(true);
+        MemberPointRecordServiceImpl service = service(mapper, userService);
+
+        service.refundOrderItemPointRecord(2L, "11");
+
+        verify(userService).updateUserPoint(2L, -12);
+        ArgumentCaptor<MemberPointRecordDO> captor = ArgumentCaptor.forClass(MemberPointRecordDO.class);
+        verify(mapper).insert(captor.capture());
+        assertEquals(MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM.getType(), captor.getValue().getBizType());
+        assertEquals("11", captor.getValue().getBizId());
+        assertEquals(-12, captor.getValue().getPoint());
+        assertEquals(-7, captor.getValue().getTotalPoint());
+        assertEquals(MemberPointRecordStatusEnum.EFFECTIVE.getStatus(), captor.getValue().getStatus());
+    }
+
+    @Test
+    void refundOrderItemPointRecord_isIdempotentWhenRollbackExists() {
+        MemberPointRecordMapper mapper = mock(MemberPointRecordMapper.class);
+        MemberUserService userService = mock(MemberUserService.class);
+        MemberPointRecordDO record = new MemberPointRecordDO().setId(7L).setPoint(12)
+                .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus());
+        when(userService.getUserForUpdate(2L)).thenReturn(new MemberUserDO().setPoint(5));
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), "11")).thenReturn(record);
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM.getType(), "11"))
+                .thenReturn(new MemberPointRecordDO().setId(8L));
+        MemberPointRecordServiceImpl service = service(mapper, userService);
+
+        service.refundOrderItemPointRecord(2L, "11");
+
+        verify(userService, never()).updateUserPoint(any(), any());
+        verify(mapper, never()).insert(any(MemberPointRecordDO.class));
+    }
+
+    @Test
+    void refundOrderItemPointRecord_doesNothingForCancelledPoint() {
+        MemberPointRecordMapper mapper = mock(MemberPointRecordMapper.class);
+        MemberUserService userService = mock(MemberUserService.class);
+        MemberPointRecordDO record = new MemberPointRecordDO().setId(7L).setPoint(12)
+                .setStatus(MemberPointRecordStatusEnum.CANCELLED.getStatus());
+        when(userService.getUserForUpdate(2L)).thenReturn(new MemberUserDO().setPoint(5));
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), "11")).thenReturn(record);
+        MemberPointRecordServiceImpl service = service(mapper, userService);
+
+        service.refundOrderItemPointRecord(2L, "11");
+
+        verify(mapper, never()).updateStatus(anyLong(), anyInt(), anyInt());
+        verify(userService, never()).updateUserPoint(any(), any());
+        verify(mapper, never()).insert(any(MemberPointRecordDO.class));
     }
 
     @Test

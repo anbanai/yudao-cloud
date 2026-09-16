@@ -10,7 +10,6 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderItemAfterSaleStatusEnum;
-import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -111,9 +110,9 @@ class TradeMemberPointOrderHandlerTest {
     }
 
     @Test
-    void afterCancelOrderItem_whenGiveTimingIsReceive_cancelsPendingPoint() {
+    void afterCancelOrderItem_whenGiveTimingIsReceive_refundsPointByActualRecordStatus() {
         MemberPointApi pointApi = mock(MemberPointApi.class);
-        when(pointApi.cancelPendingPoint(2L, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), "22"))
+        when(pointApi.refundOrderItemPoint(2L, "22"))
                 .thenReturn(CommonResult.success(true));
         AfterSaleService afterSaleService = mock(AfterSaleService.class);
         when(afterSaleService.getAfterSale(33L)).thenReturn(new AfterSaleDO().setRefundPrice(50));
@@ -128,13 +127,14 @@ class TradeMemberPointOrderHandlerTest {
 
         handler.afterCancelOrderItem(order, item);
 
-        verify(pointApi).cancelPendingPoint(2L, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), "22");
+        verify(pointApi).refundOrderItemPoint(2L, "22");
+        verify(pointApi, never()).reducePoint(anyLong(), anyInt(), anyInt(), anyString());
     }
 
     @Test
-    void afterCancelOrderItem_whenReceiveTimingAndOrderCompleted_reducesEffectivePoint() {
+    void afterCancelOrderItem_whenReceiveTimingAndOrderCompleted_stillRefundsByActualRecordStatus() {
         MemberPointApi pointApi = mock(MemberPointApi.class);
-        when(pointApi.reducePoint(2L, 17, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM.getType(), "22"))
+        when(pointApi.refundOrderItemPoint(2L, "22"))
                 .thenReturn(CommonResult.success(true));
         AfterSaleService afterSaleService = mock(AfterSaleService.class);
         when(afterSaleService.getAfterSale(33L)).thenReturn(new AfterSaleDO().setRefundPrice(50));
@@ -144,14 +144,34 @@ class TradeMemberPointOrderHandlerTest {
                 .thenReturn(CommonResult.success(true));
         TradeMemberPointOrderHandler handler = handler(pointApi, levelApi, afterSaleService);
         TradeOrderDO order = new TradeOrderDO().setId(10L).setUserId(2L)
-                .setStatus(TradeOrderStatusEnum.COMPLETED.getStatus())
                 .setPointGiveTiming(MemberPointGiveTimingEnum.RECEIVE.getType());
         TradeOrderItemDO item = item(22L, 0).setGivePoint(17).setAfterSaleId(33L);
 
         handler.afterCancelOrderItem(order, item);
 
-        verify(pointApi).reducePoint(2L, 17, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM.getType(), "22");
-        verify(pointApi, never()).cancelPendingPoint(anyLong(), anyInt(), anyString());
+        verify(pointApi).refundOrderItemPoint(2L, "22");
+        verify(pointApi, never()).reducePoint(anyLong(), anyInt(), anyInt(), anyString());
+    }
+
+    @Test
+    void afterCancelOrder_whenGiveTimingIsReceive_refundsEachOrderItem() {
+        MemberPointApi pointApi = mock(MemberPointApi.class);
+        when(pointApi.refundOrderItemPoint(2L, "11")).thenReturn(CommonResult.success(true));
+        when(pointApi.refundOrderItemPoint(2L, "12")).thenReturn(CommonResult.success(true));
+        MemberLevelApi levelApi = mock(MemberLevelApi.class);
+        when(levelApi.addExperience(2L, 0,
+                MemberExperienceBizTypeEnum.ORDER_GIVE_CANCEL.getType(), "10"))
+                .thenReturn(CommonResult.success(true));
+        TradeMemberPointOrderHandler handler = handler(pointApi, levelApi, null);
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setUserId(2L).setPayStatus(true)
+                .setPayPrice(0).setRefundPrice(0)
+                .setPointGiveTiming(MemberPointGiveTimingEnum.RECEIVE.getType());
+
+        handler.afterCancelOrder(order, List.of(
+                item(11L, 0).setGivePoint(12), item(12L, 0).setGivePoint(34)));
+
+        verify(pointApi).refundOrderItemPoint(2L, "11");
+        verify(pointApi).refundOrderItemPoint(2L, "12");
     }
 
     private static TradeMemberPointOrderHandler handler(MemberPointApi pointApi, MemberLevelApi levelApi,

@@ -78,4 +78,10 @@ public class MemberPointApiImpl implements MemberPointApi {
         return success(true);
     }
 
+    @Override
+    public CommonResult<Boolean> refundOrderItemPoint(Long userId, String orderItemId) {
+        memberPointRecordService.refundOrderItemPointRecord(userId, orderItemId);
+        return success(true);
+    }
+
 }

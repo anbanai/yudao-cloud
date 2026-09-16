@@ -9,7 +9,6 @@ import cn.iocoder.yudao.module.member.enums.point.MemberPointGiveTimingEnum;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
-import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleService;
 import org.springframework.stereotype.Component;
 
@@ -75,12 +74,12 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
             return;
         }
         // 扣减（回滚）积分（订单赠送）
-        Integer givePoint = getSumValue(orderItems, TradeOrderItemDO::getGivePoint, Integer::sum);
         if (isReceiveTiming(order)) {
             for (TradeOrderItemDO orderItem : orderItems) {
-                cancelPendingPoint(order.getUserId(), orderItem.getId());
+                refundOrderItemPoint(order.getUserId(), orderItem.getId());
             }
         } else {
+            Integer givePoint = getSumValue(orderItems, TradeOrderItemDO::getGivePoint, Integer::sum);
             reducePoint(order.getUserId(), givePoint, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL,
                     order.getId());
         }
@@ -94,8 +93,8 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
     public void afterCancelOrderItem(TradeOrderDO order, TradeOrderItemDO orderItem) {
         // 增加（回滚）积分（订单抵扣）
         addPoint(order.getUserId(), orderItem.getUsePoint(), MemberPointBizTypeEnum.ORDER_USE_CANCEL_ITEM, orderItem.getId());
-        if (isReceiveTiming(order) && !TradeOrderStatusEnum.isCompleted(order.getStatus())) {
-            cancelPendingPoint(order.getUserId(), orderItem.getId());
+        if (isReceiveTiming(order)) {
+            refundOrderItemPoint(order.getUserId(), orderItem.getId());
         } else {
             // 扣减（回滚）积分（订单赠送）
             reducePoint(order.getUserId(), orderItem.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM, orderItem.getId());
@@ -155,9 +154,8 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
                 String.valueOf(orderItemId)).checkError();
     }
 
-    protected void cancelPendingPoint(Long userId, Long orderItemId) {
-        memberPointApi.cancelPendingPoint(userId, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(),
-                String.valueOf(orderItemId)).checkError();
+    protected void refundOrderItemPoint(Long userId, Long orderItemId) {
+        memberPointApi.refundOrderItemPoint(userId, String.valueOf(orderItemId)).checkError();
     }
 
     private boolean isReceiveTiming(TradeOrderDO order) {

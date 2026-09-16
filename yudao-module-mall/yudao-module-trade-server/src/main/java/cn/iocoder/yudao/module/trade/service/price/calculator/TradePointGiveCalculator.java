@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.trade.service.price.calculator;
 
-import cn.hutool.core.util.BooleanUtil;
 import cn.iocoder.yudao.module.member.api.config.MemberConfigApi;
 import cn.iocoder.yudao.module.member.api.config.dto.MemberConfigRespDTO;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateReqBO;
@@ -32,9 +31,8 @@ public class TradePointGiveCalculator implements TradePriceCalculator {
 
     @Override
     public void calculate(TradePriceCalculateReqBO param, TradePriceCalculateRespBO result) {
-        // 1.1 校验积分功能是否开启
+        // 1.1 消费赠分与积分抵扣相互独立，赠分比例为 0 时关闭消费赠分
         int givePointPerYuan = Optional.ofNullable(memberConfigApi.getConfig().getCheckedData())
-                .filter(config -> BooleanUtil.isTrue(config.getPointTradeDeductEnable()))
                 .map(MemberConfigRespDTO::getPointTradeGivePoint)
                 .orElse(0);
         if (givePointPerYuan <= 0) {

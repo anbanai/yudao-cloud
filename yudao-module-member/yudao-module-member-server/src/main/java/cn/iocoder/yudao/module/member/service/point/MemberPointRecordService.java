@@ -45,4 +45,12 @@ public interface MemberPointRecordService {
     void effectPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId);
 
     void cancelPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId);
+
+    /**
+     * 退回订单项赠送积分。待生效记录直接作废，已生效记录扣回可用余额。
+     *
+     * @param userId 会员编号
+     * @param orderItemId 订单项编号
+     */
+    void refundOrderItemPointRecord(Long userId, String orderItemId);
 }
