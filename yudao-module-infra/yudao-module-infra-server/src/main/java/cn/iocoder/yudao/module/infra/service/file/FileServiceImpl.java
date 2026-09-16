@@ -53,7 +53,7 @@ public class FileServiceImpl implements FileService {
      * 算法：当前时间戳（毫秒）+ 5 位随机数；目的是保证文件的唯一性，避免覆盖
      * 定制：可按需调整成 UUID、或者其他方式
      */
-    static boolean PATH_SUFFIX_TIMESTAMP_ENABLE = false;
+    static boolean PATH_SUFFIX_TIMESTAMP_ENABLE = true;
     /**
      * 后缀是否作为上级目录
      *
@@ -172,15 +172,21 @@ public class FileServiceImpl implements FileService {
     @Override
     @SneakyThrows
     public FilePresignedUrlRespVO presignPutUrl(String name, String directory) {
+        return presignPutUrl(name, directory, null);
+    }
+
+    @Override
+    public FilePresignedUrlRespVO presignPutUrl(String name, String directory, String type) {
         // 1. 生成上传的 path，需要保证唯一
         String path = generateUploadPath(name, directory);
 
         // 2. 获取文件预签名地址
         FileClient fileClient = getPublicMasterFileClient();
-        String uploadUrl = fileClient.presignPutUrl(path);
+        String uploadUrl = fileClient.presignPutUrl(path, type);
         String visitUrl = fileClient.presignGetUrl(path, null);
         return new FilePresignedUrlRespVO().setConfigId(fileClient.getId())
-                .setPath(path).setUploadUrl(uploadUrl).setUrl(visitUrl);
+                .setPath(path).setUploadUrl(uploadUrl).setUrl(visitUrl)
+                .setUploadHeaders(fileClient.getPresignPutHeaders(type));
     }
 
     @Override

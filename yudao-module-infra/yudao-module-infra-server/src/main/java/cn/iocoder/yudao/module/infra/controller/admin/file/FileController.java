@@ -58,12 +58,14 @@ public class FileController {
     @Operation(summary = "获取文件预签名地址（上传）", description = "模式二：前端上传文件：用于前端直接上传七牛、阿里云 OSS 等文件存储器")
     @Parameters({
             @Parameter(name = "name", description = "文件名称", required = true),
-            @Parameter(name = "directory", description = "文件目录")
+            @Parameter(name = "directory", description = "文件目录"),
+            @Parameter(name = "type", description = "文件 MIME 类型")
     })
     public CommonResult<FilePresignedUrlRespVO> getFilePresignedUrl(
             @RequestParam("name") String name,
-            @RequestParam(value = "directory", required = false) String directory) {
-        return success(fileService.presignPutUrl(name, directory));
+            @RequestParam(value = "directory", required = false) String directory,
+            @RequestParam(value = "type", required = false) String type) {
+        return success(fileService.presignPutUrl(name, directory, type));
     }
 
     @PostMapping("/create")

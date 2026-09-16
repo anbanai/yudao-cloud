@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Schema(description = "管理后台 - 文件预签名地址 Response VO")
@@ -34,5 +36,8 @@ public class FilePresignedUrlRespVO {
      */
     @Schema(description = "文件路径", requiredMode = Schema.RequiredMode.REQUIRED, example = "xxx.png")
     private String path;
+
+    @Schema(description = "客户端直传时必须发送的请求头")
+    private Map<String, String> uploadHeaders;
 
 }

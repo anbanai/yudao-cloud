@@ -1,5 +1,8 @@
 package cn.iocoder.yudao.module.infra.framework.file.core.client;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
  * 文件客户端
  *
@@ -50,6 +53,21 @@ public interface FileClient {
      */
     default String presignPutUrl(String path) {
         throw new UnsupportedOperationException("不支持的操作");
+    }
+
+    /**
+     * 获得带 MIME 类型的文件预签名地址，用于客户端直传。
+     * 默认实现保持旧客户端兼容，不额外签名请求头。
+     */
+    default String presignPutUrl(String path, String type) {
+        return presignPutUrl(path);
+    }
+
+    /**
+     * 获得客户端直传时必须发送的请求头。返回值必须与预签名请求完全一致。
+     */
+    default Map<String, String> getPresignPutHeaders(String type) {
+        return Collections.emptyMap();
     }
 
     /**

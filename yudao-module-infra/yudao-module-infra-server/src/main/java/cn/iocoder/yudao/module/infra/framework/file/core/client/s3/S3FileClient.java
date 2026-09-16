@@ -23,6 +23,10 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 基于 S3 协议的文件客户端，实现 MinIO、阿里云、腾讯云、七牛云、华为云等云服务
@@ -32,6 +36,10 @@ import java.time.Duration;
 public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
 
     private static final Duration EXPIRATION_DEFAULT = Duration.ofHours(24);
+    private static final String IMAGE_CACHE_CONTROL = "public,max-age=31536000,immutable";
+    private static final String PRIVATE_IMAGE_CACHE_CONTROL = "private,no-store";
+    private static final Set<String> INLINE_IMAGE_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif");
 
     private S3Client client;
     private S3Presigner presigner;
@@ -74,17 +82,40 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
 
     @Override
     public String upload(byte[] content, String path, String type) {
-        // 构造 PutObjectRequest
-        PutObjectRequest putRequest = PutObjectRequest.builder()
+        // 构造 PutObjectRequest。图片使用浏览器可直接展示和长期缓存的响应头。
+        PutObjectRequest putRequest = buildPutObjectRequest(content, path, type,
+                Boolean.TRUE.equals(config.getEnablePublicAccess()))
+                .toBuilder()
                 .bucket(config.getBucket())
-                .key(path)
-                .contentType(type)
-                .contentLength((long) content.length)
                 .build();
         // 上传文件
         client.putObject(putRequest, RequestBody.fromBytes(content));
         // 拼接返回路径
         return presignGetUrl(path, null);
+    }
+
+    static PutObjectRequest buildPutObjectRequest(byte[] content, String path, String type,
+                                                  boolean publicAccess) {
+        PutObjectRequest.Builder builder = buildPutObjectRequest(path, type, publicAccess)
+                .contentLength((long) content.length);
+        return builder.build();
+    }
+
+    static PutObjectRequest.Builder buildPutObjectRequest(String path, String type, boolean publicAccess) {
+        PutObjectRequest.Builder builder = PutObjectRequest.builder().key(path);
+        if (StrUtil.isNotEmpty(type)) {
+            builder.contentType(type);
+        }
+        applyImageMetadata(builder, type, publicAccess);
+        return builder;
+    }
+
+    private static void applyImageMetadata(PutObjectRequest.Builder builder, String type, boolean publicAccess) {
+        String normalizedType = type == null ? "" : type.toLowerCase(Locale.ROOT).split(";", 2)[0].trim();
+        if (normalizedType.startsWith("image/")) {
+            builder.contentDisposition(INLINE_IMAGE_TYPES.contains(normalizedType) ? "inline" : "attachment")
+                    .cacheControl(publicAccess ? IMAGE_CACHE_CONTROL : PRIVATE_IMAGE_CACHE_CONTROL);
+        }
     }
 
     @Override
@@ -107,10 +138,37 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
 
     @Override
     public String presignPutUrl(String path) {
+        return presignPutUrl(path, null);
+    }
+
+    @Override
+    public String presignPutUrl(String path, String type) {
+        boolean publicAccess = Boolean.TRUE.equals(config.getEnablePublicAccess());
         return presigner.presignPutObject(PutObjectPresignRequest.builder()
                 .signatureDuration(EXPIRATION_DEFAULT)
-                .putObjectRequest(b -> b.bucket(config.getBucket()).key(path)).build())
+                .putObjectRequest(b -> {
+                    b.bucket(config.getBucket()).key(path);
+                    if (StrUtil.isNotEmpty(type)) {
+                        b.contentType(type);
+                    }
+                    applyImageMetadata(b, type, publicAccess);
+                }).build())
                 .url().toString();
+    }
+
+    @Override
+    public Map<String, String> getPresignPutHeaders(String type) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        if (StrUtil.isNotEmpty(type)) {
+            headers.put("Content-Type", type);
+        }
+        String normalizedType = type == null ? "" : type.toLowerCase(Locale.ROOT).split(";", 2)[0].trim();
+        if (normalizedType.startsWith("image/")) {
+            headers.put("Content-Disposition", INLINE_IMAGE_TYPES.contains(normalizedType) ? "inline" : "attachment");
+            headers.put("Cache-Control", Boolean.TRUE.equals(config.getEnablePublicAccess())
+                    ? IMAGE_CACHE_CONTROL : PRIVATE_IMAGE_CACHE_CONTROL);
+        }
+        return headers;
     }
 
     @Override

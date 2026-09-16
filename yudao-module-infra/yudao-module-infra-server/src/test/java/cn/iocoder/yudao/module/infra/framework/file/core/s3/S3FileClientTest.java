@@ -10,6 +10,10 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -113,6 +117,53 @@ public class S3FileClientTest {
         String result = client.presignPutUrl("avatar.jpg");
 
         assertTrue(result.startsWith("https://test-bucket.oss-cn-beijing.aliyuncs.com/"));
+    }
+
+    @Test
+    public void testPresignPutUrl_withImageTypeSignsMatchingMetadataHeaders() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setAccessKey("access-key");
+        config.setAccessSecret("access-secret");
+        config.setBucket("test-bucket");
+        config.setDomain("https://custom.example.com");
+        config.setEndpoint("oss-cn-beijing.aliyuncs.com");
+        config.setEnablePathStyleAccess(false);
+        config.setEnablePublicAccess(true);
+        S3FileClient client = new S3FileClient(0L, config);
+        client.init();
+
+        String result = client.presignPutUrl("avatar.jpg", "image/jpeg");
+        String signedHeaders = Arrays.stream(URI.create(result).getRawQuery().split("&"))
+                .filter(item -> item.startsWith("X-Amz-SignedHeaders="))
+                .map(item -> URLDecoder.decode(item.substring(item.indexOf('=') + 1), StandardCharsets.UTF_8))
+                .collect(Collectors.joining());
+
+        assertTrue(signedHeaders.contains("cache-control"));
+        assertTrue(signedHeaders.contains("content-disposition"));
+        assertTrue(signedHeaders.contains("content-type"));
+        assertEquals("inline", client.getPresignPutHeaders("image/jpeg").get("Content-Disposition"));
+        assertEquals("public,max-age=31536000,immutable", client.getPresignPutHeaders("image/jpeg").get("Cache-Control"));
+    }
+
+    @Test
+    public void testGetPresignPutHeaders_keepsSvgAsDownload() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setEnablePublicAccess(true);
+        S3FileClient client = new S3FileClient(0L, config);
+
+        assertEquals("attachment", client.getPresignPutHeaders("image/svg+xml").get("Content-Disposition"));
+        assertEquals("public,max-age=31536000,immutable", client.getPresignPutHeaders("image/svg+xml").get("Cache-Control"));
+    }
+
+    @Test
+    public void testGetPresignPutHeaders_doesNotAddImageMetadataToNonImage() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setEnablePublicAccess(true);
+        S3FileClient client = new S3FileClient(0L, config);
+
+        assertEquals("application/pdf", client.getPresignPutHeaders("application/pdf").get("Content-Type"));
+        assertFalse(client.getPresignPutHeaders("application/pdf").containsKey("Content-Disposition"));
+        assertFalse(client.getPresignPutHeaders("application/pdf").containsKey("Cache-Control"));
     }
 
     @Test

@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.buildTime;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
@@ -305,6 +306,23 @@ public class FileServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testPresignPutUrl_passesMimeTypeAndUploadHeaders() {
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getMasterFileClient()).thenReturn(client);
+        when(client.getId()).thenReturn(10L);
+        when(client.presignPutUrl(anyString(), eq("image/jpeg"))).thenReturn("https://upload.example/signed");
+        when(client.presignGetUrl(anyString(), isNull())).thenReturn("https://cdn.example/image.jpg");
+        when(client.getPresignPutHeaders("image/jpeg"))
+                .thenReturn(Map.of("Content-Type", "image/jpeg", "Cache-Control", "public,max-age=31536000,immutable"));
+
+        var result = fileService.presignPutUrl("image.jpg", "images", "image/jpeg");
+
+        assertEquals("https://upload.example/signed", result.getUploadUrl());
+        assertEquals("image/jpeg", result.getUploadHeaders().get("Content-Type"));
+        verify(client).presignPutUrl(anyString(), eq("image/jpeg"));
+    }
+
+    @Test
     public void testCreateFileByPresignedPath_nameInvalid() {
         // 准备参数
         FileCreateReqVO reqVO = randomPojo(FileCreateReqVO.class, o -> {
@@ -344,6 +362,14 @@ public class FileServiceImplTest extends BaseDbUnitTest {
         assertTrue(path.startsWith(directory + "/"));
         // 包含日期格式：8 位数字，如 20240517
         assertTrue(path.matches(directory + "/\\d{8}/\\d+/test\\.jpg"));
+    }
+
+    @Test
+    public void testGenerateUploadPath_generatesDifferentPathsForRepeatedUploads() {
+        String firstPath = fileService.generateUploadPath("test.jpg", "avatar");
+        String secondPath = fileService.generateUploadPath("test.jpg", "avatar");
+
+        assertNotEquals(firstPath, secondPath);
     }
 
     @Test
