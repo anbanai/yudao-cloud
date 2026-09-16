@@ -44,5 +44,9 @@ public class MemberConfigDO extends BaseDO {
      * 1 元赠送多少分
      */
     private Integer pointTradeGivePoint;
+    /**
+     * 订单赠送积分发放时机，枚举 {@link cn.iocoder.yudao.module.member.enums.point.MemberPointGiveTimingEnum}
+     */
+    private Integer pointTradeGiveTiming;
 
 }

@@ -36,6 +36,12 @@ public class MemberPointRecordRespVO {
     @Schema(description = "变动后的积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "200")
     private Integer totalPoint;
 
+    @Schema(description = "积分状态，1 已生效，2 待生效，3 已作废", example = "1")
+    private Integer status;
+
+    @Schema(description = "生效时间")
+    private LocalDateTime effectiveTime;
+
     @Schema(description = "发生时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 

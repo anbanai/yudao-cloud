@@ -15,6 +15,9 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.number.MoneyUtils;
 import cn.iocoder.yudao.module.member.api.address.MemberAddressApi;
 import cn.iocoder.yudao.module.member.api.address.dto.MemberAddressRespDTO;
+import cn.iocoder.yudao.module.member.api.config.MemberConfigApi;
+import cn.iocoder.yudao.module.member.api.config.dto.MemberConfigRespDTO;
+import cn.iocoder.yudao.module.member.enums.point.MemberPointGiveTimingEnum;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
@@ -97,6 +100,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     private TradeOrderMapper tradeOrderMapper;
     @Resource
     private TradeOrderItemMapper tradeOrderItemMapper;
+    @Resource
+    private MemberConfigApi memberConfigApi;
     @Resource
     private TradeNoRedisDAO tradeNoRedisDAO;
 
@@ -227,6 +232,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         order.setType(calculateRespBO.getType());
         order.setNo(tradeNoRedisDAO.generate(TradeNoRedisDAO.TRADE_ORDER_NO_PREFIX));
         order.setStatus(TradeOrderStatusEnum.UNPAID.getStatus());
+        MemberConfigRespDTO memberConfig = memberConfigApi.getConfig().getCheckedData();
+        Integer pointGiveTiming = memberConfig == null ? null : memberConfig.getPointTradeGiveTiming();
+        order.setPointGiveTiming(pointGiveTiming == null ? MemberPointGiveTimingEnum.PAY.getType() : pointGiveTiming);
         order.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         order.setProductCount(getSumValue(calculateRespBO.getItems(), TradePriceCalculateRespBO.OrderItem::getCount, Integer::sum));
         order.setUserIp(getClientIP()).setTerminal(getTerminal());
@@ -542,7 +550,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
         // 3. 执行 TradeOrderHandler 后置处理
         order.setStatus(TradeOrderStatusEnum.COMPLETED.getStatus()).setReceiveTime(receiveTime);
-        tradeOrderHandlers.forEach(handler -> handler.afterReceiveOrder(order));
+        List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(order.getId());
+        tradeOrderHandlers.forEach(handler -> handler.afterReceiveOrder(order, orderItems));
     }
 
     /**

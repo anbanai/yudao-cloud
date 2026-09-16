@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS "trade_order"
     "use_point"               int      NULL,
     "point_price"             int      NOT NULL,
     "give_point"              int      NULL,
+    "point_give_timing"       int      NOT NULL DEFAULT 1,
     "refund_point"            int      NULL,
     "vip_price"               int      NULL,
     "give_coupon_template_counts" varchar NULL,

@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.member.controller.admin.config.vo.MemberConfigSav
 import cn.iocoder.yudao.module.member.convert.config.MemberConfigConvert;
 import cn.iocoder.yudao.module.member.dal.dataobject.config.MemberConfigDO;
 import cn.iocoder.yudao.module.member.dal.mysql.config.MemberConfigMapper;
+import cn.iocoder.yudao.module.member.enums.point.MemberPointGiveTimingEnum;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -25,6 +26,11 @@ public class MemberConfigServiceImpl implements MemberConfigService {
 
     @Override
     public void saveConfig(MemberConfigSaveReqVO saveReqVO) {
+        if (saveReqVO.getPointTradeGiveTiming() == null) {
+            saveReqVO.setPointTradeGiveTiming(MemberPointGiveTimingEnum.PAY.getType());
+        } else if (MemberPointGiveTimingEnum.getByType(saveReqVO.getPointTradeGiveTiming()) == null) {
+            throw new IllegalArgumentException("不支持的积分发放时机");
+        }
         // 存在，则进行更新
         MemberConfigDO dbConfig = getConfig();
         if (dbConfig != null) {

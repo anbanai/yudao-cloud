@@ -21,6 +21,12 @@ public class AppMemberPointRecordRespVO {
     @Schema(description = "积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "100")
     private Integer point;
 
+    @Schema(description = "积分状态，1 已生效，2 待生效，3 已作废", example = "1")
+    private Integer status;
+
+    @Schema(description = "生效时间")
+    private LocalDateTime effectiveTime;
+
     @Schema(description = "发生时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 

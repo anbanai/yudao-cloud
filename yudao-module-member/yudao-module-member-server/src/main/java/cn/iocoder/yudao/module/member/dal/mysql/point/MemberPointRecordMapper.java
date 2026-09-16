@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.member.controller.app.point.vo.AppMemberPointReco
 import cn.iocoder.yudao.module.member.dal.dataobject.point.MemberPointRecordDO;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -18,6 +19,22 @@ import java.util.Set;
  */
 @Mapper
 public interface MemberPointRecordMapper extends BaseMapperX<MemberPointRecordDO> {
+
+    default MemberPointRecordDO selectByUserIdAndBizTypeAndBizId(Long userId, Integer bizType, String bizId) {
+        List<MemberPointRecordDO> records = selectList(new LambdaQueryWrapperX<MemberPointRecordDO>()
+                .eq(MemberPointRecordDO::getUserId, userId)
+                .eq(MemberPointRecordDO::getBizType, bizType)
+                .eq(MemberPointRecordDO::getBizId, bizId)
+                .orderByDesc(MemberPointRecordDO::getId));
+        return records.isEmpty() ? null : records.get(0);
+    }
+
+    default int updateStatus(Long id, Integer expectedStatus, Integer status) {
+        return update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<MemberPointRecordDO>()
+                .eq(MemberPointRecordDO::getId, id)
+                .eq(MemberPointRecordDO::getStatus, expectedStatus)
+                .set(MemberPointRecordDO::getStatus, status));
+    }
 
     default PageResult<MemberPointRecordDO> selectPage(MemberPointRecordPageReqVO reqVO, Set<Long> userIds) {
         return selectPage(reqVO, new LambdaQueryWrapperX<MemberPointRecordDO>()

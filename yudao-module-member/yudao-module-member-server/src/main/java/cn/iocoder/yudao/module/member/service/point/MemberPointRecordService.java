@@ -39,4 +39,10 @@ public interface MemberPointRecordService {
      * @param bizId   业务编号
      */
     void createPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId);
+
+    void createPendingPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId);
+
+    void effectPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId);
+
+    void cancelPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId);
 }

@@ -66,4 +66,14 @@ public class MemberPointRecordDO extends BaseDO {
      */
     private Integer totalPoint;
 
+    /**
+     * 记录状态：1 已生效，2 待生效，3 已作废
+     */
+    private Integer status;
+
+    /**
+     * 生效时间
+     */
+    private java.time.LocalDateTime effectiveTime;
+
 }

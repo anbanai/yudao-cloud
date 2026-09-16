@@ -75,6 +75,14 @@ public interface MemberUserService {
     MemberUserDO getUser(Long id);
 
     /**
+     * 通过用户 ID 查询并锁定用户行，仅用于需要与用户余额更新保持原子性的事务。
+     *
+     * @param id 用户ID
+     * @return 用户信息
+     */
+    MemberUserDO getUserForUpdate(Long id);
+
+    /**
      * 通过用户 ID 查询用户们
      *
      * @param ids 用户 ID

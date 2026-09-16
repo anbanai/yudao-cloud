@@ -292,6 +292,10 @@ public class TradeOrderDO extends BaseDO {
      */
     private Integer givePoint;
     /**
+     * 赠送积分发放时机快照，枚举 MemberPointGiveTimingEnum
+     */
+    private Integer pointGiveTiming;
+    /**
      * 退还的使用的积分
      */
     private Integer refundPoint;

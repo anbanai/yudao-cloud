@@ -27,6 +27,15 @@ public interface MemberUserMapper extends BaseMapperX<MemberUserDO> {
         return selectOne(MemberUserDO::getMobile, mobile);
     }
 
+    /**
+     * 查询并锁定会员行，确保积分记录幂等检查与余额更新在同一事务内串行执行。
+     */
+    default MemberUserDO selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<MemberUserDO>()
+                .eq(MemberUserDO::getId, id)
+                .last("FOR UPDATE"));
+    }
+
     default MemberUserDO selectByEmail(String email) {
         return selectOne(MemberUserDO::getEmail, email);
     }

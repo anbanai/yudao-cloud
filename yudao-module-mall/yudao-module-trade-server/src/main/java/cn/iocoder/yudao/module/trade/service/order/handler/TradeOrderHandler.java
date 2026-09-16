@@ -83,6 +83,13 @@ public interface TradeOrderHandler {
      */
     default void afterReceiveOrder(TradeOrderDO order) {}
 
+    /**
+     * 订单收货后（带订单项上下文）。默认委托旧接口，兼容已有 Handler。
+     */
+    default void afterReceiveOrder(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
+        afterReceiveOrder(order);
+    }
+
     // ========== 公用方法 ==========
 
     /**

@@ -28,4 +28,7 @@ public class MemberConfigBaseVO {
     @NotNull(message = "1 元赠送积分不能为空")
     private Integer pointTradeGivePoint;
 
+    @Schema(description = "订单赠送积分发放时机，1 支付后，2 收货后", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    private Integer pointTradeGiveTiming;
+
 }

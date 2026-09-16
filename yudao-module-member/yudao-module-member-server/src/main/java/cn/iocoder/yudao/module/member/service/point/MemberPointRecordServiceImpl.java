@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.member.dal.dataobject.point.MemberPointRecordDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
 import cn.iocoder.yudao.module.member.dal.mysql.point.MemberPointRecordMapper;
 import cn.iocoder.yudao.module.member.enums.point.MemberPointBizTypeEnum;
+import cn.iocoder.yudao.module.member.enums.point.MemberPointRecordStatusEnum;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
@@ -69,11 +71,17 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         if (point == 0) {
             return;
         }
+        MemberUserDO user = memberUserService.getUserForUpdate(userId);
+        if (isOrderGiveBizType(bizType)
+                && memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(userId, bizType.getType(), bizId) != null) {
+            return;
+        }
         // 1. 校验用户积分余额
-        MemberUserDO user = memberUserService.getUser(userId);
         Integer userPoint = ObjectUtil.defaultIfNull(user.getPoint(), 0);
         int totalPoint = userPoint + point; // 用户变动后的积分
-        if (totalPoint < 0) {
+        // 订单奖励回滚必须完整扣回，即使用户已消费奖励导致余额不足；此时允许形成负余额，
+        // 后续获得积分会优先抵消该欠账。普通积分消费仍不允许余额为负。
+        if (totalPoint < 0 && !isRewardRollbackBizType(bizType)) {
             log.error("[createPointRecord][userId({}) point({}) bizType({}) bizId({}) {}]", userId, point, bizType, bizId,
                     USER_POINT_NOT_ENOUGH);
             return;
@@ -89,8 +97,76 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         MemberPointRecordDO record = new MemberPointRecordDO()
                 .setUserId(userId).setBizId(bizId).setBizType(bizType.getType())
                 .setTitle(bizType.getName()).setDescription(StrUtil.format(bizType.getDescription(), point))
-                .setPoint(point).setTotalPoint(totalPoint);
+                .setPoint(point).setTotalPoint(totalPoint)
+                .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus())
+                .setEffectiveTime(LocalDateTime.now());
         memberPointRecordMapper.insert(record);
+    }
+
+    private boolean isOrderGiveBizType(MemberPointBizTypeEnum bizType) {
+        return bizType == MemberPointBizTypeEnum.ORDER_GIVE
+                || bizType == MemberPointBizTypeEnum.ORDER_GIVE_CANCEL
+                || bizType == MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM;
+    }
+
+    private boolean isRewardRollbackBizType(MemberPointBizTypeEnum bizType) {
+        return bizType == MemberPointBizTypeEnum.ORDER_GIVE_CANCEL
+                || bizType == MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createPendingPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId) {
+        if (point == null || point <= 0) {
+            return;
+        }
+        MemberUserDO user = memberUserService.getUserForUpdate(userId);
+        // Payment callbacks are retried; an existing record, regardless of state, is the idempotency result.
+        if (memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(userId, bizType.getType(), bizId) != null) {
+            return;
+        }
+        int totalPoint = ObjectUtil.defaultIfNull(user.getPoint(), 0);
+        MemberPointRecordDO record = new MemberPointRecordDO()
+                .setUserId(userId).setBizId(bizId).setBizType(bizType.getType())
+                .setTitle(bizType.getName()).setDescription(StrUtil.format(bizType.getDescription(), point))
+                .setPoint(point).setTotalPoint(totalPoint)
+                .setStatus(MemberPointRecordStatusEnum.PENDING.getStatus());
+        memberPointRecordMapper.insert(record);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void effectPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId) {
+        MemberUserDO user = memberUserService.getUserForUpdate(userId);
+        MemberPointRecordDO record = memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(
+                userId, bizType.getType(), bizId);
+        if (record == null || !MemberPointRecordStatusEnum.PENDING.getStatus().equals(record.getStatus())) {
+            return;
+        }
+        if (memberPointRecordMapper.updateStatus(record.getId(), MemberPointRecordStatusEnum.PENDING.getStatus(),
+                MemberPointRecordStatusEnum.EFFECTIVE.getStatus()) == 0) {
+            return;
+        }
+        int point = ObjectUtil.defaultIfNull(record.getPoint(), 0);
+        int totalPoint = ObjectUtil.defaultIfNull(user.getPoint(), 0) + point;
+        if (!memberUserService.updateUserPoint(userId, point)) {
+            throw exception(USER_POINT_NOT_ENOUGH);
+        }
+        memberPointRecordMapper.updateById(new MemberPointRecordDO().setId(record.getId())
+                .setTotalPoint(totalPoint).setEffectiveTime(LocalDateTime.now()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId) {
+        memberUserService.getUserForUpdate(userId);
+        MemberPointRecordDO record = memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(
+                userId, bizType.getType(), bizId);
+        if (record == null || !MemberPointRecordStatusEnum.PENDING.getStatus().equals(record.getStatus())) {
+            return;
+        }
+        memberPointRecordMapper.updateStatus(record.getId(), MemberPointRecordStatusEnum.PENDING.getStatus(),
+                MemberPointRecordStatusEnum.CANCELLED.getStatus());
     }
 
 }

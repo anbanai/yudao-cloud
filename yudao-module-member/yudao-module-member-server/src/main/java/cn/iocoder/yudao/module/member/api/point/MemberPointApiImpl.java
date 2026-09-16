@@ -47,4 +47,35 @@ public class MemberPointApiImpl implements MemberPointApi {
         return success(true);
     }
 
+    @Override
+    public CommonResult<Boolean> addPendingPoint(Long userId, Integer point, Integer bizType, String bizId) {
+        Assert.isTrue(point > 0);
+        MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
+        if (bizTypeEnum == null) {
+            throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
+        }
+        memberPointRecordService.createPendingPointRecord(userId, point, bizTypeEnum, bizId);
+        return success(true);
+    }
+
+    @Override
+    public CommonResult<Boolean> effectPendingPoint(Long userId, Integer bizType, String bizId) {
+        MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
+        if (bizTypeEnum == null) {
+            throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
+        }
+        memberPointRecordService.effectPendingPointRecord(userId, bizTypeEnum, bizId);
+        return success(true);
+    }
+
+    @Override
+    public CommonResult<Boolean> cancelPendingPoint(Long userId, Integer bizType, String bizId) {
+        MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
+        if (bizTypeEnum == null) {
+            throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
+        }
+        memberPointRecordService.cancelPendingPointRecord(userId, bizTypeEnum, bizId);
+        return success(true);
+    }
+
 }

@@ -44,4 +44,23 @@ public interface MemberPointApi {
                                       @RequestParam("bizType") Integer bizType,
                                       @RequestParam("bizId") String bizId);
 
+    @PostMapping(PREFIX + "/add-pending")
+    @Operation(summary = "增加待生效用户积分")
+    CommonResult<Boolean> addPendingPoint(@RequestParam("userId") Long userId,
+                                          @RequestParam("point") @Min(value = 1L, message = "积分必须是正数") Integer point,
+                                          @RequestParam("bizType") Integer bizType,
+                                          @RequestParam("bizId") String bizId);
+
+    @PostMapping(PREFIX + "/effect-pending")
+    @Operation(summary = "生效待生效用户积分")
+    CommonResult<Boolean> effectPendingPoint(@RequestParam("userId") Long userId,
+                                             @RequestParam("bizType") Integer bizType,
+                                             @RequestParam("bizId") String bizId);
+
+    @PostMapping(PREFIX + "/cancel-pending")
+    @Operation(summary = "作废待生效用户积分")
+    CommonResult<Boolean> cancelPendingPoint(@RequestParam("userId") Long userId,
+                                             @RequestParam("bizType") Integer bizType,
+                                             @RequestParam("bizId") String bizId);
+
 }

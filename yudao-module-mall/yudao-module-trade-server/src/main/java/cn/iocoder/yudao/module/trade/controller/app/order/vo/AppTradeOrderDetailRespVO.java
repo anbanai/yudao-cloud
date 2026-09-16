@@ -137,6 +137,12 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "积分抵扣的金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "100")
     private Integer pointPrice;
 
+    @Schema(description = "赠送积分", example = "10")
+    private Integer givePoint;
+
+    @Schema(description = "赠送积分发放时机，1 支付后，2 收货后", example = "1")
+    private Integer pointGiveTiming;
+
     @Schema(description = "VIP 减免金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "888")
     private Integer vipPrice;
 

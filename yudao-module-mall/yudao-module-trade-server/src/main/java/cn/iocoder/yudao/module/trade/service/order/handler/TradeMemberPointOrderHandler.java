@@ -5,9 +5,11 @@ import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
 import cn.iocoder.yudao.module.member.api.point.MemberPointApi;
 import cn.iocoder.yudao.module.member.enums.MemberExperienceBizTypeEnum;
 import cn.iocoder.yudao.module.member.enums.point.MemberPointBizTypeEnum;
+import cn.iocoder.yudao.module.member.enums.point.MemberPointGiveTimingEnum;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleService;
 import org.springframework.stereotype.Component;
 
@@ -40,9 +42,15 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
 
     @Override
     public void afterPayOrder(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
-        // 增加用户积分（订单赠送）
-        addPoint(order.getUserId(), order.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE,
-                order.getId());
+        if (isReceiveTiming(order)) {
+            for (TradeOrderItemDO orderItem : orderItems) {
+                addPendingPoint(order.getUserId(), orderItem.getGivePoint(), orderItem.getId());
+            }
+        } else {
+            // 增加用户积分（订单赠送）
+            addPoint(order.getUserId(), order.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE,
+                    order.getId());
+        }
 
         // 增加用户经验
         memberLevelApi.addExperience(order.getUserId(), order.getPayPrice(),
@@ -68,8 +76,14 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
         }
         // 扣减（回滚）积分（订单赠送）
         Integer givePoint = getSumValue(orderItems, TradeOrderItemDO::getGivePoint, Integer::sum);
-        reducePoint(order.getUserId(), givePoint, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL,
-                order.getId());
+        if (isReceiveTiming(order)) {
+            for (TradeOrderItemDO orderItem : orderItems) {
+                cancelPendingPoint(order.getUserId(), orderItem.getId());
+            }
+        } else {
+            reducePoint(order.getUserId(), givePoint, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL,
+                    order.getId());
+        }
         // 扣减（回滚）用户经验
         int payPrice = order.getPayPrice() - order.getRefundPrice();
         memberLevelApi.addExperience(order.getUserId(), payPrice,
@@ -80,13 +94,27 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
     public void afterCancelOrderItem(TradeOrderDO order, TradeOrderItemDO orderItem) {
         // 增加（回滚）积分（订单抵扣）
         addPoint(order.getUserId(), orderItem.getUsePoint(), MemberPointBizTypeEnum.ORDER_USE_CANCEL_ITEM, orderItem.getId());
-        // 扣减（回滚）积分（订单赠送）
-        reducePoint(order.getUserId(), orderItem.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM, orderItem.getId());
+        if (isReceiveTiming(order) && !TradeOrderStatusEnum.isCompleted(order.getStatus())) {
+            cancelPendingPoint(order.getUserId(), orderItem.getId());
+        } else {
+            // 扣减（回滚）积分（订单赠送）
+            reducePoint(order.getUserId(), orderItem.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM, orderItem.getId());
+        }
 
         // 扣减（回滚）用户经验
         AfterSaleDO afterSale = afterSaleService.getAfterSale(orderItem.getAfterSaleId());
         memberLevelApi.reduceExperience(order.getUserId(), afterSale.getRefundPrice(),
                 MemberExperienceBizTypeEnum.ORDER_GIVE_CANCEL_ITEM.getType(), String.valueOf(orderItem.getId())).checkError();
+    }
+
+    @Override
+    public void afterReceiveOrder(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
+        if (!isReceiveTiming(order)) {
+            return;
+        }
+        for (TradeOrderItemDO orderItem : orderItems) {
+            effectPendingPoint(order.getUserId(), orderItem.getId());
+        }
     }
 
     /**
@@ -113,6 +141,27 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
         if (point != null && point > 0) {
             memberPointApi.reducePoint(userId, point, bizType.getType(), String.valueOf(bizId)).checkError();
         }
+    }
+
+    protected void addPendingPoint(Long userId, Integer point, Long orderItemId) {
+        if (point != null && point > 0) {
+            memberPointApi.addPendingPoint(userId, point, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(),
+                    String.valueOf(orderItemId)).checkError();
+        }
+    }
+
+    protected void effectPendingPoint(Long userId, Long orderItemId) {
+        memberPointApi.effectPendingPoint(userId, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(),
+                String.valueOf(orderItemId)).checkError();
+    }
+
+    protected void cancelPendingPoint(Long userId, Long orderItemId) {
+        memberPointApi.cancelPendingPoint(userId, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(),
+                String.valueOf(orderItemId)).checkError();
+    }
+
+    private boolean isReceiveTiming(TradeOrderDO order) {
+        return MemberPointGiveTimingEnum.RECEIVE.getType().equals(order.getPointGiveTiming());
     }
 
 }

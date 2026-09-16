@@ -6934,6 +6934,7 @@ CREATE TABLE `member_config`  (
   `point_trade_deduct_unit_price` int NOT NULL COMMENT '积分抵扣(单位：分)',
   `point_trade_deduct_max_price` int NULL DEFAULT NULL COMMENT '积分抵扣最大值',
   `point_trade_give_point` bigint NULL DEFAULT NULL COMMENT '1 元赠送多少分',
+  `point_trade_give_timing` tinyint NOT NULL DEFAULT 1 COMMENT '订单赠送积分发放时机：1 支付后，2 收货后',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
@@ -6947,7 +6948,7 @@ CREATE TABLE `member_config`  (
 -- Records of member_config
 -- ----------------------------
 BEGIN;
-INSERT INTO `member_config` (`id`, `point_trade_deduct_enable`, `point_trade_deduct_unit_price`, `point_trade_deduct_max_price`, `point_trade_give_point`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (5, b'1', 3200, 1, 3, '1', '2023-08-20 09:54:42', '1', '2025-10-07 09:33:33', b'0', 1);
+INSERT INTO `member_config` (`id`, `point_trade_deduct_enable`, `point_trade_deduct_unit_price`, `point_trade_deduct_max_price`, `point_trade_give_point`, `point_trade_give_timing`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (5, b'1', 3200, 1, 3, 1, '1', '2023-08-20 09:54:42', '1', '2025-10-07 09:33:33', b'0', 1);
 COMMIT;
 
 -- ----------------------------
@@ -7079,6 +7080,8 @@ CREATE TABLE `member_point_record`  (
   `description` varchar(5000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '积分描述',
   `point` int NOT NULL COMMENT '积分',
   `total_point` int NOT NULL COMMENT '变动后的积分',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：1 已生效，2 待生效，3 已作废',
+  `effective_time` datetime NULL COMMENT '生效时间',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
@@ -9252,6 +9255,7 @@ CREATE TABLE `trade_order`  (
   `use_point` int NOT NULL DEFAULT 0 COMMENT '使用的积分',
   `point_price` int NOT NULL DEFAULT 0 COMMENT '积分抵扣的金额',
   `give_point` int NOT NULL DEFAULT 0 COMMENT '赠送的积分',
+  `point_give_timing` tinyint NOT NULL DEFAULT 1 COMMENT '赠送积分发放时机：1 支付后，2 收货后',
   `refund_point` int NOT NULL DEFAULT 0 COMMENT '退还的使用的积分',
   `vip_price` int NOT NULL DEFAULT 0 COMMENT 'VIP 减免金额，单位：分',
   `give_coupon_template_counts` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL DEFAULT NULL COMMENT '赠送的优惠劵',

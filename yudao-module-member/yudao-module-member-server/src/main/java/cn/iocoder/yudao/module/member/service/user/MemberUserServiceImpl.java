@@ -135,6 +135,11 @@ public class MemberUserServiceImpl implements MemberUserService {
     }
 
     @Override
+    public MemberUserDO getUserForUpdate(Long id) {
+        return memberUserMapper.selectByIdForUpdate(id);
+    }
+
+    @Override
     public List<MemberUserDO> getUserList(Collection<Long> ids) {
         if (CollUtil.isEmpty(ids)) {
             return ListUtil.empty();
