@@ -26,13 +26,15 @@ public class MemberConfigServiceImpl implements MemberConfigService {
 
     @Override
     public void saveConfig(MemberConfigSaveReqVO saveReqVO) {
+        MemberConfigDO dbConfig = getConfig();
         if (saveReqVO.getPointTradeGiveTiming() == null) {
-            saveReqVO.setPointTradeGiveTiming(MemberPointGiveTimingEnum.PAY.getType());
+            Integer pointGiveTiming = dbConfig == null ? null : dbConfig.getPointTradeGiveTiming();
+            saveReqVO.setPointTradeGiveTiming(pointGiveTiming != null
+                    ? pointGiveTiming : MemberPointGiveTimingEnum.PAY.getType());
         } else if (MemberPointGiveTimingEnum.getByType(saveReqVO.getPointTradeGiveTiming()) == null) {
             throw new IllegalArgumentException("不支持的积分发放时机");
         }
         // 存在，则进行更新
-        MemberConfigDO dbConfig = getConfig();
         if (dbConfig != null) {
             memberConfigMapper.updateById(MemberConfigConvert.INSTANCE.convert(saveReqVO).setId(dbConfig.getId()));
             return;
