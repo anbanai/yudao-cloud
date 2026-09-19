@@ -1,12 +1,15 @@
 package cn.iocoder.yudao.module.product.dal.mysql.group;
 
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.controller.admin.group.vo.ProductGroupSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.group.vo.ProductGroupSpuRespVO;
 import cn.iocoder.yudao.module.product.controller.app.group.vo.AppProductGroupSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.group.ProductGroupSpuDO;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
@@ -22,6 +25,16 @@ class ProductGroupSpuMapperTest extends BaseDbUnitTest {
     private ProductGroupSpuMapper groupSpuMapper;
     @Resource
     private DataSource dataSource;
+
+    @BeforeEach
+    void setTenant() {
+        TenantContextHolder.setTenantId(1L);
+    }
+
+    @AfterEach
+    void clearTenant() {
+        TenantContextHolder.clear();
+    }
 
     @Test
     void testPhysicalDeleteAllowsReAdd() {
@@ -105,6 +118,24 @@ class ProductGroupSpuMapperTest extends BaseDbUnitTest {
         assertEquals(1, groupSpuMapper.deleteByGroupIdAndSpuIds(9L, 10L, List.of(100L)));
         assertEquals(1, jdbc().queryForObject(
                 "SELECT COUNT(*) FROM product_group_spu WHERE group_id = 10 AND spu_id = 100", Integer.class));
+    }
+
+    @Test
+    void testAppQueryExcludesInternalAndForeignRelationsEvenInMixedSelection() {
+        insertGroup(10L, 0, 1L);
+        insertGroup(20L, 0, 1L);
+        insertGroup(30L, 0, 2L);
+        jdbc().update("UPDATE product_group SET storefront_visible = FALSE WHERE id = 20");
+        insertSpu(100L, 1, 1);
+        insertSpu(101L, 1, 2);
+        insertSpu(102L, 1, 3);
+        insertRelation(1L, 10L, 100L, 0, 1L);
+        insertRelation(2L, 20L, 101L, 0, 1L);
+        insertRelation(3L, 30L, 102L, 0, 2L);
+        var request = new AppProductGroupSpuPageReqVO().setGroupIds(List.of(10L, 20L, 30L));
+
+        assertEquals(List.of(100L), groupSpuMapper.selectAppSpuPage(request).getList().stream()
+                .map(spu -> spu.getId()).toList());
     }
 
     private void insertGroup(Long id, int status, Long tenantId) {

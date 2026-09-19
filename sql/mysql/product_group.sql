@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS `product_group` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品分组编号',
   `name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品分组名称',
+  `storefront_visible` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否在商城公开',
   `sort` int NOT NULL DEFAULT 0 COMMENT '排序',
   `status` tinyint NOT NULL COMMENT '状态：0 开启，1 禁用',
   `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '备注',
@@ -14,6 +15,17 @@ CREATE TABLE IF NOT EXISTS `product_group` (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_product_group_tenant_status_sort` (`tenant_id`, `status`, `sort`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '商品分组';
+
+-- 已有分组表升级；历史分组默认公开。可重复执行，不修改已有公开/内部设置。
+SET @product_group_visibility_ddl = IF(
+  EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product_group' AND COLUMN_NAME = 'storefront_visible'),
+  'SELECT 1',
+  'ALTER TABLE `product_group` ADD COLUMN `storefront_visible` bit(1) NOT NULL DEFAULT b''1'' COMMENT ''是否在商城公开'''
+);
+PREPARE product_group_visibility_stmt FROM @product_group_visibility_ddl;
+EXECUTE product_group_visibility_stmt;
+DEALLOCATE PREPARE product_group_visibility_stmt;
 
 CREATE TABLE IF NOT EXISTS `product_group_spu` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',

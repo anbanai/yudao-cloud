@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -20,7 +22,7 @@ public class AppProductGroupSpuPageReqVO extends PageParam {
 
     @NotEmpty(message = "商品分组不能为空")
     @Size(max = 15, message = "最多选择 15 个商品分组")
-    private List<Long> groupIds;
+    private List<@NotNull @Positive Long> groupIds;
     private String keyword;
     private String sortField;
     private Boolean sortAsc;

@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS `product_category` (
 CREATE TABLE IF NOT EXISTS `product_group` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品分组编号',
     `name` varchar(64) NOT NULL COMMENT '商品分组名称',
+    `storefront_visible` bit NOT NULL DEFAULT TRUE COMMENT '是否在商城公开',
     `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
     `status` tinyint NOT NULL COMMENT '状态',
     `remark` varchar(255) DEFAULT NULL COMMENT '备注',
