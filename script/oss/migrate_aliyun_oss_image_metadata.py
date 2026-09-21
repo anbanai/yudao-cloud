@@ -22,7 +22,13 @@ SAFE_INLINE_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif",
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prefix", required=True, help="Only migrate objects under this OSS prefix")
+    scope = parser.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--prefix", help="Only migrate objects under this OSS prefix")
+    scope.add_argument(
+        "--all-objects",
+        action="store_true",
+        help="Migrate the entire bucket; use only after a limited dry-run",
+    )
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -40,6 +46,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-objects", type=int, default=0, help="Stop after N objects; 0 means no limit")
     parser.add_argument("--sleep-ms", type=int, default=50, help="Pause between writes to limit request rate")
     return parser.parse_args()
+
+
+def resolve_prefix(args: argparse.Namespace) -> str:
+    if args.all_objects:
+        return ""
+    prefix = args.prefix
+    if not prefix.strip():
+        raise SystemExit("--prefix cannot be empty; use --all-objects for an intentional whole-bucket run")
+    return prefix
 
 
 def required_env(name: str) -> str:
@@ -93,8 +108,7 @@ def iter_objects(bucket, prefix: str) -> Iterable:
 
 def main() -> int:
     args = parse_args()
-    if not args.prefix.strip():
-        raise SystemExit("--prefix cannot be empty; choose an explicit object directory")
+    prefix = resolve_prefix(args)
     if args.max_objects < 0 or args.sleep_ms < 0:
         raise SystemExit("--max-objects and --sleep-ms cannot be negative")
 
@@ -116,7 +130,7 @@ def main() -> int:
     bucket = oss2.Bucket(auth, endpoint, bucket_name)
     scanned = changed = skipped = failed = 0
 
-    for obj in iter_objects(bucket, args.prefix):
+    for obj in iter_objects(bucket, prefix):
         if args.max_objects and scanned >= args.max_objects:
             break
         scanned += 1
