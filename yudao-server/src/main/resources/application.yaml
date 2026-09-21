@@ -67,6 +67,15 @@ knife4j:
   setting:
     language: zh_cn
 
+--- #################### 监控相关配置 ####################
+
+# Actuator 监控端点的配置项
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true # 开启后可通过 /actuator/health/liveness 与 /actuator/health/readiness 供 Kubernetes 探针使用
+
 # 工作流 Flowable 配置
 flowable:
   # 1. false: 默认值，Flowable 启动时，对比数据库表中保存的版本，如果不匹配。将抛出异常
