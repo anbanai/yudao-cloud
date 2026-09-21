@@ -44,7 +44,7 @@ public class AlipayQrPayClientTest extends AbstractAlipayClientTest {
         // mock 方法
         String notifyUrl = randomURL();
         String qrCode = randomString();
-        Integer price = randomInteger();
+        Integer price = 12345;
         AlipayTradePrecreateResponse response = randomPojo(AlipayTradePrecreateResponse.class, o -> {
             o.setQrCode(qrCode);
             o.setSubCode("");
@@ -79,7 +79,7 @@ public class AlipayQrPayClientTest extends AbstractAlipayClientTest {
         String notifyUrl = randomURL();
         String subCode = randomString();
         String subMsg = randomString();
-        Integer price = randomInteger();
+        Integer price = 12345;
         AlipayTradePrecreateResponse response = randomPojo(AlipayTradePrecreateResponse.class, o -> {
             o.setSubCode(subCode);
             o.setSubMsg(subMsg);
@@ -114,7 +114,7 @@ public class AlipayQrPayClientTest extends AbstractAlipayClientTest {
         // mock 方法
         String outTradeNo = randomString();
         String notifyUrl = randomURL();
-        Integer price = randomInteger();
+        Integer price = 12345;
         when(defaultAlipayClient.execute(argThat((ArgumentMatcher<AlipayTradePrecreateRequest>) request -> {
             assertEquals(notifyUrl, request.getNotifyUrl());
             return true;
@@ -132,7 +132,7 @@ public class AlipayQrPayClientTest extends AbstractAlipayClientTest {
         // mock 方法
         String outTradeNo = randomString();
         String notifyUrl = randomURL();
-        Integer price = randomInteger();
+        Integer price = 12345;
         when(defaultAlipayClient.execute(argThat((ArgumentMatcher<AlipayTradePrecreateRequest>) request -> {
             assertEquals(notifyUrl, request.getNotifyUrl());
             return true;
