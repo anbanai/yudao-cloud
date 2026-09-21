@@ -47,8 +47,15 @@ public class SfRoutePushController {
     }
 
     private boolean validToken(String token) {
-        return callbackToken != null && callbackToken.length() >= 16 && token != null
-                && MessageDigest.isEqual(callbackToken.getBytes(StandardCharsets.UTF_8),
-                token.getBytes(StandardCharsets.UTF_8));
+        if (callbackToken == null || callbackToken.length() < 16) {
+            log.warn("[routePush][拒绝未通过鉴权的顺丰路由推送：未配置回调 token，请设置 SF_LOGISTICS_CALLBACK_TOKEN 环境变量（至少 16 位）]");
+            return false;
+        }
+        if (token == null || !MessageDigest.isEqual(callbackToken.getBytes(StandardCharsets.UTF_8),
+                token.getBytes(StandardCharsets.UTF_8))) {
+            log.warn("[routePush][拒绝未通过鉴权的顺丰路由推送：请求 token 缺失或不匹配，请确认顺丰推送地址已追加 ?token=]");
+            return false;
+        }
+        return true;
     }
 }
