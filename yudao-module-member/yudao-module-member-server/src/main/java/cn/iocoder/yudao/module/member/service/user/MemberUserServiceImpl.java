@@ -51,6 +51,8 @@ import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
 public class MemberUserServiceImpl implements MemberUserService {
 
     @Resource
+    private org.springframework.beans.factory.ObjectProvider<cn.iocoder.yudao.module.member.service.identity.MemberIdentityService> identityService;
+    @Resource
     private MemberUserMapper memberUserMapper;
 
     @Resource
@@ -162,6 +164,7 @@ public class MemberUserServiceImpl implements MemberUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateUserMobile(Long userId, AppMemberUserUpdateMobileReqVO reqVO) {
+        identityService.getObject().requireSafeSms();
         // 1.1 检测用户是否存在
         MemberUserDO user = validateUserExists(userId);
         // 1.2 校验新手机是否已经被绑定
@@ -177,12 +180,18 @@ public class MemberUserServiceImpl implements MemberUserService {
         smsCodeApi.useSmsCode(new SmsCodeUseReqDTO().setMobile(reqVO.getMobile()).setCode(reqVO.getCode())
                 .setScene(SmsSceneEnum.MEMBER_UPDATE_MOBILE.getScene()).setUsedIp(getClientIP())).checkError();
 
+        identityService.getObject().verifiedSmsPhone(userId, reqVO.getMobile());
+
         // 3. 更新用户手机
         memberUserMapper.updateById(MemberUserDO.builder().id(userId).mobile(reqVO.getMobile()).build());
     }
 
     @Override
     public void updateUserMobileByWeixin(Long userId, AppMemberUserUpdateMobileByWeixinReqVO reqVO) {
+        if (identityService.getObject().enabled()) {
+            identityService.getObject().verifyWechatPhone(userId, reqVO.getCode());
+            return;
+        }
         // 1.1 获得对应的手机号信息
         SocialWxPhoneNumberInfoRespDTO phoneNumberInfo = socialClientApi.getWxMaPhoneNumberInfo(
                 UserTypeEnum.MEMBER.getValue(), reqVO.getCode()).getCheckedData();
@@ -196,6 +205,7 @@ public class MemberUserServiceImpl implements MemberUserService {
 
     @Override
     public void updateUserPassword(Long userId, AppMemberUserUpdatePasswordReqVO reqVO) {
+        identityService.getObject().requireSafeSms();
         // 检测用户是否存在
         MemberUserDO user = validateUserExists(userId);
         // 校验验证码
@@ -209,6 +219,7 @@ public class MemberUserServiceImpl implements MemberUserService {
 
     @Override
     public void resetUserPassword(AppMemberUserResetPasswordReqVO reqVO) {
+        identityService.getObject().requireSafeSms();
         // 检验用户是否存在
         MemberUserDO user = validateUserExists(reqVO.getMobile());
 

@@ -19,6 +19,9 @@ import jakarta.validation.Valid;
 @Tag(name = "RPC 服务 - 短信验证码")
 public interface SmsCodeApi {
 
+    @GetMapping(ApiConstants.PREFIX + "/oauth2/sms/code/identity-verification-safe")
+    CommonResult<Boolean> isIdentityVerificationSafe();
+
     String PREFIX = ApiConstants.PREFIX + "/oauth2/sms/code";
 
     @PostMapping(PREFIX + "/send")

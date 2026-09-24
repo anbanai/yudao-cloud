@@ -29,7 +29,16 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class AppSocialUserController {
 
     @Resource
+    private cn.iocoder.yudao.module.member.service.identity.MemberIdentityService identityService;
+    @Resource
     private SocialUserApi socialUserApi;
+
+    private void rejectLegacyMini(Integer type) {
+        if (identityService.enabled() && java.util.Objects.equals(type,
+                cn.iocoder.yudao.module.system.enums.social.SocialTypeEnum.WECHAT_MINI_PROGRAM.getType())) {
+            throw cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.conflict();
+        }
+    }
     @Resource
     private SocialClientApi socialClientApi;
 
@@ -37,6 +46,7 @@ public class AppSocialUserController {
     @Operation(summary = "社交绑定，使用 code 授权码")
     @PermitAll
     public CommonResult<String> socialBind(@RequestBody @Valid AppSocialUserBindReqVO reqVO) {
+        rejectLegacyMini(reqVO.getType());
         SocialUserBindReqDTO reqDTO = new SocialUserBindReqDTO(getLoginUserId(), UserTypeEnum.MEMBER.getValue(),
                 reqVO.getType(), reqVO.getCode(), reqVO.getState());
         String openid = socialUserApi.bindSocialUser(reqDTO).getCheckedData();
@@ -46,6 +56,7 @@ public class AppSocialUserController {
     @DeleteMapping("/unbind")
     @Operation(summary = "取消社交绑定")
     public CommonResult<Boolean> socialUnbind(@RequestBody AppSocialUserUnbindReqVO reqVO) {
+        rejectLegacyMini(reqVO.getType());
         SocialUserUnbindReqDTO reqDTO = new SocialUserUnbindReqDTO(getLoginUserId(), UserTypeEnum.MEMBER.getValue(),
                 reqVO.getType(), reqVO.getOpenid());
         socialUserApi.unbindSocialUser(reqDTO).checkError();
@@ -56,6 +67,12 @@ public class AppSocialUserController {
     @Operation(summary = "获得社交用户")
     @Parameter(name = "type", description = "社交平台的类型，参见 SocialTypeEnum 枚举值", required = true, example = "10")
     public CommonResult<AppSocialUserRespVO> getSocialUser(@RequestParam("type") Integer type) {
+        if (identityService.enabled() && java.util.Objects.equals(type,
+                cn.iocoder.yudao.module.system.enums.social.SocialTypeEnum.WECHAT_MINI_PROGRAM.getType())) {
+            AppSocialUserRespVO result = new AppSocialUserRespVO();
+            result.setOpenid(identityService.currentOpenid(getLoginUserId()));
+            return success(result);
+        }
         SocialUserRespDTO socialUser = socialUserApi.getSocialUserByUserId(UserTypeEnum.MEMBER.getValue(), getLoginUserId(), type).getCheckedData();
         return success(BeanUtils.toBean(socialUser, AppSocialUserRespVO.class));
     }

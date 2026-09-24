@@ -48,7 +48,21 @@ import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
 public class MemberAuthServiceImpl implements MemberAuthService {
 
     @Resource
+    private cn.iocoder.yudao.module.member.service.identity.MemberIdentityService identityService;
+    @Resource
     private MemberUserService userService;
+
+    @Override
+    public AppAuthLoginRespVO bridgeLogin(AppAuthBridgeLoginReqVO reqVO) {
+        var login = identityService.bridge(reqVO.getHandoffCode(), reqVO.getLoginCode(), reqVO.getRequestId(), reqVO.getSourceAppId());
+        return createTokenAfterLoginSuccess(userService.getUser(login.memberId()), null, LoginLogTypeEnum.LOGIN_SOCIAL, login.openid());
+    }
+
+    private void rejectLegacyMiniBinding(Integer type) {
+        if (identityService.enabled() && java.util.Objects.equals(type, SocialTypeEnum.WECHAT_MINI_PROGRAM.getType())) {
+            throw cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.conflict();
+        }
+    }
     @Resource
     private SmsCodeApi smsCodeApi;
     @Resource
@@ -62,6 +76,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
 
     @Override
     public AppAuthLoginRespVO login(AppAuthLoginReqVO reqVO) {
+        rejectLegacyMiniBinding(reqVO.getSocialType());
         // 使用手机 + 密码，进行登录。
         MemberUserDO user = login0(reqVO.getMobile(), reqVO.getPassword());
 
@@ -79,6 +94,8 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     @Override
     @Transactional
     public AppAuthLoginRespVO smsLogin(AppAuthSmsLoginReqVO reqVO) {
+        rejectLegacyMiniBinding(reqVO.getSocialType());
+        identityService.requireSafeSms();
         // 校验验证码
         String userIp = getClientIP();
         smsCodeApi.useSmsCode(AuthConvert.INSTANCE.convert(reqVO, SmsSceneEnum.MEMBER_LOGIN.getScene(), userIp)).checkError();
@@ -98,12 +115,17 @@ public class MemberAuthServiceImpl implements MemberAuthService {
         }
 
         // 创建 Token 令牌，记录登录日志
+        identityService.verifiedSmsPhone(user.getId(), reqVO.getMobile());
         return createTokenAfterLoginSuccess(user, reqVO.getMobile(), LoginLogTypeEnum.LOGIN_SMS, openid);
     }
 
     @Override
     @Transactional
     public AppAuthLoginRespVO socialLogin(AppAuthSocialLoginReqVO reqVO) {
+        if (identityService.enabled() && java.util.Objects.equals(reqVO.getType(), SocialTypeEnum.WECHAT_MINI_PROGRAM.getType())) {
+            var login = identityService.ordinary(reqVO.getCode());
+            return createTokenAfterLoginSuccess(userService.getUser(login.memberId()), null, LoginLogTypeEnum.LOGIN_SOCIAL, login.openid());
+        }
         // 使用 code 授权码，进行登录。然后，获得到绑定的用户编号
         SocialUserRespDTO socialUser = socialUserApi.getSocialUserByCode(UserTypeEnum.MEMBER.getValue(), reqVO.getType(),
                 reqVO.getCode(), reqVO.getState()).getCheckedData();
@@ -134,6 +156,10 @@ public class MemberAuthServiceImpl implements MemberAuthService {
 
     @Override
     public AppAuthLoginRespVO weixinMiniAppLogin(AppAuthWeixinMiniAppLoginReqVO reqVO) {
+        if (identityService.enabled()) {
+            var login = identityService.phoneLogin(reqVO.getLoginCode(), reqVO.getPhoneCode());
+            return createTokenAfterLoginSuccess(userService.getUser(login.memberId()), null, LoginLogTypeEnum.LOGIN_SOCIAL, login.openid());
+        }
         // 获得对应的手机号信息
         SocialWxPhoneNumberInfoRespDTO phoneNumberInfo = socialClientApi.getWxMaPhoneNumberInfo(
                 UserTypeEnum.MEMBER.getValue(), reqVO.getPhoneCode()).getCheckedData();
@@ -158,6 +184,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
         // 统一校验用户状态，避免登录方式增加后遗漏
         validateUserStatus(user, mobile, logType);
 
+        identityService.resolve(user.getId());
         // 插入登陆日志
         createLoginLog(user.getId(), mobile, logType, LoginResultEnum.SUCCESS);
         // 创建 Token 令牌
@@ -204,7 +231,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
         reqDTO.setTraceId(TracerUtils.getTraceId());
         reqDTO.setUserId(userId);
         reqDTO.setUserType(getUserType().getValue());
-        reqDTO.setUsername(mobile);
+        reqDTO.setUsername(identityService.enabled() ? String.valueOf(userId) : mobile);
         reqDTO.setUserAgent(ServletUtils.getUserAgent());
         reqDTO.setUserIp(getClientIP());
         reqDTO.setResult(loginResult.getResult());
@@ -228,6 +255,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
 
     @Override
     public void sendSmsCode(Long userId, AppAuthSmsSendReqVO reqVO) {
+        identityService.requireSafeSms();
         // 情况 1：如果是修改手机场景，需要校验新手机号是否已经注册，说明不能使用该手机了
         if (Objects.equals(reqVO.getScene(), SmsSceneEnum.MEMBER_UPDATE_MOBILE.getScene())) {
             MemberUserDO user = userService.getUserByMobile(reqVO.getMobile());
@@ -262,6 +290,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     public AppAuthLoginRespVO refreshToken(String refreshToken) {
         OAuth2AccessTokenRespDTO accessTokenDO = oauth2TokenApi.refreshAccessToken(refreshToken,
                 OAuth2ClientConstants.CLIENT_ID_DEFAULT).getCheckedData();
+        identityService.resolve(accessTokenDO.getUserId());
         return AuthConvert.INSTANCE.convert(accessTokenDO, null);
     }
 
@@ -271,7 +300,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
         reqDTO.setTraceId(TracerUtils.getTraceId());
         reqDTO.setUserId(userId);
         reqDTO.setUserType(getUserType().getValue());
-        reqDTO.setUsername(getMobile(userId));
+        reqDTO.setUsername(identityService.enabled() ? String.valueOf(userId) : getMobile(userId));
         reqDTO.setUserAgent(ServletUtils.getUserAgent());
         reqDTO.setUserIp(getClientIP());
         reqDTO.setResult(LoginResultEnum.SUCCESS.getResult());

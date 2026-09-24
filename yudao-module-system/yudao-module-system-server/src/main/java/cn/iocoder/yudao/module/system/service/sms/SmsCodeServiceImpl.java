@@ -16,7 +16,6 @@ import org.springframework.validation.annotation.Validated;
 import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
 
-import static cn.hutool.core.util.RandomUtil.randomInt;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.isToday;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
@@ -68,7 +67,7 @@ public class SmsCodeServiceImpl implements SmsCodeService {
 
         // 创建验证码记录
         String code = String.format("%0" + smsCodeProperties.getEndCode().toString().length() + "d",
-                randomInt(smsCodeProperties.getBeginCode(), smsCodeProperties.getEndCode() + 1));
+                new java.security.SecureRandom().nextInt(smsCodeProperties.getBeginCode(), smsCodeProperties.getEndCode() + 1));
         SmsCodeDO newSmsCode = SmsCodeDO.builder().mobile(mobile).code(code).scene(scene)
                 .todayIndex(lastSmsCode != null && isToday(lastSmsCode.getCreateTime()) ? lastSmsCode.getTodayIndex() + 1 : 1)
                 .createIp(ip).used(false).build();

@@ -17,6 +17,19 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class SmsCodeApiImpl implements SmsCodeApi {
 
     @Resource
+    private cn.iocoder.yudao.module.system.framework.sms.config.SmsCodeProperties smsCodeProperties;
+
+    @Override
+    public CommonResult<Boolean> isIdentityVerificationSafe() {
+        Integer begin = smsCodeProperties.getBeginCode();
+        Integer end = smsCodeProperties.getEndCode();
+        return success(begin != null && end != null && begin >= 100000 && end <= 999999
+                && end - begin >= 899999 && smsCodeProperties.getExpireTimes() != null
+                && !smsCodeProperties.getExpireTimes().isNegative() && !smsCodeProperties.getExpireTimes().isZero()
+                && smsCodeProperties.getExpireTimes().compareTo(java.time.Duration.ofMinutes(10)) <= 0);
+    }
+
+    @Resource
     private SmsCodeService smsCodeService;
 
     @Override
