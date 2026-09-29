@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS `trade_after_sale_return_shipment` (
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_after_sale_id` (`after_sale_id`), UNIQUE KEY `uk_idempotency_key` (`idempotency_key`)
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_after_sale_id` (`after_sale_id`),
+  UNIQUE KEY `uk_tenant_idempotency_key` (`tenant_id`, `idempotency_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='售后逆向物流单';
 
 CREATE TABLE IF NOT EXISTS `trade_after_sale_return_trace` (
@@ -63,3 +64,28 @@ SET @return_shipment_refund_fee_sql := IF(@return_shipment_refund_fee_exists = 0
 PREPARE return_shipment_refund_fee_stmt FROM @return_shipment_refund_fee_sql;
 EXECUTE return_shipment_refund_fee_stmt;
 DEALLOCATE PREPARE return_shipment_refund_fee_stmt;
+
+-- 将旧版本全局幂等索引升级为租户级幂等约束。
+SET @return_shipment_old_idempotency_index_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trade_after_sale_return_shipment'
+    AND INDEX_NAME = 'uk_idempotency_key'
+);
+SET @return_shipment_drop_old_idempotency_sql := IF(@return_shipment_old_idempotency_index_exists > 0,
+  'ALTER TABLE `trade_after_sale_return_shipment` DROP INDEX `uk_idempotency_key`',
+  'SELECT 1');
+PREPARE return_shipment_drop_old_idempotency_stmt FROM @return_shipment_drop_old_idempotency_sql;
+EXECUTE return_shipment_drop_old_idempotency_stmt;
+DEALLOCATE PREPARE return_shipment_drop_old_idempotency_stmt;
+
+SET @return_shipment_tenant_idempotency_index_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trade_after_sale_return_shipment'
+    AND INDEX_NAME = 'uk_tenant_idempotency_key'
+);
+SET @return_shipment_add_tenant_idempotency_sql := IF(@return_shipment_tenant_idempotency_index_exists = 0,
+  'ALTER TABLE `trade_after_sale_return_shipment` ADD UNIQUE KEY `uk_tenant_idempotency_key` (`tenant_id`,`idempotency_key`)',
+  'SELECT 1');
+PREPARE return_shipment_add_tenant_idempotency_stmt FROM @return_shipment_add_tenant_idempotency_sql;
+EXECUTE return_shipment_add_tenant_idempotency_stmt;
+DEALLOCATE PREPARE return_shipment_add_tenant_idempotency_stmt;

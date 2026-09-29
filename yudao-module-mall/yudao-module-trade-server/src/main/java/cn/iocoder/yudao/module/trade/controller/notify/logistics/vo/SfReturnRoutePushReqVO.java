@@ -20,5 +20,9 @@ public class SfReturnRoutePushReqVO {
     private String description;
     @Size(max = 255)
     private String location;
+    @Size(max = 64)
+    private String timestamp;
+    @Size(max = 128)
+    private String nonce;
     private Long tenantId;
 }

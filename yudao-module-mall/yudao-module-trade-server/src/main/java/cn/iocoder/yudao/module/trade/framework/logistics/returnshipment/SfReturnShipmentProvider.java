@@ -146,7 +146,7 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
     private String status(JsonNode response) {
         String value = text(response, "status", "orderStatus", "opCode");
         return value == null ? "PICKUP_PENDING" : switch (value.toUpperCase()) {
-            case "1", "10", "50", "CREATED", "已收件", "揽收" -> "PICKED_UP";
+            case "10", "50", "已收件", "揽收" -> "PICKED_UP";
             case "2", "3", "在途中", "运输中", "派送中" -> "IN_TRANSIT";
             case "4", "已签收", "签收" -> "DELIVERED";
             case "5", "问题件", "异常" -> "EXCEPTION";

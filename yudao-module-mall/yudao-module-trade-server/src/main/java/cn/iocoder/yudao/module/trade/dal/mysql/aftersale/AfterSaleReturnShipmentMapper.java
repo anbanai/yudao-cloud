@@ -18,8 +18,11 @@ public interface AfterSaleReturnShipmentMapper extends BaseMapperX<AfterSaleRetu
                 && (waybillNo == null || waybillNo.isBlank())) {
             return null;
         }
+        // Callback lookup runs outside the tenant interceptor. Never allow a
+        // waybill-only callback to search across tenants.
+        if (tenantId == null) return null;
         LambdaQueryWrapper<AfterSaleReturnShipmentDO> wrapper = new LambdaQueryWrapper<AfterSaleReturnShipmentDO>()
-                .eq(tenantId != null, AfterSaleReturnShipmentDO::getTenantId, tenantId);
+                .eq(AfterSaleReturnShipmentDO::getTenantId, tenantId);
         boolean hasProviderOrderNo = providerOrderNo != null && !providerOrderNo.isBlank();
         boolean hasWaybillNo = waybillNo != null && !waybillNo.isBlank();
         if (hasProviderOrderNo && hasWaybillNo) {

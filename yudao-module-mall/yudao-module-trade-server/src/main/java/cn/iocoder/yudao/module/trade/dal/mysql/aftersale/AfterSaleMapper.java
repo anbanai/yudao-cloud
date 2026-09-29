@@ -26,14 +26,17 @@ public interface AfterSaleMapper extends BaseMapperX<AfterSaleDO> {
                 .likeIfPresent(AfterSaleDO::getSpuName, reqVO.getSpuName())
                 .betweenIfPresent(AfterSaleDO::getCreateTime, reqVO.getCreateTime());
         if (reqVO.getReturnShipmentStatus() != null && !reqVO.getReturnShipmentStatus().isBlank()) {
+            ReturnShipmentStatusEnum shipmentStatus;
             try {
-                ReturnShipmentStatusEnum.valueOf(reqVO.getReturnShipmentStatus());
+                shipmentStatus = ReturnShipmentStatusEnum.valueOf(reqVO.getReturnShipmentStatus());
             } catch (IllegalArgumentException exception) {
                 return PageResult.empty();
             }
+            // The value is taken from the closed enum above, never from arbitrary
+            // request text. MyBatis tenant filtering applies to this subquery.
             wrapper.inSql(AfterSaleDO::getId,
                     "SELECT after_sale_id FROM trade_after_sale_return_shipment WHERE status = '"
-                            + reqVO.getReturnShipmentStatus() + "'");
+                            + shipmentStatus.name() + "'");
         }
         return selectPage(reqVO, wrapper.orderByDesc(AfterSaleDO::getId));
     }
@@ -53,6 +56,11 @@ public interface AfterSaleMapper extends BaseMapperX<AfterSaleDO> {
     default AfterSaleDO selectByIdAndUserId(Long id, Long userId) {
         return selectOne(AfterSaleDO::getId, id,
                 AfterSaleDO::getUserId, userId);
+    }
+
+    default AfterSaleDO selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<AfterSaleDO>()
+                .eq(AfterSaleDO::getId, id).last("FOR UPDATE"));
     }
 
     default Long selectCountByUserIdAndStatus(Long userId, Collection<Integer> statuses) {

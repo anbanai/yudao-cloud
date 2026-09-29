@@ -8916,7 +8916,8 @@ CREATE TABLE `trade_after_sale_return_shipment` (
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_after_sale_id` (`after_sale_id`), UNIQUE KEY `uk_idempotency_key` (`idempotency_key`)
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_after_sale_id` (`after_sale_id`),
+  UNIQUE KEY `uk_tenant_idempotency_key` (`tenant_id`, `idempotency_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='售后逆向物流单';
 
 DROP TABLE IF EXISTS `trade_after_sale_return_trace`;

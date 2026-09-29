@@ -264,8 +264,8 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.MEMBER_DELIVERY)
     public void deliveryAfterSale(Long userId, AppAfterSaleDeliveryReqVO deliveryReqVO) {
         // 校验售后单存在，并状态未退货
-        AfterSaleDO afterSale = tradeAfterSaleMapper.selectByIdAndUserId(deliveryReqVO.getId(), userId);
-        if (afterSale == null) {
+        AfterSaleDO afterSale = tradeAfterSaleMapper.selectByIdForUpdate(deliveryReqVO.getId());
+        if (afterSale == null || ObjectUtil.notEqual(afterSale.getUserId(), userId)) {
             throw exception(AFTER_SALE_NOT_FOUND);
         }
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.SELLER_AGREE.getStatus())) {
@@ -275,6 +275,9 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         // provider shipment. Once a provider order is creating, unknown, picked up,
         // or delivered, accepting another waybill would create two return flows.
         var returnShipment = returnShipmentMapper.selectByAfterSaleId(afterSale.getId());
+        if (returnShipment != null) {
+            returnShipment = returnShipmentMapper.selectByIdForUpdate(returnShipment.getId());
+        }
         if (returnShipment != null && !ReturnShipmentStateMachine.canUseManualFallback(returnShipment.statusEnum())) {
             throw exception(RETURN_SHIPMENT_ALREADY_EXISTS);
         }
@@ -366,13 +369,19 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @Transactional(rollbackFor = Exception.class)
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_REFUND)
     public void refundAfterSale(Long userId, String userIp, Long id) {
-        // 校验售后单的状态，并状态待退款
-        AfterSaleDO afterSale = tradeAfterSaleMapper.selectById(id);
+        // Lock the after-sale row across the complete refund claim. This closes the
+        // window where two admin requests both pass WAIT_REFUND and create refunds.
+        AfterSaleDO afterSale = tradeAfterSaleMapper.selectByIdForUpdate(id);
         if (afterSale == null) {
             throw exception(AFTER_SALE_NOT_FOUND);
         }
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.WAIT_REFUND.getStatus())) {
             throw exception(AFTER_SALE_REFUND_FAIL_STATUS_NOT_WAIT_REFUND);
+        }
+        if (afterSale.getPayRefundId() != null) {
+            log.info("[refundAfterSale][afterSale({}) already has payRefund({}), ignore duplicate request]",
+                    id, afterSale.getPayRefundId());
+            return;
         }
 
         // Actual buyer-paid return freight is deducted once immediately before creating the refund.

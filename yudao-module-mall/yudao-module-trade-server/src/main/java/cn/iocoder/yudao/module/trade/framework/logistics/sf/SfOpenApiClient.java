@@ -41,13 +41,16 @@ public class SfOpenApiClient {
         try (HttpResponse response = HttpRequest.post(endpoint).form(form)
                 .timeout(20_000).executeAsync()) {
             if (!response.isOk()) {
-                throw new SfApiException("HTTP_" + response.getStatus(), "顺丰 HTTP 状态 " + response.getStatus());
+                // The carrier may have accepted the order before returning an HTTP
+                // error. Reconcile by provider order number before allowing retry.
+                throw new SfApiException("HTTP_" + response.getStatus(), "顺丰 HTTP 状态 " + response.getStatus(),
+                        true, null);
             }
             return parseResponse(readBoundedBody(response));
         } catch (SfApiException exception) {
             throw exception;
         } catch (IOException exception) {
-            throw new SfApiException("NETWORK", "读取顺丰响应失败", false, exception);
+            throw new SfApiException("NETWORK", "读取顺丰响应失败", true, exception);
         } catch (HttpException exception) {
             boolean timeout = exception.getCause() instanceof SocketTimeoutException
                     || exception.getMessage() != null && exception.getMessage().toLowerCase().contains("timed out");
@@ -57,19 +60,24 @@ public class SfOpenApiClient {
 
     private String readBoundedBody(HttpResponse response) throws IOException {
         if (response.contentLength() > MAX_RESPONSE_BYTES) {
-            throw new SfApiException("RESPONSE_TOO_LARGE", "顺丰响应超过 15 MB 限制");
+            throw new SfApiException("RESPONSE_TOO_LARGE", "顺丰响应超过 15 MB 限制", true, null);
         }
         byte[] bytes = response.bodyStream().readNBytes(MAX_RESPONSE_BYTES + 1);
         if (bytes.length > MAX_RESPONSE_BYTES) {
-            throw new SfApiException("RESPONSE_TOO_LARGE", "顺丰响应超过 15 MB 限制");
+            throw new SfApiException("RESPONSE_TOO_LARGE", "顺丰响应超过 15 MB 限制", true, null);
         }
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
     private JsonNode parseResponse(String body) {
-        JsonNode root = JsonUtils.parseTree(body);
+        final JsonNode root;
+        try {
+            root = JsonUtils.parseTree(body);
+        } catch (RuntimeException exception) {
+            throw new SfApiException("INVALID_RESPONSE", "顺丰响应无法解析", true, exception);
+        }
         if (root == null) {
-            throw new SfApiException("EMPTY_RESPONSE", "顺丰返回为空");
+            throw new SfApiException("EMPTY_RESPONSE", "顺丰返回为空", true, null);
         }
         String apiCode = root.path("apiResultCode").asText();
         if (!"A1000".equals(apiCode)) {
@@ -80,7 +88,7 @@ public class SfOpenApiClient {
             apiData = JsonUtils.parseTree(apiData.asText());
         }
         if (apiData == null || apiData.isMissingNode()) {
-            throw new SfApiException("INVALID_RESPONSE", "顺丰返回缺少 apiResultData");
+            throw new SfApiException("INVALID_RESPONSE", "顺丰返回缺少 apiResultData", true, null);
         }
         if (apiData.has("success") && !apiData.path("success").asBoolean()) {
             throw new SfApiException(apiData.path("errorCode").asText("SF_ERROR"),

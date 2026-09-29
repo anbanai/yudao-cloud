@@ -346,7 +346,7 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void manualDelivery(Long afterSaleId, Long logisticsId, String logisticsNo) {
-        AfterSaleDO afterSale = afterSaleMapper.selectById(afterSaleId);
+        AfterSaleDO afterSale = afterSaleMapper.selectByIdForUpdate(afterSaleId);
         if (afterSale == null) throw exception(AFTER_SALE_NOT_FOUND);
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.SELLER_AGREE.getStatus())) {
             throw exception(AFTER_SALE_DELIVERY_FAIL_STATUS_NOT_SELLER_AGREE);
@@ -355,6 +355,7 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
             throw exception(AFTER_SALE_DELIVERY_FAIL_STATUS_NOT_SELLER_AGREE);
         }
         AfterSaleReturnShipmentDO shipment = shipmentMapper.selectByAfterSaleId(afterSaleId);
+        if (shipment != null) shipment = shipmentMapper.selectByIdForUpdate(shipment.getId());
         if (!ReturnShipmentStateMachine.canUseManualFallback(shipment == null ? null : shipment.statusEnum())) {
             throw exception(RETURN_SHIPMENT_ALREADY_EXISTS);
         }
@@ -376,7 +377,27 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
             return;
         }
         if (shipment.getActualFee() == null) {
-            throw exception(RETURN_SHIPMENT_REFUND_FEE_NOT_READY);
+            if (!returnShipmentProvider.isAvailable()) {
+                throw exception(RETURN_SHIPMENT_REFUND_FEE_NOT_READY);
+            }
+            try {
+                ReturnShipmentProvider.Result result = returnShipmentProvider.query(shipment);
+                if (result != null) {
+                    if (result.actualFee() != null) shipment.setActualFee(result.actualFee());
+                    if (result.estimatedFee() != null) shipment.setEstimatedFee(result.estimatedFee());
+                    if (StrUtil.isNotBlank(result.response())) {
+                        shipment.setProviderResponse(StrUtil.maxLength(result.response(), 20_000));
+                    }
+                    shipment.setLastSyncTime(LocalDateTime.now());
+                    shipmentMapper.updateById(shipment);
+                }
+            } catch (RuntimeException exception) {
+                log.warn("[applyRefundDeduction][query actual fee for return shipment {} failed]",
+                        shipment.getId(), exception);
+            }
+            if (shipment.getActualFee() == null) {
+                throw exception(RETURN_SHIPMENT_REFUND_FEE_NOT_READY);
+            }
         }
         int refundPrice = afterSale.getRefundPrice() == null ? 0 : afterSale.getRefundPrice();
         if (shipment.getActualFee() > refundPrice) {
@@ -465,7 +486,7 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
             // Continue with SF's route code/name aliases.
         }
         return switch (value) {
-            case "1", "10", "50", "CREATED", "已收件", "收件", "揽收" -> ReturnShipmentStatusEnum.PICKED_UP.name();
+            case "10", "50", "已收件", "收件", "揽收" -> ReturnShipmentStatusEnum.PICKED_UP.name();
             case "2", "3", "在途中", "运输中", "派送中" -> ReturnShipmentStatusEnum.IN_TRANSIT.name();
             case "4", "已签收", "签收" -> ReturnShipmentStatusEnum.DELIVERED.name();
             case "5", "问题件", "异常" -> ReturnShipmentStatusEnum.EXCEPTION.name();
