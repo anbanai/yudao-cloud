@@ -2480,6 +2480,11 @@ INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_i
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (266, '订单中心', '', 1, 65, 449, 'trade', 'ep:eleme', NULL, NULL, 0, b'1', b'1', b'1', '1', '2022-11-19 18:57:19', '1', '2026-08-14 01:49:42', b'0');
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (267, '售后退款', '', 2, 2, 266, 'after-sale', 'ep:refrigerator', 'mall/trade/afterSale/index', 'TradeAfterSale', 0, b'1', b'1', b'1', '', '2022-11-19 20:15:32', '1', '2026-08-14 01:49:42', b'0');
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (268, '售后查询', 'trade:after-sale:query', 3, 1, 267, '', '', '', NULL, 0, b'1', b'1', b'1', '', '2022-11-19 20:15:33', '1', '2026-08-14 01:49:42', b'0');
+INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (2027, '逆向物流查询', 'trade:after-sale:return-shipment:query', 3, 6, 267, '', '', '', NULL, 0, b'1', b'1', b'1', '', '2026-09-30 00:00:00', '1', '2026-09-30 00:00:00', b'0');
+INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (2028, '逆向物流创建', 'trade:after-sale:return-shipment:create', 3, 7, 267, '', '', '', NULL, 0, b'1', b'1', b'1', '', '2026-09-30 00:00:00', '1', '2026-09-30 00:00:00', b'0');
+INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (2029, '逆向物流取消', 'trade:after-sale:return-shipment:cancel', 3, 8, 267, '', '', '', NULL, 0, b'1', b'1', b'1', '', '2026-09-30 00:00:00', '1', '2026-09-30 00:00:00', b'0');
+INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (2030, '逆向物流重试', 'trade:after-sale:return-shipment:retry', 3, 9, 267, '', '', '', NULL, 0, b'1', b'1', b'1', '', '2026-09-30 00:00:00', '1', '2026-09-30 00:00:00', b'0');
+INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (2031, '逆向物流人工补录', 'trade:after-sale:return-shipment:manual', 3, 10, 267, '', '', '', NULL, 0, b'1', b'1', b'1', '', '2026-09-30 00:00:00', '1', '2026-09-30 00:00:00', b'0');
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (269, '秒杀活动关闭', 'promotion:seckill-activity:close', 3, 5, 256, '', '', '', '', 0, b'1', b'1', b'1', '1', '2022-11-28 20:20:15', '1', '2026-08-14 01:49:42', b'0');
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (270, '订单列表', '', 2, 1, 266, 'order', 'ep:list', 'mall/trade/order/index', 'TradeOrder', 0, b'1', b'1', b'1', '1', '2022-12-10 21:05:44', '1', '2026-08-14 01:49:42', b'0');
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`) VALUES (271, '地区管理', '', 2, 14, 1, 'area', 'fa:map-marker', 'system/area/index', 'SystemArea', 0, b'1', b'1', b'1', '1', '2022-12-23 17:35:05', '1', '2026-08-14 01:49:42', b'0');
@@ -8866,7 +8871,66 @@ CREATE TABLE `trade_after_sale`  (
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_user_id`(`user_id` ASC) USING BTREE
+
 ) ENGINE = InnoDB AUTO_INCREMENT = 32 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '售后订单';
+
+-- ----------------------------
+-- Table structure for trade_after_sale_return_shipment
+-- ----------------------------
+DROP TABLE IF EXISTS `trade_after_sale_return_shipment`;
+CREATE TABLE `trade_after_sale_return_shipment` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '逆向物流编号',
+  `after_sale_id` bigint NOT NULL COMMENT '售后单编号',
+  `account_id` bigint DEFAULT NULL COMMENT '物流账号编号',
+  `provider` varchar(32) NOT NULL COMMENT '服务商',
+  `provider_order_no` varchar(64) DEFAULT NULL COMMENT '服务商订单号',
+  `waybill_no` varchar(64) DEFAULT NULL COMMENT '运单号',
+  `status` varchar(32) NOT NULL COMMENT '逆向物流状态',
+  `idempotency_key` varchar(64) NOT NULL COMMENT '幂等请求号',
+  `address_id` bigint DEFAULT NULL COMMENT '用户地址编号',
+  `pickup_name` varchar(64) DEFAULT NULL COMMENT '取件联系人',
+  `pickup_mobile` varchar(32) DEFAULT NULL COMMENT '取件手机号',
+  `pickup_area_id` int DEFAULT NULL COMMENT '取件地区',
+  `pickup_province` varchar(64) DEFAULT NULL COMMENT '取件省份快照',
+  `pickup_city` varchar(64) DEFAULT NULL COMMENT '取件城市快照',
+  `pickup_district` varchar(64) DEFAULT NULL COMMENT '取件区县快照',
+  `pickup_address` varchar(255) DEFAULT NULL COMMENT '取件详细地址',
+  `warehouse_name` varchar(64) DEFAULT NULL COMMENT '退货仓联系人',
+  `warehouse_phone` varchar(32) DEFAULT NULL COMMENT '退货仓电话',
+  `warehouse_province` varchar(64) DEFAULT NULL,
+  `warehouse_city` varchar(64) DEFAULT NULL,
+  `warehouse_district` varchar(64) DEFAULT NULL,
+  `warehouse_address` varchar(255) DEFAULT NULL,
+  `appointment_time` datetime DEFAULT NULL,
+  `package_weight` decimal(10,2) DEFAULT NULL,
+  `fee_payer` varchar(32) DEFAULT NULL,
+  `estimated_fee` int DEFAULT NULL,
+  `actual_fee` int DEFAULT NULL,
+  `refund_deducted_fee` int DEFAULT NULL COMMENT '已从退款扣除的实际费用，单位：分',
+  `error_code` varchar(64) DEFAULT NULL,
+  `error_message` varchar(500) DEFAULT NULL,
+  `provider_response` text,
+  `last_sync_time` datetime DEFAULT NULL,
+  `cancelled_time` datetime DEFAULT NULL,
+  `delivered_time` datetime DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_after_sale_id` (`after_sale_id`), UNIQUE KEY `uk_idempotency_key` (`idempotency_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='售后逆向物流单';
+
+DROP TABLE IF EXISTS `trade_after_sale_return_trace`;
+CREATE TABLE `trade_after_sale_return_trace` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `return_shipment_id` bigint NOT NULL,
+  `provider` varchar(32) NOT NULL, `status` varchar(32) NOT NULL,
+  `description` varchar(500) DEFAULT NULL, `location` varchar(255) DEFAULT NULL,
+  `occurred_time` datetime DEFAULT NULL, `event_id` varchar(128) NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_shipment_event` (`return_shipment_id`,`event_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='售后逆向物流轨迹';
 
 -- ----------------------------
 -- Records of trade_after_sale

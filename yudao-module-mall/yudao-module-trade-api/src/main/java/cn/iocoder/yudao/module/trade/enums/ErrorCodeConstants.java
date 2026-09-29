@@ -63,6 +63,14 @@ public interface ErrorCodeConstants {
     ErrorCode AFTER_SALE_CANCEL_FAIL_STATUS_NOT_APPLY_OR_AGREE_OR_BUYER_DELIVERY =
             new ErrorCode(1_011_000_115, "取消售后单失败，售后单状态不是【待审核】或【卖家同意】或【商家待收货】");
     ErrorCode AFTER_SALE_CREATE_FAIL_ORDER_STATUS_COMBINATION_IN_PROGRESS = new ErrorCode(1_011_000_116, "订单拼团中，无法申请售后");
+    ErrorCode RETURN_SHIPMENT_PROVIDER_UNAVAILABLE = new ErrorCode(1_011_000_117, "当前暂不支持上门取件，请填写其他物流单号");
+    ErrorCode RETURN_SHIPMENT_ALREADY_EXISTS = new ErrorCode(1_011_000_118, "该售后单已存在退货物流单");
+    ErrorCode RETURN_SHIPMENT_ADDRESS_INVALID = new ErrorCode(1_011_000_119, "取件地址无效或不属于当前用户");
+    ErrorCode RETURN_SHIPMENT_WEIGHT_INVALID = new ErrorCode(1_011_000_120, "包裹重量不符合服务商要求");
+    ErrorCode RETURN_SHIPMENT_APPOINTMENT_INVALID = new ErrorCode(1_011_000_121, "预约取件时间无效");
+    ErrorCode RETURN_SHIPMENT_CANCEL_NOT_ALLOWED = new ErrorCode(1_011_000_122, "当前退货物流状态不允许取消");
+    ErrorCode RETURN_SHIPMENT_REFUND_FEE_NOT_READY = new ErrorCode(1_011_000_123, "退货运费尚未确认，暂不能退款");
+    ErrorCode RETURN_SHIPMENT_REFUND_FEE_EXCEEDS_REFUND = new ErrorCode(1_011_000_124, "退货运费超过可退款金额，暂不能退款");
 
     // ========== Cart 模块 1-011-002-000 ==========
     ErrorCode CARD_ITEM_NOT_FOUND = new ErrorCode(1_011_002_000, "购物车项不存在");

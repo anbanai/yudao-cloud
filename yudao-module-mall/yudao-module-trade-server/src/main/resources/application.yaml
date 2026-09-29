@@ -126,6 +126,11 @@ yudao:
   trade:
     logistics:
       sf:
+        return-shipment-enabled: ${SF_RETURN_SHIPMENT_ENABLED:false}
+        return-shipment-api-service-code: ${SF_RETURN_SHIPMENT_API_SERVICE_CODE:EXP_RECE_CREATE_ORDER}
+        return-shipment-express-type-id: ${SF_RETURN_SHIPMENT_EXPRESS_TYPE_ID:}
+        return-shipment-fee-unit: ${SF_RETURN_SHIPMENT_FEE_UNIT:fen} # 顺丰金额单位：fen 或 yuan
+        return-shipment-estimated-fee-per-kg: ${SF_RETURN_SHIPMENT_ESTIMATED_FEE_PER_KG:0} # 预计费用，单位：分/kg
         callback-token: ${SF_LOGISTICS_CALLBACK_TOKEN:} # 顺丰回调 URL 的 token，生产环境必须配置至少 16 位
         template-100x150-code: ${SF_LOGISTICS_TEMPLATE_100X150_CODE:} # 顺丰分配的 100x150 云打印模板代码
         label-host-suffixes: ${SF_LOGISTICS_LABEL_HOST_SUFFIXES:sf-express.com,sf-express.cn} # 面单下载域名白名单

@@ -26,11 +26,13 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.aftersale.AfterSaleMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.aftersale.AfterSaleReturnShipmentMapper;
 import cn.iocoder.yudao.module.trade.dal.redis.no.TradeNoRedisDAO;
 import cn.iocoder.yudao.module.trade.enums.aftersale.AfterSaleOperateTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.aftersale.AfterSaleStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.aftersale.AfterSaleTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.aftersale.AfterSaleWayEnum;
+import cn.iocoder.yudao.module.trade.enums.aftersale.ReturnShipmentStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderItemAfterSaleStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderTypeEnum;
@@ -73,6 +75,10 @@ public class AfterSaleServiceImpl implements AfterSaleService {
 
     @Resource
     private AfterSaleMapper tradeAfterSaleMapper;
+    @Resource
+    private AfterSaleReturnShipmentMapper returnShipmentMapper;
+    @Resource
+    private AfterSaleReturnShipmentService returnShipmentService;
     @Resource
     private TradeNoRedisDAO tradeNoRedisDAO;
 
@@ -265,6 +271,13 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.SELLER_AGREE.getStatus())) {
             throw exception(AFTER_SALE_DELIVERY_FAIL_STATUS_NOT_SELLER_AGREE);
         }
+        // Keep the legacy manual-delivery fallback mutually exclusive with an active
+        // provider shipment. Once a provider order is creating, unknown, picked up,
+        // or delivered, accepting another waybill would create two return flows.
+        var returnShipment = returnShipmentMapper.selectByAfterSaleId(afterSale.getId());
+        if (returnShipment != null && !ReturnShipmentStateMachine.canUseManualFallback(returnShipment.statusEnum())) {
+            throw exception(RETURN_SHIPMENT_ALREADY_EXISTS);
+        }
         DeliveryExpressDO express = deliveryExpressService.validateDeliveryExpress(deliveryReqVO.getLogisticsId());
 
         // 更新售后单的物流信息
@@ -337,6 +350,15 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.BUYER_DELIVERY.getStatus())) {
             throw exception(AFTER_SALE_CONFIRM_FAIL_STATUS_NOT_BUYER_DELIVERY);
         }
+        if (ObjectUtil.equal(afterSale.getWay(), AfterSaleWayEnum.RETURN_AND_REFUND.getWay())) {
+            var shipment = returnShipmentMapper.selectByAfterSaleId(id);
+            boolean manualWaybillSubmitted = afterSale.getLogisticsId() != null
+                    && StrUtil.isNotBlank(afterSale.getLogisticsNo());
+            ReturnShipmentStatusEnum shipmentStatus = shipment == null ? null : shipment.statusEnum();
+            if (!ReturnShipmentStateMachine.canConfirmReceipt(shipmentStatus, manualWaybillSubmitted)) {
+                throw exception(AFTER_SALE_CONFIRM_FAIL_STATUS_NOT_BUYER_DELIVERY);
+            }
+        }
         return afterSale;
     }
 
@@ -352,6 +374,9 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.WAIT_REFUND.getStatus())) {
             throw exception(AFTER_SALE_REFUND_FAIL_STATUS_NOT_WAIT_REFUND);
         }
+
+        // Actual buyer-paid return freight is deducted once immediately before creating the refund.
+        returnShipmentService.applyRefundDeduction(afterSale);
 
         Integer newStatus;
         if (ObjUtil.equals(afterSale.getRefundPrice(), 0)) {

@@ -11,6 +11,9 @@ import cn.iocoder.yudao.module.trade.controller.admin.aftersale.vo.*;
 import cn.iocoder.yudao.module.trade.convert.aftersale.AfterSaleConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleLogDO;
+import cn.iocoder.yudao.module.trade.controller.app.aftersale.vo.AppReturnShipmentRespVO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleReturnShipmentDO;
+import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleReturnShipmentService;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleLogService;
@@ -53,6 +56,8 @@ public class AfterSaleController {
     private AfterSaleLogService afterSaleLogService;
     @Resource
     private MemberUserApi memberUserApi;
+    @Resource
+    private AfterSaleReturnShipmentService returnShipmentService;
 
     @GetMapping("/page")
     @Operation(summary = "获得售后订单分页")
@@ -150,6 +155,70 @@ public class AfterSaleController {
                     notifyReqDTO.getPayRefundId());
         }
         return success(true);
+    }
+
+    @GetMapping("/{id}/return-shipment")
+    @Operation(summary = "获得售后逆向物流")
+    @PreAuthorize("@ss.hasPermission('trade:after-sale:return-shipment:query')")
+    public CommonResult<AppReturnShipmentRespVO> getReturnShipment(@PathVariable("id") Long id) {
+        return success(toReturnShipmentResp(returnShipmentService.getAdminShipment(id),
+                returnShipmentService.getAdminTraces(id)));
+    }
+
+    @GetMapping("/{id}/return-shipment/traces")
+    @Operation(summary = "获得售后逆向物流轨迹")
+    @PreAuthorize("@ss.hasPermission('trade:after-sale:return-shipment:query')")
+    public CommonResult<List<AppReturnShipmentRespVO.Trace>> getReturnShipmentTraces(@PathVariable("id") Long id) {
+        return success(returnShipmentService.getAdminTraces(id).stream().map(trace -> {
+            AppReturnShipmentRespVO.Trace item = new AppReturnShipmentRespVO.Trace();
+            item.setStatus(trace.getStatus()).setDescription(trace.getDescription()).setLocation(trace.getLocation())
+                    .setOccurredTime(trace.getOccurredTime());
+            return item;
+        }).toList());
+    }
+
+    @PostMapping("/{id}/return-shipment/retry")
+    @Operation(summary = "重试创建售后逆向物流")
+    @PreAuthorize("@ss.hasPermission('trade:after-sale:return-shipment:retry')")
+    public CommonResult<Boolean> retryReturnShipment(@PathVariable("id") Long id) {
+        returnShipmentService.retry(id);
+        return success(true);
+    }
+
+    @PostMapping("/{id}/return-shipment/cancel")
+    @Operation(summary = "取消售后逆向物流")
+    @PreAuthorize("@ss.hasPermission('trade:after-sale:return-shipment:cancel')")
+    public CommonResult<Boolean> cancelReturnShipment(@PathVariable("id") Long id) {
+        returnShipmentService.cancelAdmin(id);
+        return success(true);
+    }
+
+    @PostMapping("/{id}/return-shipment/manual")
+    @Operation(summary = "人工补录售后物流")
+    @PreAuthorize("@ss.hasPermission('trade:after-sale:return-shipment:manual')")
+    public CommonResult<Boolean> manualReturnShipment(@PathVariable("id") Long id,
+                                                       @Valid @RequestBody AfterSaleReturnShipmentManualReqVO request) {
+        returnShipmentService.manualDelivery(id, request.getLogisticsId(), request.getLogisticsNo());
+        return success(true);
+    }
+
+    private AppReturnShipmentRespVO toReturnShipmentResp(AfterSaleReturnShipmentDO shipment,
+                                                          List<cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleReturnTraceDO> traces) {
+        if (shipment == null) return null;
+        AppReturnShipmentRespVO response = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(
+                shipment, AppReturnShipmentRespVO.class);
+        response.setPickupContactName(shipment.getPickupName());
+        response.setPickupContactMobile(shipment.getPickupMobile());
+        response.setReturnAddress(shipment.getWarehouseAddress());
+        if (shipment.statusEnum() != null) response.setStatusName(shipment.statusEnum().getName());
+        if (shipment.feePayerEnum() != null) response.setFeePayerName(shipment.feePayerEnum().getName());
+        response.setTraces(traces.stream().map(trace -> {
+            AppReturnShipmentRespVO.Trace item = new AppReturnShipmentRespVO.Trace();
+            item.setStatus(trace.getStatus()).setDescription(trace.getDescription()).setLocation(trace.getLocation())
+                    .setOccurredTime(trace.getOccurredTime());
+            return item;
+        }).toList());
+        return response;
     }
 
 }
