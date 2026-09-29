@@ -50,6 +50,11 @@ public class CouponApiImpl implements CouponApi {
     }
 
     @Override
+    public CommonResult<Long> takeCouponForBenefit(Long templateId, Long userId, String bizId) {
+        return success(couponService.takeCouponForBenefit(templateId, userId, bizId));
+    }
+
+    @Override
     public CommonResult<Boolean> invalidateCouponsByAdmin(List<Long> giveCouponIds, Long userId) {
         couponService.invalidateCouponsByAdmin(giveCouponIds, userId);
         return success(true);

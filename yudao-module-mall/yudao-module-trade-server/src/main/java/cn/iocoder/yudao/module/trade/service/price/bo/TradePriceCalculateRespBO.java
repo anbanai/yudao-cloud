@@ -76,6 +76,13 @@ public class TradePriceCalculateRespBO {
      */
     private Integer givePoint;
 
+    /** 消费返积分计算基数，商品优惠后实付金额，单位：分（不含运费） */
+    private Integer pointGiveCalculatePrice;
+    /** 消费返积分倍率，千分比，例如 1200 表示 1.2 倍 */
+    private Integer pointGiveMultiplier;
+    /** 未乘会员倍率的基础消费积分 */
+    private Integer pointGiveBase;
+
     /**
      * 砍价活动编号
      */
@@ -277,6 +284,13 @@ public class TradePriceCalculateRespBO {
          * 赠送的积分
          */
         private Integer givePoint;
+
+        /** 当前商品分摊的消费返积分计算基数，单位：分 */
+        private Integer pointGiveCalculatePrice;
+        /** 下单时会员积分倍率快照，千分比 */
+        private Integer pointGiveMultiplier;
+        /** 当前商品分摊的基础消费积分 */
+        private Integer pointGiveBase;
 
     }
 

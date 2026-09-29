@@ -2,6 +2,10 @@ package cn.iocoder.yudao.module.trade.service.price.calculator;
 
 import cn.iocoder.yudao.module.member.api.config.MemberConfigApi;
 import cn.iocoder.yudao.module.member.api.config.dto.MemberConfigRespDTO;
+import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
+import cn.iocoder.yudao.module.member.api.level.dto.MemberLevelRespDTO;
+import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
+import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateReqBO;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateRespBO;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +33,12 @@ public class TradePointGiveCalculator implements TradePriceCalculator {
     @Resource
     private MemberConfigApi memberConfigApi;
 
+    @Resource
+    private MemberUserApi memberUserApi;
+
+    @Resource
+    private MemberLevelApi memberLevelApi;
+
     @Override
     public void calculate(TradePriceCalculateReqBO param, TradePriceCalculateRespBO result) {
         // 1.1 消费赠分与积分抵扣相互独立，赠分比例为 0 时关闭消费赠分
@@ -42,13 +52,17 @@ public class TradePointGiveCalculator implements TradePriceCalculator {
 
         // 1.2 只统计优惠后的商品实付金额，运费不参与消费积分计算。
         long productPayPrice = calculateProductPayPrice(result);
+        result.setPointGiveCalculatePrice((int) Math.min(productPayPrice, Integer.MAX_VALUE));
         if (productPayPrice <= 0) {
             TradePriceCalculatorHelper.recountAllGivePoint(result);
             return;
         }
 
         // 2.1 计算赠送积分
-        int givePoint = calculateGivePoint(productPayPrice, givePointPerYuan);
+        int multiplier = getPointMultiplier(param.getUserId());
+        result.setPointGiveMultiplier(multiplier);
+        result.setPointGiveBase(calculateBaseGivePoint(productPayPrice, givePointPerYuan));
+        int givePoint = calculateGivePoint(productPayPrice, givePointPerYuan, multiplier);
         if (givePoint <= 0) {
             TradePriceCalculatorHelper.recountAllGivePoint(result);
             return;
@@ -69,6 +83,10 @@ public class TradePointGiveCalculator implements TradePriceCalculator {
             // 商品可能赠送了积分，所以这里要加上
             long itemGivePoint = (long) Math.max(defaultValue(orderItem.getGivePoint()), 0) + dividePoints.get(i);
             orderItem.setGivePoint((int) Math.min(itemGivePoint, Integer.MAX_VALUE));
+            long itemBasePoint = calculateBaseGivePoint(calculateItemProductPayPrice(orderItem), givePointPerYuan);
+            orderItem.setPointGiveCalculatePrice((int) Math.min(Math.max(calculateItemProductPayPrice(orderItem), 0L), Integer.MAX_VALUE));
+            orderItem.setPointGiveMultiplier(multiplier);
+            orderItem.setPointGiveBase((int) Math.min(itemBasePoint, Integer.MAX_VALUE));
         }
         // 3.3 更新订单赠送积分
         TradePriceCalculatorHelper.recountAllGivePoint(result);
@@ -97,11 +115,36 @@ public class TradePointGiveCalculator implements TradePriceCalculator {
     /**
      * 按“每 1 元赠送多少分”计算基础消费积分，结果限制在积分字段可表示的范围内。
      */
-    private int calculateGivePoint(long productPayPrice, int givePointPerYuan) {
+    private int calculateGivePoint(long productPayPrice, int givePointPerYuan, int multiplier) {
+        BigDecimal givePoint = BigDecimal.valueOf(calculateBaseGivePoint(productPayPrice, givePointPerYuan))
+                .multiply(BigDecimal.valueOf(multiplier))
+                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.FLOOR);
+        return givePoint.min(BigDecimal.valueOf(Integer.MAX_VALUE)).intValue();
+    }
+
+    private int calculateBaseGivePoint(long productPayPrice, int givePointPerYuan) {
         BigDecimal givePoint = BigDecimal.valueOf(productPayPrice)
                 .multiply(BigDecimal.valueOf(givePointPerYuan))
                 .divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR);
         return givePoint.min(BigDecimal.valueOf(Integer.MAX_VALUE)).intValue();
+    }
+
+    private int getPointMultiplier(Long userId) {
+        if (userId == null || userId <= 0) {
+            return 1000;
+        }
+        try {
+            MemberUserRespDTO user = memberUserApi.getUser(userId).getCheckedData();
+            if (user == null || user.getLevelId() == null || user.getLevelId() <= 0) {
+                return 1000;
+            }
+            MemberLevelRespDTO level = memberLevelApi.getMemberLevel(user.getLevelId()).getCheckedData();
+            return level == null || level.getPointTradeGiveMultiplier() == null
+                    ? 1000 : Math.max(level.getPointTradeGiveMultiplier(), 0);
+        } catch (Exception ex) {
+            log.warn("读取会员积分倍率失败，按 1.0 倍计算，userId={}", userId, ex);
+            return 1000;
+        }
     }
 
     private int defaultValue(Integer value) {

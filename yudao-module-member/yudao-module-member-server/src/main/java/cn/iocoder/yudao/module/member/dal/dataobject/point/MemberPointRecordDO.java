@@ -66,6 +66,13 @@ public class MemberPointRecordDO extends BaseDO {
      */
     private Integer totalPoint;
 
+    /** 积分计算基数，单位：分；非消费返积分记录为空 */
+    private Integer pointCalculatePrice;
+    /** 未乘会员倍率的基础消费积分 */
+    private Integer pointGiveBase;
+    /** 消费返积分倍率快照，千分比 */
+    private Integer pointGiveMultiplier;
+
     /**
      * 记录状态：1 已生效，2 待生效，3 已作废
      */

@@ -163,6 +163,44 @@ public class CouponServiceImpl implements CouponService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long takeCouponForBenefit(Long templateId, Long userId, String bizId) {
+        if (templateId == null || userId == null || StrUtil.isBlank(bizId)) {
+            throw new IllegalArgumentException("权益发券参数不能为空");
+        }
+        if (bizId.length() > 64) {
+            throw new IllegalArgumentException("权益发券业务单号过长");
+        }
+        MemberUserRespDTO user = memberUserApi.getUser(userId).getCheckedData();
+        if (user == null || user.getId() == null) {
+            throw new IllegalArgumentException("会员用户不存在");
+        }
+        // CouponTemplateService is tenant-aware; loading the template here also
+        // prevents a caller from issuing a coupon from another tenant.
+        CouponTemplateDO template = couponTemplateService.getCouponTemplate(templateId);
+        if (template == null) {
+            throw exception(COUPON_TEMPLATE_NOT_EXISTS);
+        }
+        CouponDO existing = couponMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CouponDO>()
+                .eq(CouponDO::getSourceBizId, bizId));
+        if (existing != null) {
+            if (!Objects.equals(existing.getUserId(), userId) || !Objects.equals(existing.getTemplateId(), templateId)) {
+                throw new IllegalStateException("权益发券业务单号已被使用");
+            }
+            return existing.getId();
+        }
+        List<Long> ids = getSelf().takeCoupon(templateId, CollUtil.newHashSet(userId), CouponTakeTypeEnum.ADMIN).get(userId);
+        if (ids == null || ids.size() != 1) {
+            throw new IllegalStateException("权益优惠券发放失败");
+        }
+        CouponDO coupon = new CouponDO();
+        coupon.setId(ids.get(0));
+        coupon.setSourceBizId(bizId);
+        couponMapper.updateById(coupon);
+        return ids.get(0);
+    }
+
+    @Override
     public void invalidateCouponsByAdmin(List<Long> giveCouponIds, Long userId) {
         // 循环收回
         for (Long couponId : giveCouponIds) {

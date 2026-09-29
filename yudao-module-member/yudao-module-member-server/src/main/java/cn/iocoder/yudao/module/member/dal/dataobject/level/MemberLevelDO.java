@@ -45,6 +45,10 @@ public class MemberLevelDO extends BaseDO {
      * 享受折扣
      */
     private Integer discountPercent;
+    /**
+     * 消费返积分倍率，按千分比存储，例如 1200 表示 1.2 倍。
+     */
+    private Integer pointTradeGiveMultiplier;
 
     /**
      * 等级图标

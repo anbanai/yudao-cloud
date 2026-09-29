@@ -234,7 +234,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         order.setStatus(TradeOrderStatusEnum.UNPAID.getStatus());
         MemberConfigRespDTO memberConfig = memberConfigApi.getConfig().getCheckedData();
         Integer pointGiveTiming = memberConfig == null ? null : memberConfig.getPointTradeGiveTiming();
-        order.setPointGiveTiming(pointGiveTiming == null ? MemberPointGiveTimingEnum.PAY.getType() : pointGiveTiming);
+        order.setPointGiveTiming(pointGiveTiming == null ? MemberPointGiveTimingEnum.RECEIVE.getType() : pointGiveTiming);
         order.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         order.setProductCount(getSumValue(calculateRespBO.getItems(), TradePriceCalculateRespBO.OrderItem::getCount, Integer::sum));
         order.setUserIp(getClientIP()).setTerminal(getTerminal());

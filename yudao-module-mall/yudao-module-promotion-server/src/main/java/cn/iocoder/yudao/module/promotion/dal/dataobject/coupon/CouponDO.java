@@ -69,6 +69,8 @@ public class CouponDO extends BaseDO {
      * 枚举 {@link CouponTakeTypeEnum}
      */
     private Integer takeType;
+    /** 幂等发券业务单号；普通领券为空。 */
+    private String sourceBizId;
     // ========== 领取情况 END ==========
 
     // ========== 使用规则 BEGIN ==========

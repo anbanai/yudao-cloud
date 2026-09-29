@@ -31,6 +31,16 @@ public interface MemberPointApi {
                                    @RequestParam("bizType") Integer bizType,
                                    @RequestParam("bizId") String bizId);
 
+    @PostMapping(PREFIX + "/add-with-snapshot")
+    @Operation(summary = "增加用户积分（带消费返积分快照）")
+    CommonResult<Boolean> addPointWithSnapshot(@RequestParam("userId") Long userId,
+                                               @RequestParam("point") @Min(value = 1L, message = "积分必须是正数") Integer point,
+                                               @RequestParam("bizType") Integer bizType,
+                                               @RequestParam("bizId") String bizId,
+                                               @RequestParam(value = "pointCalculatePrice", required = false) Integer pointCalculatePrice,
+                                               @RequestParam(value = "pointGiveBase", required = false) Integer pointGiveBase,
+                                               @RequestParam(value = "pointGiveMultiplier", required = false) Integer pointGiveMultiplier);
+
     @PostMapping(PREFIX + "/reducePoint")
     @Operation(summary = "减少用户积分")
     @Parameters({
@@ -44,12 +54,32 @@ public interface MemberPointApi {
                                       @RequestParam("bizType") Integer bizType,
                                       @RequestParam("bizId") String bizId);
 
+    @PostMapping(PREFIX + "/reduce-with-snapshot")
+    @Operation(summary = "减少用户积分（带消费返积分快照）")
+    CommonResult<Boolean> reducePointWithSnapshot(@RequestParam("userId") Long userId,
+                                                  @RequestParam("point") @Min(value = 1L, message = "积分必须是正数") Integer point,
+                                                  @RequestParam("bizType") Integer bizType,
+                                                  @RequestParam("bizId") String bizId,
+                                                  @RequestParam(value = "pointCalculatePrice", required = false) Integer pointCalculatePrice,
+                                                  @RequestParam(value = "pointGiveBase", required = false) Integer pointGiveBase,
+                                                  @RequestParam(value = "pointGiveMultiplier", required = false) Integer pointGiveMultiplier);
+
     @PostMapping(PREFIX + "/add-pending")
     @Operation(summary = "增加待生效用户积分")
     CommonResult<Boolean> addPendingPoint(@RequestParam("userId") Long userId,
                                           @RequestParam("point") @Min(value = 1L, message = "积分必须是正数") Integer point,
                                           @RequestParam("bizType") Integer bizType,
                                           @RequestParam("bizId") String bizId);
+
+    @PostMapping(PREFIX + "/add-pending-with-snapshot")
+    @Operation(summary = "增加待生效用户积分（带消费返积分快照）")
+    CommonResult<Boolean> addPendingPointWithSnapshot(@RequestParam("userId") Long userId,
+                                                      @RequestParam("point") @Min(value = 1L, message = "积分必须是正数") Integer point,
+                                                      @RequestParam("bizType") Integer bizType,
+                                                      @RequestParam("bizId") String bizId,
+                                                      @RequestParam(value = "pointCalculatePrice", required = false) Integer pointCalculatePrice,
+                                                      @RequestParam(value = "pointGiveBase", required = false) Integer pointGiveBase,
+                                                      @RequestParam(value = "pointGiveMultiplier", required = false) Integer pointGiveMultiplier);
 
     @PostMapping(PREFIX + "/effect-pending")
     @Operation(summary = "生效待生效用户积分")

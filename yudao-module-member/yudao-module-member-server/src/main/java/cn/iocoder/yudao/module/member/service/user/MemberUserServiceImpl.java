@@ -363,4 +363,9 @@ public class MemberUserServiceImpl implements MemberUserService {
         return true;
     }
 
+    @Override
+    public boolean updateUserPointForRewardRollback(Long id, Integer point) {
+        return point != null && point < 0 && memberUserMapper.updatePointDecrAllowNegative(id, point) > 0;
+    }
+
 }

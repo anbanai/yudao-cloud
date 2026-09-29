@@ -291,6 +291,12 @@ public class TradeOrderDO extends BaseDO {
      * 赠送的积分
      */
     private Integer givePoint;
+    /** 消费返积分计算基数快照，单位：分，不含运费 */
+    private Integer pointGiveCalculatePrice;
+    /** 消费返积分倍率快照，千分比 */
+    private Integer pointGiveMultiplier;
+    /** 未乘会员倍率的基础消费积分 */
+    private Integer pointGiveBase;
     /**
      * 赠送积分发放时机快照，枚举 MemberPointGiveTimingEnum
      */

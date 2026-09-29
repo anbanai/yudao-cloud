@@ -22,6 +22,9 @@ public class MemberLevelRespDTO {
     @Schema(description = "享受折扣", requiredMode = Schema.RequiredMode.REQUIRED, example = "100")
     private Integer discountPercent;
 
+    @Schema(description = "消费返积分倍率，千分比", example = "1200")
+    private Integer pointTradeGiveMultiplier;
+
     @Schema(description = "状态", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status; // 参见 CommonStatusEnum 枚举
 

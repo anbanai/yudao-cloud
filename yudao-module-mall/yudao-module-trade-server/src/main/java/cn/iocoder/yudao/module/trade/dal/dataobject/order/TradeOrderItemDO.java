@@ -153,6 +153,12 @@ public class TradeOrderItemDO extends BaseDO {
      * 目的：用于后续取消或者售后订单时，需要扣减赠送
      */
     private Integer givePoint;
+    /** 消费返积分计算基数快照，单位：分 */
+    private Integer pointGiveCalculatePrice;
+    /** 消费返积分倍率快照，千分比 */
+    private Integer pointGiveMultiplier;
+    /** 未乘会员倍率的基础消费积分 */
+    private Integer pointGiveBase;
     /**
      * VIP 减免金额，单位：分
      */
@@ -208,4 +214,3 @@ public class TradeOrderItemDO extends BaseDO {
     }
 
 }
-
