@@ -147,3 +147,16 @@ UPDATE `trade_order_item` i
 JOIN `trade_order_sub` s ON s.`order_id` = i.`order_id` AND s.`merchant_id` = i.`merchant_id`
 SET i.`sub_order_id` = s.`id`
 WHERE i.`sub_order_id` IS NULL;
+
+-- 多商家商城管理菜单（超级管理员可直接使用，其他角色可在权限管理中授权）
+INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+VALUES
+(12740,'商家管理','',2,2,209,'merchant','ep:shop','mall/product/merchant/index','ProductMerchant',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12741,'商家查询','product:merchant:query',3,1,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12742,'商家创建','product:merchant:create',3,2,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12743,'商家更新','product:merchant:update',3,3,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12744,'商家审核','product:merchant:review',3,4,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12745,'资质查询','product:merchant-qualification:query',3,5,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12746,'资质创建','product:merchant-qualification:create',3,6,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12747,'资质更新','product:merchant-qualification:update',3,7,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(12748,'资质删除','product:merchant-qualification:delete',3,8,12740,'','','','',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0');
