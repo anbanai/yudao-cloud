@@ -27,6 +27,7 @@ public interface ErrorCodeConstants {
     ErrorCode ORDER_DELIVERY_FAIL_COMBINATION_RECORD_STATUS_NOT_SUCCESS = new ErrorCode(1_011_000_022, "交易订单发货失败，拼团未成功");
     ErrorCode ORDER_DELIVERY_FAIL_BARGAIN_RECORD_STATUS_NOT_SUCCESS = new ErrorCode(1_011_000_023, "交易订单发货失败，砍价未成功");
     ErrorCode ORDER_DELIVERY_FAIL_DELIVERY_TYPE_NOT_EXPRESS = new ErrorCode(1_011_000_024, "交易订单发货失败，发货类型不是快递");
+    ErrorCode ORDER_DELIVERY_FAIL_SUB_ORDER_REQUIRED = new ErrorCode(1_011_000_041, "交易订单发货失败，多商家订单必须指定商家履约订单");
     ErrorCode ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID = new ErrorCode(1_011_000_025, "交易订单取消失败，订单不是【待支付】状态");
     ErrorCode ORDER_UPDATE_PRICE_FAIL_PAID = new ErrorCode(1_011_000_026, "支付订单调价失败，原因：支付订单已付款,不能调价");
     ErrorCode ORDER_UPDATE_PRICE_FAIL_ALREADY = new ErrorCode(1_011_000_027, "支付订单调价失败，原因：已经修改过价格");
@@ -43,6 +44,7 @@ public interface ErrorCodeConstants {
     ErrorCode ORDER_CREATE_FAIL_INSUFFICIENT_USER_POINTS = new ErrorCode(1_011_000_038, "交易订单创建失败，原因：用户积分不足");
     ErrorCode ORDER_PICK_UP_FAIL_STATUS_NOT_UNDELIVERED = new ErrorCode(1_011_000_039, "交易订单自提失败，订单不是【待核销】状态");
     ErrorCode ORDER_CREATE_PRICE_CHANGED = new ErrorCode(1_011_000_040, "订单价格或积分抵扣已变化，请重新确认");
+    ErrorCode ORDER_CREATE_MERCHANT_REQUIRED = new ErrorCode(1_011_000_042, "交易订单创建失败，商品缺少有效商家归属，请先完成数据迁移");
 
     // ========== After Sale 模块 1-011-000-100 ==========
     ErrorCode AFTER_SALE_NOT_FOUND = new ErrorCode(1_011_000_100, "售后单不存在");

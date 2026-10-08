@@ -17,6 +17,9 @@ public interface LogisticsWaybillService {
     void cancelWaybill(Long id);
     List<LogisticsTraceRespVO> syncTrace(Long id);
     List<LogisticsTraceRespVO> getTrace(Long id);
-    void validateManualDelivery(Long orderId, Long logisticsId, String logisticsNo);
+    void validateManualDelivery(Long orderId, Long subOrderId, Long logisticsId, String logisticsNo);
+    default void validateManualDelivery(Long orderId, Long logisticsId, String logisticsNo) {
+        validateManualDelivery(orderId, null, logisticsId, logisticsNo);
+    }
     void deliverManually(TradeOrderDeliveryReqVO request);
 }

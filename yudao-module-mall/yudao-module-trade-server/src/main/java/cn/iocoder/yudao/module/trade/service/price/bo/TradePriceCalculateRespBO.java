@@ -167,6 +167,8 @@ public class TradePriceCalculateRespBO {
          * SPU 编号
          */
         private Long spuId;
+        private Long merchantId;
+        private String merchantName;
         /**
          * SKU 编号
          */

@@ -24,6 +24,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -135,12 +136,15 @@ public class TradeDeliveryPriceCalculator implements TradePriceCalculator {
     private void calculateDeliveryPrice(List<OrderItem> selectedSkus,
                                         Map<Long, DeliveryExpressTemplateRespBO> expressTemplateMap,
                                         TradePriceCalculateRespBO result) {
-        // 按商品运费模板来计算商品的运费：相同的运费模板可能对应多条订单商品 SKU
-        Map<Long, List<OrderItem>> template2ItemMap = convertMultiMap(selectedSkus, OrderItem::getDeliveryTemplateId);
+        // 按商家再按商品运费模板计算，避免不同商家共用模板时错误合并首重或包邮门槛。
+        Map<String, List<OrderItem>> merchantTemplate2ItemMap = new LinkedHashMap<>();
+        for (OrderItem item : selectedSkus) {
+            String key = String.valueOf(item.getMerchantId()) + "#" + item.getDeliveryTemplateId();
+            merchantTemplate2ItemMap.computeIfAbsent(key, ignored -> new java.util.ArrayList<>()).add(item);
+        }
         // 依次计算快递运费
-        for (Map.Entry<Long, List<OrderItem>> entry : template2ItemMap.entrySet()) {
-            Long templateId = entry.getKey();
-            List<OrderItem> orderItems = entry.getValue();
+        for (List<OrderItem> orderItems : merchantTemplate2ItemMap.values()) {
+            Long templateId = orderItems.get(0).getDeliveryTemplateId();
             DeliveryExpressTemplateRespBO templateBO = expressTemplateMap.get(templateId);
             if (templateBO == null) {
                 log.error("[calculateDeliveryPrice][不能计算快递运费，找不到 templateId({}) 对应的运费模板配置]", templateId);

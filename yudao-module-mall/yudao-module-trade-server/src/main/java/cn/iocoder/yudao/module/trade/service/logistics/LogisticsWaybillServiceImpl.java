@@ -17,9 +17,11 @@ import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliver
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.*;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.*;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
 import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsWaybillStatusEnum;
@@ -52,6 +54,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     @Resource private TradeOrderMapper orderMapper;
     @Resource private TradeOrderItemMapper orderItemMapper;
+    @Resource private TradeOrderSubMapper orderSubMapper;
     @Resource private TradeLogisticsAccountMapper accountMapper;
     @Resource private TradeLogisticsWaybillMapper waybillMapper;
     @Resource private TradeWechatLogisticsWaybillMapper wechatWaybillMapper;
@@ -88,6 +91,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     private CreationPreparation prepareCreation(LogisticsWaybillCreateReqVO request) {
         TradeOrderDO order = orderMapper.selectByIdForUpdate(request.getOrderId());
         validateOrder(order);
+        validateSubOrder(order, request.getSubOrderId());
         TradeWechatLogisticsWaybillDO wechatWaybill = wechatWaybillMapper.selectByOrderIdForUpdate(order.getId());
         if (wechatWaybill != null && List.of("CREATING", "CREATED", "UNKNOWN")
                 .contains(wechatWaybill.getStatus())) {
@@ -95,11 +99,13 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         }
         TradeLogisticsAccountDO account = getAccount(request.getAccountId());
         TradeLogisticsPrintDeviceDO device = getDevice(request.getDeviceId());
-        TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId());
+        TradeLogisticsWaybillDO waybill = request.getSubOrderId() == null
+                ? waybillMapper.selectByOrderIdForUpdate(order.getId())
+                : waybillMapper.selectByOrderIdForUpdate(order.getId(), request.getSubOrderId());
         boolean newRecord = false;
         if (waybill == null) {
             String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId();
-            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setOrderNo(order.getNo())
+            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setOrderNo(order.getNo())
                     .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
                     .setRequestedDeviceId(device.getId())
                     .setProviderOrderNo(providerOrderNo).setStatus(LogisticsWaybillStatusEnum.CREATING.name())
@@ -110,7 +116,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             if (LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
                 String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId()
                         + "-" + IdUtil.fastSimpleUUID();
-                waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setOrderNo(order.getNo())
+                waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setOrderNo(order.getNo())
                         .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
                         .setRequestedDeviceId(device.getId()).setProviderOrderNo(providerOrderNo)
                         .setStatus(LogisticsWaybillStatusEnum.CREATING.name()).setDeliveryStatus("PENDING");
@@ -136,6 +142,9 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                                      TradeOrderDO order) {
         try {
             List<TradeOrderItemDO> items = orderItemMapper.selectListByOrderId(order.getId());
+            if (waybill.getSubOrderId() != null) {
+                items.removeIf(item -> !waybill.getSubOrderId().equals(item.getSubOrderId()));
+            }
             Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Map.of()
                     : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId)
                             .collect(Collectors.toSet()));
@@ -363,9 +372,11 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void validateManualDelivery(Long orderId, Long logisticsId, String logisticsNo) {
+    public void validateManualDelivery(Long orderId, Long subOrderId, Long logisticsId, String logisticsNo) {
         orderMapper.selectByIdForUpdate(orderId);
-        TradeLogisticsWaybillDO waybill = waybillMapper.selectActiveByOrderId(orderId);
+        TradeLogisticsWaybillDO waybill = subOrderId == null
+                ? waybillMapper.selectActiveByOrderId(orderId)
+                : waybillMapper.selectActiveByOrderId(orderId, subOrderId);
         if (waybill == null || !List.of(LogisticsWaybillStatusEnum.CREATING.name(),
                 LogisticsWaybillStatusEnum.CREATED.name(), LogisticsWaybillStatusEnum.UNKNOWN.name(),
                 LogisticsWaybillStatusEnum.CANCELLING.name(), LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name())
@@ -375,10 +386,14 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         throw exception(LOGISTICS_WAYBILL_ALREADY_EXISTS);
     }
 
+    public void validateManualDelivery(Long orderId, Long logisticsId, String logisticsNo) {
+        validateManualDelivery(orderId, null, logisticsId, logisticsNo);
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deliverManually(TradeOrderDeliveryReqVO request) {
-        validateManualDelivery(request.getId(), request.getLogisticsId(), request.getLogisticsNo());
+        validateManualDelivery(request.getId(), request.getSubOrderId(), request.getLogisticsId(), request.getLogisticsNo());
         orderUpdateService.deliveryOrder(request);
     }
 
@@ -414,13 +429,24 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     }
 
     private LogisticsWaybillRespVO toResp(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task) {
-        return new LogisticsWaybillRespVO().setId(waybill.getId()).setOrderId(waybill.getOrderId())
+        return new LogisticsWaybillRespVO().setId(waybill.getId()).setOrderId(waybill.getOrderId()).setSubOrderId(waybill.getSubOrderId())
                 .setOrderNo(waybill.getOrderNo()).setProviderOrderNo(waybill.getProviderOrderNo())
                 .setWaybillNo(waybill.getWaybillNo()).setStatus(waybill.getStatus())
                 .setDeliveryStatus(waybill.getDeliveryStatus()).setPrintStatus(task == null ? null : task.getStatus())
                 .setJobId(task == null ? null : task.getJobId()).setDeviceId(task == null ? null : task.getDeviceId())
                 .setErrorCode(waybill.getErrorCode()).setErrorMessage(waybill.getErrorMessage())
                 .setCreateTime(waybill.getCreateTime());
+    }
+
+    private void validateSubOrder(TradeOrderDO order, Long subOrderId) {
+        if (subOrderId == null) {
+            return;
+        }
+        TradeOrderSubDO subOrder = orderSubMapper.selectById(subOrderId);
+        if (subOrder == null || !order.getId().equals(subOrder.getOrderId())
+                || !TradeOrderStatusEnum.isUndelivered(subOrder.getStatus())) {
+            throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+        }
     }
 
     private LogisticsPrintTaskRespVO toTaskResp(TradeLogisticsPrintTaskDO task) {

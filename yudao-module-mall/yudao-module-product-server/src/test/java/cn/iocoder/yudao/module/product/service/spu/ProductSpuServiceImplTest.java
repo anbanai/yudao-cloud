@@ -6,11 +6,13 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageRe
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSkuSaveReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.brand.ProductBrandDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
 import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +46,8 @@ class ProductSpuServiceImplTest {
     private ProductSkuService productSkuService;
     @Mock
     private ProductGroupService productGroupService;
+    @Mock
+    private ProductMerchantService merchantService;
 
     @Test
     void testGetAppSpuPageExpandsAllSelectedCategoryChildren() {
@@ -71,10 +75,11 @@ class ProductSpuServiceImplTest {
         ProductSkuSaveReqVO sku = new ProductSkuSaveReqVO()
                 .setPrice(100).setMarketPrice(120).setCostPrice(80).setStock(5);
         ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L)
-                .setCategoryId(9L).setBrandId(8L).setSpecType(false)
+                .setCategoryId(9L).setBrandId(8L).setMerchantId(1L).setSpecType(false)
                 .setSkus(List.of(sku)).setGroupIds(null);
         when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setStatus(1));
         when(categoryService.getCategoryLevel(9L)).thenReturn(2);
+        when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
 
         productSpuService.updateSpu(reqVO);
 

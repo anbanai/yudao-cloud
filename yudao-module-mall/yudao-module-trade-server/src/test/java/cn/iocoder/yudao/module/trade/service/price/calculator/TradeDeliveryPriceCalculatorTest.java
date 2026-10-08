@@ -88,6 +88,25 @@ class TradeDeliveryPriceCalculatorTest {
         assertThat(exception.getCode()).isEqualTo(PRICE_CALCULATE_DELIVERY_PRICE_TEMPLATE_NOT_FOUND.getCode());
     }
 
+    @Test
+    void calculate_sameTemplateAcrossMerchantsChargesEachMerchantSeparately() {
+        TradeDeliveryPriceCalculator calculator = newCalculator(650102,
+                Map.of(10L, templateBO(new DeliveryExpressTemplateRespBO.Charge()
+                        .setStartCount(1D).setStartPrice(1200).setExtraCount(1D).setExtraPrice(0), null)));
+        TradePriceCalculateReqBO param = new TradePriceCalculateReqBO()
+                .setUserId(2L).setAddressId(1L).setDeliveryType(DeliveryTypeEnum.EXPRESS.getType());
+        TradePriceCalculateRespBO result = priceResult(10L);
+        result.getItems().get(0).setMerchantId(1L);
+        result.setItems(new java.util.ArrayList<>(result.getItems()));
+        result.getItems().add(orderItem(10L).setMerchantId(2L));
+
+        calculator.calculate(param, result);
+
+        assertThat(result.getPrice().getDeliveryPrice()).isEqualTo(2400);
+        assertThat(result.getItems()).extracting(TradePriceCalculateRespBO.OrderItem::getDeliveryPrice)
+                .containsExactly(1200, 1200);
+    }
+
     private static TradeDeliveryPriceCalculator newCalculator(Integer areaId,
                                                                Map<Long, DeliveryExpressTemplateRespBO> templates) {
         MemberAddressApi addressApi = mock(MemberAddressApi.class);

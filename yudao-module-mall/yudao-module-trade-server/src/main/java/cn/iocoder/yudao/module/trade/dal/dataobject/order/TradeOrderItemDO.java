@@ -40,6 +40,8 @@ public class TradeOrderItemDO extends BaseDO {
      * 关联 {@link TradeOrderDO#getId()}
      */
     private Long orderId;
+    /** 商家履约子订单编号 */
+    private Long subOrderId;
     /**
      * 购物车项编号
      *
@@ -54,6 +56,9 @@ public class TradeOrderItemDO extends BaseDO {
      * 关联 ProductSkuDO 的 spuId 编号
      */
     private Long spuId;
+    /** 商家编号及名称快照 */
+    private Long merchantId;
+    private String merchantName;
     /**
      * 商品 SPU 名称
      *

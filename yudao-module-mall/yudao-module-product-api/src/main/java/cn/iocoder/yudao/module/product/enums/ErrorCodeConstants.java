@@ -58,4 +58,12 @@ public interface ErrorCodeConstants {
     ErrorCode GROUP_DISABLED = new ErrorCode(1_008_009_002, "商品分组已禁用");
     ErrorCode GROUP_HAVE_BIND_SPU = new ErrorCode(1_008_009_003, "分组下存在商品，无法删除");
 
+    // ========== 商家相关 1-008-010-000 ==========
+    ErrorCode MERCHANT_NOT_EXISTS = new ErrorCode(1_008_010_000, "商家不存在");
+    ErrorCode MERCHANT_NOT_AVAILABLE = new ErrorCode(1_008_010_001, "商家未审核通过或已被冻结");
+    ErrorCode MERCHANT_NAME_EXISTS = new ErrorCode(1_008_010_002, "商家名称已存在");
+    ErrorCode MERCHANT_QUALIFICATION_NOT_EXISTS = new ErrorCode(1_008_010_003, "商家资质不存在");
+    ErrorCode MERCHANT_REVIEW_STATUS_ERROR = new ErrorCode(1_008_010_004, "商家当前状态不允许执行审核操作");
+    ErrorCode BRAND_MERCHANT_MISMATCH = new ErrorCode(1_008_010_005, "品牌不属于当前商家");
+
 }

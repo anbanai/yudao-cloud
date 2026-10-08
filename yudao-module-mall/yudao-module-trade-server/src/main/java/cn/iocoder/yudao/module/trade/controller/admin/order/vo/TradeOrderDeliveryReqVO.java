@@ -13,6 +13,9 @@ public class TradeOrderDeliveryReqVO {
     @NotNull(message = "订单编号不能为空")
     private Long id;
 
+    @Schema(description = "商家履约订单编号；多商家订单发货时必填", example = "2048")
+    private Long subOrderId;
+
     @Schema(description = "发货物流公司编号", example = "1")
     @NotNull(message = "发货物流公司不能为空")
     private Long logisticsId;

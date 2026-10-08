@@ -14,8 +14,10 @@ import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderPageRe
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
 import cn.iocoder.yudao.module.trade.dal.redis.RedisKeyConstants;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
@@ -50,6 +52,8 @@ public class TradeOrderQueryServiceImpl implements TradeOrderQueryService {
     private TradeOrderMapper tradeOrderMapper;
     @Resource
     private TradeOrderItemMapper tradeOrderItemMapper;
+    @Resource
+    private TradeOrderSubMapper tradeOrderSubMapper;
 
     @Resource
     private DeliveryExpressService deliveryExpressService;
@@ -246,6 +250,11 @@ public class TradeOrderQueryServiceImpl implements TradeOrderQueryService {
             return Collections.emptyList();
         }
         return tradeOrderItemMapper.selectListByOrderId(orderIds);
+    }
+
+    @Override
+    public List<TradeOrderSubDO> getOrderSubListByOrderId(Long orderId) {
+        return tradeOrderSubMapper.selectListByOrderId(orderId);
     }
 
     /**

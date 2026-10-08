@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS `product_spu` (
     `bar_code` varchar(64) NOT NULL COMMENT '条形码',
     `category_id` bigint NOT NULL COMMENT '商品分类编号',
     `brand_id` int DEFAULT NULL COMMENT '商品品牌编号',
+    `merchant_id` bigint DEFAULT NULL COMMENT '商品销售商家编号',
     `pic_url` varchar(256) NOT NULL COMMENT '商品封面图',
     `slider_pic_urls` varchar(2000)  DEFAULT '' COMMENT '商品轮播图地址\n 数组，以逗号分隔\n 最多上传15张',
     `video_url` varchar(256) DEFAULT NULL COMMENT '商品视频',
@@ -115,6 +116,7 @@ CREATE TABLE IF NOT EXISTS `product_group_spu` (
 
 CREATE TABLE IF NOT EXISTS `product_brand` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '品牌编号',
+    `merchant_id` bigint DEFAULT NULL COMMENT '品牌默认归属商家编号',
     `name` varchar(255) NOT NULL COMMENT '品牌名称',
     `pic_url` varchar(255) NOT NULL COMMENT '品牌图片',
     `sort` int DEFAULT '0' COMMENT '品牌排序',
@@ -128,6 +130,49 @@ CREATE TABLE IF NOT EXISTS `product_brand` (
     "tenant_id" bigint not null default  '0',
     PRIMARY KEY("id")
 ) COMMENT '商品品牌';
+
+CREATE TABLE IF NOT EXISTS `product_merchant` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商家编号',
+    `name` varchar(128) NOT NULL COMMENT '商家名称',
+    `store_name` varchar(128) DEFAULT NULL COMMENT '店铺名称',
+    `logo_url` varchar(512) DEFAULT NULL COMMENT '店铺 logo',
+    `company_name` varchar(255) DEFAULT NULL COMMENT '企业主体名称',
+    `credit_code` varchar(64) DEFAULT NULL COMMENT '统一社会信用代码',
+    `legal_person` varchar(64) DEFAULT NULL COMMENT '法人',
+    `contact_name` varchar(64) DEFAULT NULL COMMENT '联系人',
+    `contact_mobile` varchar(32) DEFAULT NULL COMMENT '联系手机',
+    `status` tinyint NOT NULL DEFAULT 0 COMMENT '入驻状态',
+    `reviewer_id` bigint DEFAULT NULL COMMENT '审核人',
+    `review_time` datetime DEFAULT NULL COMMENT '审核时间',
+    `reject_reason` varchar(512) DEFAULT NULL COMMENT '驳回原因',
+    `creator` varchar(64) DEFAULT '',
+    `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '',
+    `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE,
+    `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+) COMMENT '平台商家';
+
+CREATE TABLE IF NOT EXISTS `product_merchant_qualification` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '资质编号',
+    `merchant_id` bigint NOT NULL COMMENT '商家编号',
+    `type` varchar(64) NOT NULL COMMENT '资质类型',
+    `certificate_no` varchar(128) DEFAULT NULL COMMENT '证件编号',
+    `file_url` varchar(1024) NOT NULL COMMENT '证件文件',
+    `valid_start` date DEFAULT NULL COMMENT '有效期开始',
+    `valid_end` date DEFAULT NULL COMMENT '有效期结束',
+    `status` tinyint NOT NULL DEFAULT 10 COMMENT '审核状态',
+    `reviewer_id` bigint DEFAULT NULL COMMENT '审核人',
+    `review_reason` varchar(512) DEFAULT NULL COMMENT '审核意见',
+    `creator` varchar(64) DEFAULT '',
+    `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '',
+    `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE,
+    `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+) COMMENT '商家资质';
 
 CREATE TABLE IF NOT EXISTS `product_property` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',

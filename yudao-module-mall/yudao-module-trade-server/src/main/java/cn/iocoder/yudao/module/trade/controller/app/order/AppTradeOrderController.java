@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.controller.app.order;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.*;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemCommentCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemRespVO;
@@ -113,11 +114,14 @@ public class AppTradeOrderController {
 
         // 2.1 查询订单项
         List<TradeOrderItemDO> orderItems = tradeOrderQueryService.getOrderItemListByOrderId(order.getId());
+        List<cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO> subOrders = tradeOrderQueryService.getOrderSubListByOrderId(order.getId());
         // 2.2 查询物流公司
         DeliveryExpressDO express = order.getLogisticsId() != null && order.getLogisticsId() > 0 ?
                 deliveryExpressService.getDeliveryExpress(order.getLogisticsId()) : null;
         // 2.3 最终组合
-        return success(TradeOrderConvert.INSTANCE.convert02(order, orderItems, tradeOrderProperties, express));
+        AppTradeOrderDetailRespVO result = TradeOrderConvert.INSTANCE.convert02(order, orderItems, tradeOrderProperties, express);
+        result.setSubOrders(BeanUtils.toBean(subOrders, AppTradeOrderSubRespVO.class));
+        return success(result);
     }
 
     @GetMapping("/get-express-track-list")

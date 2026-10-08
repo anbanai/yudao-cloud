@@ -4,6 +4,8 @@ DELETE FROM "product_category";
 DELETE FROM "product_group_spu";
 DELETE FROM "product_group";
 DELETE FROM "product_brand";
+DELETE FROM "product_merchant_qualification";
+DELETE FROM "product_merchant";
 DELETE FROM "product_property";
 DELETE FROM "product_property_value";
 DELETE FROM "product_comment";

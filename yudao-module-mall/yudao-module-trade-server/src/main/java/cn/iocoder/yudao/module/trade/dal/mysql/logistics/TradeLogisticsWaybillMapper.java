@@ -18,14 +18,24 @@ public interface TradeLogisticsWaybillMapper extends BaseMapperX<TradeLogisticsW
     }
 
     default TradeLogisticsWaybillDO selectByOrderIdForUpdate(Long orderId) {
+        return selectByOrderIdForUpdate(orderId, null);
+    }
+
+    default TradeLogisticsWaybillDO selectByOrderIdForUpdate(Long orderId, Long subOrderId) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
                 .eq(TradeLogisticsWaybillDO::getOrderId, orderId)
+                .eqIfPresent(TradeLogisticsWaybillDO::getSubOrderId, subOrderId)
                 .orderByDesc(TradeLogisticsWaybillDO::getId).last("LIMIT 1 FOR UPDATE"));
     }
 
     default TradeLogisticsWaybillDO selectActiveByOrderId(Long orderId) {
+        return selectActiveByOrderId(orderId, null);
+    }
+
+    default TradeLogisticsWaybillDO selectActiveByOrderId(Long orderId, Long subOrderId) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsWaybillDO>()
                 .eq(TradeLogisticsWaybillDO::getOrderId, orderId)
+                .eqIfPresent(TradeLogisticsWaybillDO::getSubOrderId, subOrderId)
                 .in(TradeLogisticsWaybillDO::getStatus, List.of("CREATING", "CREATED", "UNKNOWN",
                         "CANCELLING", "CANCEL_UNKNOWN"))
                 .orderByDesc(TradeLogisticsWaybillDO::getId).last("LIMIT 1"));

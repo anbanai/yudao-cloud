@@ -1,7 +1,12 @@
 DELETE FROM trade_order;
 DELETE FROM trade_order_item;
+DELETE FROM trade_order_sub;
 DELETE FROM trade_after_sale;
 DELETE FROM trade_after_sale_log;
+DELETE FROM trade_after_sale_return_trace;
+DELETE FROM trade_after_sale_return_shipment;
+DELETE FROM trade_report_history_detail;
+DELETE FROM trade_report_history;
 DELETE FROM trade_brokerage_user;
 DELETE FROM trade_brokerage_record;
 DELETE FROM "trade_brokerage_withdraw";

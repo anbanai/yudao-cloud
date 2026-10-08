@@ -23,6 +23,9 @@ public class ProductBrandPageReqVO extends PageParam {
     @Schema(description = "状态", example = "0")
     private Integer status;
 
+    @Schema(description = "商家编号")
+    private Long merchantId;
+
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     @Schema(description = "创建时间")
     private LocalDateTime[] createTime;

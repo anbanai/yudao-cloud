@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
 import cn.iocoder.yudao.module.product.convert.spu.ProductSpuConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,22 +29,38 @@ public class ProductSpuApiImpl implements ProductSpuApi {
     @Resource
     private ProductSpuService spuService;
 
+    @Resource
+    private ProductMerchantService merchantService;
+
     @Override
     public CommonResult<List<ProductSpuRespDTO>> getSpuList(Collection<Long> ids) {
         List<ProductSpuDO> spus = spuService.getSpuList(ids);
-        return success(BeanUtils.toBean(spus, ProductSpuRespDTO.class));
+        return success(convertWithMerchant(spus));
     }
 
     @Override
     public CommonResult<List<ProductSpuRespDTO>> validateSpuList(Collection<Long> ids) {
         List<ProductSpuDO> spus = spuService.validateSpuList(ids);
-        return success(BeanUtils.toBean(spus, ProductSpuRespDTO.class));
+        return success(convertWithMerchant(spus));
     }
 
     @Override
     public CommonResult<ProductSpuRespDTO> getSpu(Long id) {
         ProductSpuDO spu = spuService.getSpu(id);
-        return success(BeanUtils.toBean(spu, ProductSpuRespDTO.class));
+        return success(spu == null ? null : convertWithMerchant(java.util.List.of(spu)).get(0));
+    }
+
+    private List<ProductSpuRespDTO> convertWithMerchant(List<ProductSpuDO> spus) {
+        List<ProductSpuRespDTO> result = BeanUtils.toBean(spus, ProductSpuRespDTO.class);
+        result.forEach(dto -> {
+            if (dto.getMerchantId() != null) {
+                var merchant = merchantService.getMerchant(dto.getMerchantId());
+                if (merchant != null) {
+                    dto.setMerchantName(merchant.getStoreName() != null ? merchant.getStoreName() : merchant.getName());
+                }
+            }
+        });
+        return result;
     }
 
 }

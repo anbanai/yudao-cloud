@@ -154,4 +154,7 @@ public class AppTradeOrderDetailRespVO {
      */
     private List<AppTradeOrderItemRespVO> items;
 
+    /** 按商家拆分的履约订单 */
+    private List<AppTradeOrderSubRespVO> subOrders;
+
 }

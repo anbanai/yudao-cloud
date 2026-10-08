@@ -13,12 +13,14 @@ import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReq
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuUpdateStatusReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.brand.ProductBrandDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
 import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
@@ -56,12 +58,16 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     @Resource
     private ProductGroupService productGroupService;
 
+    @Resource
+    private ProductMerchantService merchantService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createSpu(ProductSpuSaveReqVO createReqVO) {
         // 校验分类、品牌
         validateCategory(createReqVO.getCategoryId());
         brandService.validateProductBrand(createReqVO.getBrandId());
+        validateMerchantAndBrand(createReqVO.getMerchantId(), createReqVO.getBrandId());
         // 校验 SKU
         List<ProductSkuSaveReqVO> skuSaveReqList = createReqVO.getSkus();
         productSkuService.validateSkuList(skuSaveReqList, createReqVO.getSpecType());
@@ -86,6 +92,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验分类、品牌
         validateCategory(updateReqVO.getCategoryId());
         brandService.validateProductBrand(updateReqVO.getBrandId());
+        validateMerchantAndBrand(updateReqVO.getMerchantId(), updateReqVO.getBrandId());
         // 校验SKU
         List<ProductSkuSaveReqVO> skuSaveReqList = updateReqVO.getSkus();
         productSkuService.validateSkuList(skuSaveReqList, updateReqVO.getSpecType());
@@ -133,6 +140,18 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验层级
         if (categoryService.getCategoryLevel(id) < CATEGORY_LEVEL) {
             throw exception(SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR);
+        }
+    }
+
+    private void validateMerchantAndBrand(Long merchantId, Long brandId) {
+        merchantService.validateMerchantAvailable(merchantId);
+        brandService.validateProductBrand(brandId);
+        ProductBrandDO brand = brandService.getBrand(brandId);
+        if (brand == null) {
+            throw exception(BRAND_NOT_EXISTS);
+        }
+        if (!Objects.equals(merchantId, brand.getMerchantId())) {
+            throw exception(BRAND_MERCHANT_MISMATCH);
         }
     }
 

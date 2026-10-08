@@ -222,6 +222,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             return;
         }
         orderUpdateService.deliveryOrder(new TradeOrderDeliveryReqVO().setId(waybill.getOrderId())
+                .setSubOrderId(waybill.getSubOrderId())
                 .setLogisticsId(waybill.getLogisticsId()).setLogisticsNo(waybill.getWaybillNo()));
         waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
                 .setDeliveryStatus("DELIVERED").setDeliveredTime(LocalDateTime.now()));

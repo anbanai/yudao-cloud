@@ -47,8 +47,10 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryPickUpStoreDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
 import cn.iocoder.yudao.module.trade.dal.redis.no.TradeNoRedisDAO;
 import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.order.*;
@@ -75,6 +77,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -100,6 +103,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     private TradeOrderMapper tradeOrderMapper;
     @Resource
     private TradeOrderItemMapper tradeOrderItemMapper;
+
+    @Resource
+    private TradeOrderSubMapper tradeOrderSubMapper;
     @Resource
     private MemberConfigApi memberConfigApi;
     @Resource
@@ -202,11 +208,27 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 3. 保存订单
         tradeOrderMapper.insert(order);
         orderItems.forEach(orderItem -> orderItem.setOrderId(order.getId()));
+        createSubOrders(order, orderItems);
         tradeOrderItemMapper.insertBatch(orderItems);
 
         // 4. 订单创建后的逻辑
         afterCreateTradeOrder(order, orderItems, createReqVO);
         return order;
+    }
+
+    /** 按商家创建履约订单，支付仍由主订单统一承载。 */
+    private void createSubOrders(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
+        orderItems.forEach(item -> {
+            if (item.getMerchantId() == null || StrUtil.isBlank(item.getMerchantName())) {
+                throw exception(ORDER_CREATE_MERCHANT_REQUIRED);
+            }
+        });
+        for (TradeOrderSubOrderAssembler.Group group : TradeOrderSubOrderAssembler.assemble(order, orderItems)) {
+            TradeOrderSubDO subOrder = group.subOrder()
+                    .setNo(tradeNoRedisDAO.generate(TradeNoRedisDAO.TRADE_ORDER_NO_PREFIX));
+            tradeOrderSubMapper.insert(subOrder);
+            group.items().forEach(item -> item.setSubOrderId(subOrder.getId()));
+        }
     }
 
     void validateExpectedPrice(Long userId, AppTradeOrderCreateReqVO createReqVO,
@@ -333,6 +355,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (updateCount == 0) {
             throw exception(ORDER_UPDATE_PAID_STATUS_NOT_UNPAID);
         }
+        tradeOrderSubMapper.updateStatusByOrderId(id, TradeOrderStatusEnum.UNPAID.getStatus(),
+                TradeOrderStatusEnum.UNDELIVERED.getStatus());
 
         // 4. 执行 TradeOrderHandler 的后置处理
         List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(id);
@@ -406,6 +430,27 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             throw exception(ORDER_DELIVERY_FAIL_DELIVERY_TYPE_NOT_EXPRESS);
         }
 
+        // 多商家订单按商家履约订单独立发货；没有子单的数据继续走历史主订单逻辑。
+        List<TradeOrderSubDO> subOrders = tradeOrderSubMapper.selectListByOrderId(order.getId());
+        TradeOrderSubDO subOrder = null;
+        if (!subOrders.isEmpty()) {
+            if (deliveryReqVO.getSubOrderId() == null) {
+                if (subOrders.size() > 1) {
+                    throw exception(ORDER_DELIVERY_FAIL_SUB_ORDER_REQUIRED);
+                }
+                subOrder = subOrders.get(0);
+            } else {
+                subOrder = subOrders.stream().filter(item -> Objects.equals(item.getId(), deliveryReqVO.getSubOrderId()))
+                        .findFirst().orElseThrow(() -> exception(ORDER_NOT_FOUND));
+            }
+            if (!TradeOrderStatusEnum.isUndelivered(subOrder.getStatus())) {
+                throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+            }
+            if (ObjectUtil.notEqual(subOrder.getRefundStatus(), TradeOrderRefundStatusEnum.NONE.getStatus())) {
+                throw exception(ORDER_DELIVERY_FAIL_REFUND_STATUS_NOT_NONE);
+            }
+        }
+
         // 2. 更新订单为已发货
         TradeOrderDO updateOrderObj = new TradeOrderDO();
         // 2.1 快递发货
@@ -417,28 +462,59 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             // 2.2 无需发货
             updateOrderObj.setLogisticsId(0L).setLogisticsNo("");
         }
-        // 执行更新
-        updateOrderObj.setStatus(TradeOrderStatusEnum.DELIVERED.getStatus()).setDeliveryTime(LocalDateTime.now());
-        int updateCount = tradeOrderMapper.updateByIdAndStatus(order.getId(), order.getStatus(), updateOrderObj);
-        if (updateCount == 0) {
-            throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+        // 执行更新。子单发货后，只有全部子单发货才推进平台主订单状态。
+        LocalDateTime deliveryTime = LocalDateTime.now();
+        boolean parentDelivered = subOrder == null;
+        updateOrderObj.setStatus(TradeOrderStatusEnum.DELIVERED.getStatus()).setDeliveryTime(deliveryTime);
+        if (subOrder == null) {
+            int updateCount = tradeOrderMapper.updateByIdAndStatus(order.getId(), order.getStatus(), updateOrderObj);
+            if (updateCount == 0) {
+                throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+            }
+        } else {
+            int updateCount = tradeOrderSubMapper.updateByIdAndStatus(subOrder.getId(), subOrder.getStatus(),
+                    new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.DELIVERED.getStatus())
+                            .setLogisticsId(updateOrderObj.getLogisticsId()).setLogisticsNo(updateOrderObj.getLogisticsNo())
+                            .setDeliveryTime(deliveryTime));
+            if (updateCount == 0) {
+                throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+            }
+            Long deliveredSubOrderId = subOrder.getId();
+            boolean allDelivered = subOrders.stream().allMatch(item -> Objects.equals(item.getId(), deliveredSubOrderId)
+                    || TradeOrderStatusEnum.haveDelivered(item.getStatus()));
+            if (allDelivered) {
+                parentDelivered = true;
+                if (subOrders.size() == 1) {
+                    int parentUpdateCount = tradeOrderMapper.updateByIdAndStatus(order.getId(), order.getStatus(), updateOrderObj);
+                    if (parentUpdateCount == 0) {
+                        throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
+                    }
+                } else {
+                    tradeOrderMapper.updateById(new TradeOrderDO().setId(order.getId())
+                            .setStatus(TradeOrderStatusEnum.DELIVERED.getStatus()).setDeliveryTime(deliveryTime));
+                }
+            }
         }
 
         // 3. 记录订单日志
-        TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), TradeOrderStatusEnum.DELIVERED.getStatus(),
+        Integer logStatus = !parentDelivered
+                ? order.getStatus() : TradeOrderStatusEnum.DELIVERED.getStatus();
+        TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), logStatus,
                 MapUtil.<String, Object>builder().put("expressName", express != null ? express.getName() : "")
                         .put("logisticsNo", express != null ? deliveryReqVO.getLogisticsNo() : "").build());
 
-        // 4.1 发送站内信
-        tradeMessageService.sendMessageWhenDeliveryOrder(new TradeOrderMessageWhenDeliveryOrderReqBO()
-                .setOrderId(order.getId()).setUserId(order.getUserId()).setMessage(null));
-        // 4.2 发送订阅消息
-        getSelf().sendDeliveryOrderMessage(order, deliveryReqVO);
+        if (parentDelivered) {
+            // 4.1 发送站内信
+            tradeMessageService.sendMessageWhenDeliveryOrder(new TradeOrderMessageWhenDeliveryOrderReqBO()
+                    .setOrderId(order.getId()).setUserId(order.getUserId()).setMessage(null));
+            // 4.2 发送订阅消息
+            getSelf().sendDeliveryOrderMessage(order, deliveryReqVO);
 
-        // 5. 处理订单发货后逻辑
-        order.setLogisticsId(updateOrderObj.getLogisticsId()).setLogisticsNo(updateOrderObj.getLogisticsNo())
-                .setStatus(updateOrderObj.getStatus()).setDeliveryTime(updateOrderObj.getDeliveryTime());
-        tradeOrderHandlers.forEach(handler -> handler.afterDeliveryOrder(order));
+            // 5. 处理订单发货后逻辑
+            order.setLogisticsId(updateOrderObj.getLogisticsId()).setLogisticsNo(updateOrderObj.getLogisticsNo())
+                    .setStatus(updateOrderObj.getStatus()).setDeliveryTime(updateOrderObj.getDeliveryTime());
+            tradeOrderHandlers.forEach(handler -> handler.afterDeliveryOrder(order));
+        }
     }
 
     @Async
@@ -544,6 +620,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (updateCount == 0) {
             throw exception(ORDER_RECEIVE_FAIL_STATUS_NOT_DELIVERED);
         }
+        tradeOrderSubMapper.updateByOrderId(order.getId(), new TradeOrderSubDO()
+                .setStatus(TradeOrderStatusEnum.COMPLETED.getStatus()).setReceiveTime(receiveTime));
 
         // 2. 插入订单日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), TradeOrderStatusEnum.COMPLETED.getStatus());
@@ -659,6 +737,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (updateCount == 0) {
             throw exception(ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID);
         }
+        tradeOrderSubMapper.updateByOrderId(order.getId(), new TradeOrderSubDO()
+                .setStatus(TradeOrderStatusEnum.CANCELED.getStatus()));
 
         // 2. 执行 TradeOrderHandler 的后置处理
         List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(order.getId());
@@ -684,6 +764,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         tradeOrderMapper.updateById(new TradeOrderDO().setId(order.getId())
                 .setStatus(TradeOrderStatusEnum.CANCELED.getStatus())
                 .setCancelType(TradeOrderCancelTypeEnum.AFTER_SALE_CLOSE.getType()).setCancelTime(LocalDateTime.now()));
+        tradeOrderSubMapper.updateByOrderId(order.getId(), new TradeOrderSubDO()
+                .setStatus(TradeOrderStatusEnum.CANCELED.getStatus()));
 
         // 2. 执行 TradeOrderHandler 的后置处理
         List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(order.getId());
@@ -705,6 +787,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         }
         // 2. 删除订单
         tradeOrderMapper.deleteById(id);
+        tradeOrderSubMapper.deleteByOrderId(id);
 
         // 3. 记录日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), order.getStatus());
@@ -754,6 +837,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                     .setPayPrice(item.getPayPrice() + dividePrices.get(i)));
         }
         tradeOrderItemMapper.updateBatch(updateItems);
+        syncSubOrderAmounts(order.getId(), orderOrderItems);
 
         // 4. 更新支付订单
         payOrderApi.updatePayOrderPrice(order.getPayOrderId(), newPayPrice).checkError();
@@ -763,6 +847,30 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                 MapUtil.<String, Object>builder().put("oldPayPrice", MoneyUtils.fenToYuanStr(order.getPayPrice()))
                         .put("adjustPrice", MoneyUtils.fenToYuanStr(reqVO.getAdjustPrice()))
                         .put("newPayPrice", MoneyUtils.fenToYuanStr(newPayPrice)).build());
+    }
+
+    /** 调价后同步商家履约订单金额，保证主订单与履约订单快照一致。 */
+    private void syncSubOrderAmounts(Long orderId, List<TradeOrderItemDO> orderItems) {
+        List<TradeOrderSubDO> subOrders = tradeOrderSubMapper.selectListByOrderId(orderId);
+        if (subOrders.isEmpty()) {
+            return;
+        }
+        Map<Long, TradeOrderSubDO> subOrderMap = new java.util.HashMap<>();
+        subOrders.forEach(subOrder -> subOrderMap.put(subOrder.getMerchantId(), subOrder));
+        TradeOrderDO order = new TradeOrderDO().setId(orderId);
+        for (TradeOrderSubOrderAssembler.Group group : TradeOrderSubOrderAssembler.assemble(order, orderItems)) {
+            TradeOrderSubDO existing = subOrderMap.get(group.subOrder().getMerchantId());
+            if (existing == null) {
+                continue;
+            }
+            TradeOrderSubDO calculated = group.subOrder();
+            tradeOrderSubMapper.updateById(new TradeOrderSubDO().setId(existing.getId())
+                    .setProductCount(calculated.getProductCount()).setTotalPrice(calculated.getTotalPrice())
+                    .setDiscountPrice(calculated.getDiscountPrice()).setCouponPrice(calculated.getCouponPrice())
+                    .setPointPrice(calculated.getPointPrice()).setVipPrice(calculated.getVipPrice())
+                    .setAdjustPrice(calculated.getAdjustPrice()).setDeliveryPrice(calculated.getDeliveryPrice())
+                    .setPayPrice(calculated.getPayPrice()));
+        }
     }
 
     @Override
@@ -834,6 +942,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 更新订单项
         updateOrderItemAfterSaleStatus(id, TradeOrderItemAfterSaleStatusEnum.NONE.getStatus(),
                 TradeOrderItemAfterSaleStatusEnum.APPLY.getStatus(), afterSaleId);
+        TradeOrderItemDO item = tradeOrderItemMapper.selectById(id);
+        if (item != null && item.getSubOrderId() != null) {
+            tradeOrderSubMapper.updateById(new TradeOrderSubDO().setId(item.getSubOrderId())
+                    .setAfterSaleStatus(TradeOrderItemAfterSaleStatusEnum.APPLY.getStatus()));
+        }
     }
 
     @Override
@@ -845,6 +958,16 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 1.2 执行 TradeOrderHandler 的后置处理
         TradeOrderItemDO orderItem = tradeOrderItemMapper.selectById(id);
         TradeOrderDO order = tradeOrderMapper.selectById(orderItem.getOrderId());
+        if (orderItem.getSubOrderId() != null) {
+            List<TradeOrderItemDO> subItems = tradeOrderItemMapper.selectListBySubOrderId(orderItem.getSubOrderId());
+            boolean allSuccess = subItems.stream().allMatch(item -> Objects.equals(item.getAfterSaleStatus(),
+                    TradeOrderItemAfterSaleStatusEnum.SUCCESS.getStatus()));
+            tradeOrderSubMapper.updateById(new TradeOrderSubDO().setId(orderItem.getSubOrderId())
+                    .setAfterSaleStatus(allSuccess ? TradeOrderItemAfterSaleStatusEnum.SUCCESS.getStatus()
+                            : TradeOrderItemAfterSaleStatusEnum.APPLY.getStatus())
+                    .setRefundStatus(allSuccess ? TradeOrderRefundStatusEnum.ALL.getStatus()
+                            : TradeOrderRefundStatusEnum.PART.getStatus()));
+        }
         tradeOrderHandlers.forEach(handler -> handler.afterCancelOrderItem(order, orderItem));
 
         // 2.1 更新订单的退款金额、积分

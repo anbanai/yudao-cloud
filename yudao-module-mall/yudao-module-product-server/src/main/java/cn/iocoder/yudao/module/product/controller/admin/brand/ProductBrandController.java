@@ -6,7 +6,9 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.admin.brand.vo.*;
 import cn.iocoder.yudao.module.product.convert.brand.ProductBrandConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.brand.ProductBrandDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +31,9 @@ public class ProductBrandController {
 
     @Resource
     private ProductBrandService brandService;
+
+    @Resource
+    private ProductMerchantService merchantService;
 
     @PostMapping("/create")
     @Operation(summary = "创建品牌")
@@ -60,16 +65,29 @@ public class ProductBrandController {
     @PreAuthorize("@ss.hasPermission('product:brand:query')")
     public CommonResult<ProductBrandRespVO> getBrand(@RequestParam("id") Long id) {
         ProductBrandDO brand = brandService.getBrand(id);
-        return success(ProductBrandConvert.INSTANCE.convert(brand));
+        ProductBrandRespVO result = ProductBrandConvert.INSTANCE.convert(brand);
+        if (result != null) {
+            fillMerchantName(result);
+        }
+        return success(result);
     }
 
     @GetMapping("/list-all-simple")
     @Operation(summary = "获取品牌精简信息列表", description = "主要用于前端的下拉选项")
-    public CommonResult<List<ProductBrandSimpleRespVO>> getSimpleBrandList() {
+    public CommonResult<List<ProductBrandSimpleRespVO>> getSimpleBrandList(
+            @RequestParam(value = "merchantId", required = false) Long merchantId) {
         // 获取品牌列表，只要开启状态的
         List<ProductBrandDO> list = brandService.getBrandListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        if (merchantId != null) {
+            list.removeIf(brand -> !merchantId.equals(brand.getMerchantId()));
+        }
         // 排序后，返回给前端
-        return success(ProductBrandConvert.INSTANCE.convertList1(list));
+        List<ProductBrandSimpleRespVO> result = ProductBrandConvert.INSTANCE.convertList1(list);
+        result.forEach(item -> {
+            ProductMerchantDO merchant = item.getMerchantId() == null ? null : merchantService.getMerchant(item.getMerchantId());
+            item.setMerchantName(merchant == null ? null : merchant.getStoreName() != null ? merchant.getStoreName() : merchant.getName());
+        });
+        return success(result);
     }
 
     @GetMapping("/page")
@@ -77,7 +95,9 @@ public class ProductBrandController {
     @PreAuthorize("@ss.hasPermission('product:brand:query')")
     public CommonResult<PageResult<ProductBrandRespVO>> getBrandPage(@Valid ProductBrandPageReqVO pageVO) {
         PageResult<ProductBrandDO> pageResult = brandService.getBrandPage(pageVO);
-        return success(ProductBrandConvert.INSTANCE.convertPage(pageResult));
+        PageResult<ProductBrandRespVO> result = ProductBrandConvert.INSTANCE.convertPage(pageResult);
+        result.getList().forEach(this::fillMerchantName);
+        return success(result);
     }
 
     @GetMapping("/list")
@@ -86,7 +106,19 @@ public class ProductBrandController {
     public CommonResult<List<ProductBrandRespVO>> getBrandList(@Valid ProductBrandListReqVO listVO) {
         List<ProductBrandDO> list = brandService.getBrandList(listVO);
         list.sort(Comparator.comparing(ProductBrandDO::getSort));
-        return success(ProductBrandConvert.INSTANCE.convertList(list));
+        List<ProductBrandRespVO> result = ProductBrandConvert.INSTANCE.convertList(list);
+        result.forEach(this::fillMerchantName);
+        return success(result);
+    }
+
+    private void fillMerchantName(ProductBrandRespVO brand) {
+        if (brand.getMerchantId() == null) {
+            return;
+        }
+        ProductMerchantDO merchant = merchantService.getMerchant(brand.getMerchantId());
+        if (merchant != null) {
+            brand.setMerchantName(merchant.getStoreName() != null ? merchant.getStoreName() : merchant.getName());
+        }
     }
 
 }
