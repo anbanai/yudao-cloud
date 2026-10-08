@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO
 import cn.iocoder.yudao.module.product.dal.dataobject.brand.ProductBrandDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
+import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
 import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
@@ -88,6 +89,17 @@ class ProductSpuServiceImplTest {
         assertEquals(9L, spuCaptor.getValue().getCategoryId());
         verify(categoryService).validateCategory(9L);
         verify(productGroupService).syncSpuGroups(100L, null);
+    }
+
+    @Test
+    void testValidateSpuListChecksMerchantAvailability() {
+        ProductSpuDO spu = new ProductSpuDO().setId(100L).setName("茶叶")
+                .setStatus(ProductSpuStatusEnum.ENABLE.getStatus()).setMerchantId(9L);
+        when(productSpuMapper.selectByIds(Set.of(100L))).thenReturn(List.of(spu));
+
+        productSpuService.validateSpuList(Set.of(100L));
+
+        verify(merchantService).validateMerchantAvailable(9L);
     }
 
 }

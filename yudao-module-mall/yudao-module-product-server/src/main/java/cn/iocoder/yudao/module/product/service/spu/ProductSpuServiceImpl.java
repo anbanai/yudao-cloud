@@ -172,6 +172,8 @@ public class ProductSpuServiceImpl implements ProductSpuService {
             if (!ProductSpuStatusEnum.isEnable(spu.getStatus())) {
                 throw exception(SPU_NOT_ENABLE, spu.getName());
             }
+            // 商品可能在上架后被其商家冻结或撤销审核，购买链路必须再次校验商家状态。
+            merchantService.validateMerchantAvailable(spu.getMerchantId());
         });
         return list;
     }

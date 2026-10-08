@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.service.order;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -47,6 +48,44 @@ final class TradeOrderSubOrderAssembler {
             result.add(new Group(subOrder, merchantItems));
         }
         return result;
+    }
+
+    /**
+     * Aggregates merchant-order states into the platform order state.
+     * Canceled merchant orders do not block the remaining merchants from completing.
+     */
+    static Integer aggregateStatus(List<TradeOrderSubDO> subOrders) {
+        if (subOrders == null || subOrders.isEmpty()) {
+            return null;
+        }
+        boolean hasActive = false;
+        boolean allCompleted = true;
+        boolean allDelivered = true;
+        for (TradeOrderSubDO subOrder : subOrders) {
+            Integer status = subOrder.getStatus();
+            if (TradeOrderStatusEnum.isCanceled(status)) {
+                continue;
+            }
+            hasActive = true;
+            if (!TradeOrderStatusEnum.isCompleted(status)) {
+                allCompleted = false;
+            }
+            if (!TradeOrderStatusEnum.haveDelivered(status)) {
+                allDelivered = false;
+            }
+        }
+        if (!hasActive) {
+            return TradeOrderStatusEnum.CANCELED.getStatus();
+        }
+        if (allCompleted) {
+            return TradeOrderStatusEnum.COMPLETED.getStatus();
+        }
+        if (allDelivered) {
+            return TradeOrderStatusEnum.DELIVERED.getStatus();
+        }
+        return subOrders.stream().anyMatch(sub -> TradeOrderStatusEnum.isUnpaid(sub.getStatus()))
+                ? TradeOrderStatusEnum.UNPAID.getStatus()
+                : TradeOrderStatusEnum.UNDELIVERED.getStatus();
     }
 
     private static int sumProductPrices(List<TradeOrderItemDO> items) {

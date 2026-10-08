@@ -125,20 +125,23 @@ WHERE i.`merchant_id` IS NULL;
 INSERT INTO `trade_order_sub` (`order_id`, `no`, `user_id`, `merchant_id`, `merchant_name`, `status`,
                                `product_count`, `total_price`, `discount_price`, `coupon_price`, `point_price`,
                                `vip_price`, `adjust_price`, `delivery_price`, `pay_price`, `delivery_type`,
-                               `refund_status`, `after_sale_status`)
+                               `logistics_id`, `logistics_no`, `delivery_time`, `receive_time`,
+                               `refund_status`, `after_sale_status`, `tenant_id`)
 SELECT i.`order_id`, LEFT(CONCAT(o.`no`, '-', i.`merchant_id`), 32), o.`user_id`, i.`merchant_id`,
        MAX(i.`merchant_name`), o.`status`, SUM(i.`count`),
        SUM(i.`price` * i.`count`), SUM(COALESCE(i.`discount_price`, 0)), SUM(COALESCE(i.`coupon_price`, 0)),
        SUM(COALESCE(i.`point_price`, 0)), SUM(COALESCE(i.`vip_price`, 0)), SUM(COALESCE(i.`adjust_price`, 0)),
        SUM(COALESCE(i.`delivery_price`, 0)), SUM(COALESCE(i.`pay_price`, 0)), o.`delivery_type`,
-       COALESCE(o.`refund_status`, 0), 0
+       o.`logistics_id`, o.`logistics_no`, o.`delivery_time`, o.`receive_time`,
+       COALESCE(o.`refund_status`, 0), MAX(COALESCE(i.`after_sale_status`, 0)), o.`tenant_id`
 FROM `trade_order_item` i
 JOIN `trade_order` o ON o.`id` = i.`order_id`
 LEFT JOIN `trade_order_sub` existing ON existing.`order_id` = i.`order_id`
                                     AND existing.`merchant_id` = i.`merchant_id`
 WHERE i.`merchant_id` IS NOT NULL
   AND existing.`id` IS NULL
-GROUP BY i.`order_id`, i.`merchant_id`, o.`no`, o.`user_id`, o.`status`, o.`delivery_type`, o.`refund_status`;
+GROUP BY i.`order_id`, i.`merchant_id`, o.`no`, o.`user_id`, o.`status`, o.`delivery_type`,
+         o.`logistics_id`, o.`logistics_no`, o.`delivery_time`, o.`receive_time`, o.`refund_status`, o.`tenant_id`;
 
 UPDATE `trade_order_item` i
 JOIN `trade_order_sub` s ON s.`order_id` = i.`order_id` AND s.`merchant_id` = i.`merchant_id`

@@ -91,11 +91,6 @@ public class TradeDeliveryPriceCalculator implements TradePriceCalculator {
         MemberAddressRespDTO address = addressApi.getAddress(param.getAddressId(), param.getUserId()).getCheckedData();
         Assert.notNull(address, "收件人({})的地址，不能为空", param.getUserId());
 
-        // 情况一：全局包邮
-        if (isGlobalExpressFree(result)) {
-            return;
-        }
-
         // 情况二：活动包邮
         if (Boolean.TRUE.equals(result.getFreeDelivery())) {
             return;
@@ -104,6 +99,10 @@ public class TradeDeliveryPriceCalculator implements TradePriceCalculator {
         // 情况三：快递模版
         // 2.1 过滤出已选中的商品 SKU
         List<OrderItem> selectedItem = filterList(result.getItems(), OrderItem::getSelected);
+        // 多商家订单按商家商品金额判断全局包邮，避免商家之间互相凑单。
+        if (isGlobalExpressFree(selectedItem)) {
+            return;
+        }
         Set<Long> deliveryTemplateIds = convertSet(selectedItem, OrderItem::getDeliveryTemplateId);
         Map<Long, DeliveryExpressTemplateRespBO> expressTemplateMap =
                 deliveryExpressTemplateService.getExpressTemplateMapByIdsAndArea(deliveryTemplateIds, address.getAreaId());
@@ -122,15 +121,22 @@ public class TradeDeliveryPriceCalculator implements TradePriceCalculator {
      * @param result 计算结果
      * @return 是否包邮
      */
-    private boolean isGlobalExpressFree(TradePriceCalculateRespBO result) {
+    private boolean isGlobalExpressFree(List<OrderItem> items) {
         TradeConfigDO config = tradeConfigService.getTradeConfig();
         // 情况一：交易中心配置不存在默认不包邮
         if (config == null) {
             return false;
         }
         // 情况二：开启了全局包邮 && 满足包邮金额
-        return Boolean.TRUE.equals(config.getDeliveryExpressFreeEnabled()) &&
-                result.getPrice().getPayPrice() >= config.getDeliveryExpressFreePrice();
+        if (!Boolean.TRUE.equals(config.getDeliveryExpressFreeEnabled()) || items.isEmpty()) {
+            return false;
+        }
+        Map<Long, Integer> merchantPayPrices = new LinkedHashMap<>();
+        for (OrderItem item : items) {
+            merchantPayPrices.merge(item.getMerchantId(), item.getPayPrice(), Integer::sum);
+        }
+        return merchantPayPrices.values().stream()
+                .allMatch(price -> price >= config.getDeliveryExpressFreePrice());
     }
 
     private void calculateDeliveryPrice(List<OrderItem> selectedSkus,

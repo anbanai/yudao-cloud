@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.service.order;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -39,6 +40,26 @@ class TradeOrderSubOrderAssemblerTest {
                 .isEqualTo(order.getPayPrice());
         assertThat(groups.get(0).items()).containsExactly(items.get(0), items.get(1));
         assertThat(groups.get(1).items()).containsExactly(items.get(2));
+    }
+
+    @Test
+    void aggregateStatus_ignoresCanceledSubOrdersWhenAllActiveSubOrdersComplete() {
+        List<TradeOrderSubDO> subOrders = List.of(
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.CANCELED.getStatus()),
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.COMPLETED.getStatus()));
+
+        assertThat(TradeOrderSubOrderAssembler.aggregateStatus(subOrders))
+                .isEqualTo(TradeOrderStatusEnum.COMPLETED.getStatus());
+    }
+
+    @Test
+    void aggregateStatus_isDeliveredUntilEveryActiveSubOrderIsCompleted() {
+        List<TradeOrderSubDO> subOrders = List.of(
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.DELIVERED.getStatus()),
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.COMPLETED.getStatus()));
+
+        assertThat(TradeOrderSubOrderAssembler.aggregateStatus(subOrders))
+                .isEqualTo(TradeOrderStatusEnum.DELIVERED.getStatus());
     }
 
     private static TradeOrderItemDO item(Long merchantId, String merchantName, int price, int count,

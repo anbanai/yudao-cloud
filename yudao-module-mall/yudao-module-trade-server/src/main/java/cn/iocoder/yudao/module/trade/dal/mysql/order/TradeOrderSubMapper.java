@@ -6,7 +6,6 @@ import org.apache.ibatis.annotations.Mapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 import java.util.List;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 @Mapper
 public interface TradeOrderSubMapper extends BaseMapperX<TradeOrderSubDO> {
@@ -16,6 +15,11 @@ public interface TradeOrderSubMapper extends BaseMapperX<TradeOrderSubDO> {
 
     default int updateStatusByOrderId(Long orderId, Integer oldStatus, Integer newStatus) {
         return update(new TradeOrderSubDO().setStatus(newStatus), new LambdaUpdateWrapper<TradeOrderSubDO>()
+                .eq(TradeOrderSubDO::getOrderId, orderId).eq(TradeOrderSubDO::getStatus, oldStatus));
+    }
+
+    default int updateByOrderIdAndStatus(Long orderId, Integer oldStatus, TradeOrderSubDO update) {
+        return update(update, new LambdaUpdateWrapper<TradeOrderSubDO>()
                 .eq(TradeOrderSubDO::getOrderId, orderId).eq(TradeOrderSubDO::getStatus, oldStatus));
     }
 

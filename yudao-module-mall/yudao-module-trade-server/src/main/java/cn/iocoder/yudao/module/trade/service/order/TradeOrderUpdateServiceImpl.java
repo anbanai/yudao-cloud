@@ -620,8 +620,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (updateCount == 0) {
             throw exception(ORDER_RECEIVE_FAIL_STATUS_NOT_DELIVERED);
         }
-        tradeOrderSubMapper.updateByOrderId(order.getId(), new TradeOrderSubDO()
-                .setStatus(TradeOrderStatusEnum.COMPLETED.getStatus()).setReceiveTime(receiveTime));
+        tradeOrderSubMapper.updateByOrderIdAndStatus(order.getId(), TradeOrderStatusEnum.DELIVERED.getStatus(),
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.COMPLETED.getStatus()).setReceiveTime(receiveTime));
 
         // 2. 插入订单日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), TradeOrderStatusEnum.COMPLETED.getStatus());
@@ -958,16 +958,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 1.2 执行 TradeOrderHandler 的后置处理
         TradeOrderItemDO orderItem = tradeOrderItemMapper.selectById(id);
         TradeOrderDO order = tradeOrderMapper.selectById(orderItem.getOrderId());
-        if (orderItem.getSubOrderId() != null) {
-            List<TradeOrderItemDO> subItems = tradeOrderItemMapper.selectListBySubOrderId(orderItem.getSubOrderId());
-            boolean allSuccess = subItems.stream().allMatch(item -> Objects.equals(item.getAfterSaleStatus(),
-                    TradeOrderItemAfterSaleStatusEnum.SUCCESS.getStatus()));
-            tradeOrderSubMapper.updateById(new TradeOrderSubDO().setId(orderItem.getSubOrderId())
-                    .setAfterSaleStatus(allSuccess ? TradeOrderItemAfterSaleStatusEnum.SUCCESS.getStatus()
-                            : TradeOrderItemAfterSaleStatusEnum.APPLY.getStatus())
-                    .setRefundStatus(allSuccess ? TradeOrderRefundStatusEnum.ALL.getStatus()
-                            : TradeOrderRefundStatusEnum.PART.getStatus()));
-        }
+        syncSubOrderAfterSaleStatus(orderItem);
         tradeOrderHandlers.forEach(handler -> handler.afterCancelOrderItem(order, orderItem));
 
         // 2.1 更新订单的退款金额、积分
@@ -988,6 +979,25 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 更新订单项
         updateOrderItemAfterSaleStatus(id, TradeOrderItemAfterSaleStatusEnum.APPLY.getStatus(),
                 TradeOrderItemAfterSaleStatusEnum.NONE.getStatus(), null);
+        syncSubOrderAfterSaleStatus(tradeOrderItemMapper.selectById(id));
+    }
+
+    private void syncSubOrderAfterSaleStatus(TradeOrderItemDO orderItem) {
+        if (orderItem == null || orderItem.getSubOrderId() == null) {
+            return;
+        }
+        List<TradeOrderItemDO> subItems = tradeOrderItemMapper.selectListBySubOrderId(orderItem.getSubOrderId());
+        boolean allSuccess = !subItems.isEmpty() && subItems.stream().allMatch(item ->
+                Objects.equals(item.getAfterSaleStatus(), TradeOrderItemAfterSaleStatusEnum.SUCCESS.getStatus()));
+        boolean anyAfterSale = subItems.stream().anyMatch(item ->
+                !Objects.equals(item.getAfterSaleStatus(), TradeOrderItemAfterSaleStatusEnum.NONE.getStatus()));
+        tradeOrderSubMapper.updateById(new TradeOrderSubDO().setId(orderItem.getSubOrderId())
+                .setAfterSaleStatus(allSuccess ? TradeOrderItemAfterSaleStatusEnum.SUCCESS.getStatus()
+                        : (anyAfterSale ? TradeOrderItemAfterSaleStatusEnum.APPLY.getStatus()
+                        : TradeOrderItemAfterSaleStatusEnum.NONE.getStatus()))
+                .setRefundStatus(allSuccess ? TradeOrderRefundStatusEnum.ALL.getStatus()
+                        : (anyAfterSale ? TradeOrderRefundStatusEnum.PART.getStatus()
+                        : TradeOrderRefundStatusEnum.NONE.getStatus())));
     }
 
     private void updateOrderItemAfterSaleStatus(Long id, Integer oldAfterSaleStatus, Integer newAfterSaleStatus,
