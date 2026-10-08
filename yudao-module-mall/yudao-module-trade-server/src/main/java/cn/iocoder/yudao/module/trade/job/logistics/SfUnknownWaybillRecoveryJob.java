@@ -34,6 +34,7 @@ public class SfUnknownWaybillRecoveryJob {
                     waybillService.cancelWaybill(waybill.getId());
                 } else {
                     waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(waybill.getOrderId())
+                            .setSubOrderId(waybill.getSubOrderId())
                             .setAccountId(waybill.getAccountId()).setDeviceId(waybill.getRequestedDeviceId()));
                 }
                 count++;

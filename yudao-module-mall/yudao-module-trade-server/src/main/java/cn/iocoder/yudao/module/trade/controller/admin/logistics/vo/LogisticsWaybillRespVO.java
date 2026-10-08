@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class LogisticsWaybillRespVO {
     private Long id;
     private Long orderId;
+    private Long subOrderId;
     private String orderNo;
     private String providerOrderNo;
     private String waybillNo;

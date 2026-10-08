@@ -43,12 +43,12 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
     public void afterPayOrder(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
         if (isReceiveTiming(order)) {
             for (TradeOrderItemDO orderItem : orderItems) {
-                addPendingPoint(order.getUserId(), orderItem.getGivePoint(), orderItem.getId());
+                addPendingPoint(order.getUserId(), orderItem.getGivePoint(), orderItem.getId(), orderItem);
             }
         } else {
             // 增加用户积分（订单赠送）
             addPoint(order.getUserId(), order.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE,
-                    order.getId());
+                    order.getId(), order);
         }
 
         // 增加用户经验
@@ -81,7 +81,7 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
         } else {
             Integer givePoint = getSumValue(orderItems, TradeOrderItemDO::getGivePoint, Integer::sum);
             reducePoint(order.getUserId(), givePoint, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL,
-                    order.getId());
+                    order.getId(), order);
         }
         // 扣减（回滚）用户经验
         int payPrice = order.getPayPrice() - order.getRefundPrice();
@@ -97,7 +97,10 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
             refundOrderItemPoint(order.getUserId(), orderItem.getId());
         } else {
             // 扣减（回滚）积分（订单赠送）
-            reducePoint(order.getUserId(), orderItem.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM, orderItem.getId());
+            reducePointWithSnapshot(order.getUserId(), orderItem.getGivePoint(),
+                    MemberPointBizTypeEnum.ORDER_GIVE_CANCEL_ITEM, orderItem.getId(),
+                    orderItem.getPointGiveCalculatePrice(), orderItem.getPointGiveBase(),
+                    orderItem.getPointGiveMultiplier());
         }
 
         // 扣减（回滚）用户经验
@@ -131,21 +134,68 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
      * @param bizId   业务编号
      */
     protected void addPoint(Long userId, Integer point, MemberPointBizTypeEnum bizType, Long bizId) {
+        addPoint(userId, point, bizType, bizId, null);
+    }
+
+    protected void addPoint(Long userId, Integer point, MemberPointBizTypeEnum bizType, Long bizId,
+                            TradeOrderDO order) {
         if (point != null && point > 0) {
-            memberPointApi.addPoint(userId, point, bizType.getType(), String.valueOf(bizId)).checkError();
+            if (order == null || !hasPointSnapshot(order.getPointGiveCalculatePrice(), order.getPointGiveBase(),
+                    order.getPointGiveMultiplier())) {
+                memberPointApi.addPoint(userId, point, bizType.getType(), String.valueOf(bizId)).checkError();
+            } else {
+                memberPointApi.addPointWithSnapshot(userId, point, bizType.getType(), String.valueOf(bizId),
+                        order.getPointGiveCalculatePrice(), order.getPointGiveBase(), order.getPointGiveMultiplier()).checkError();
+            }
         }
     }
 
     protected void reducePoint(Long userId, Integer point, MemberPointBizTypeEnum bizType, Long bizId) {
+        reducePoint(userId, point, bizType, bizId, null);
+    }
+
+    protected void reducePoint(Long userId, Integer point, MemberPointBizTypeEnum bizType, Long bizId,
+                               TradeOrderDO order) {
         if (point != null && point > 0) {
-            memberPointApi.reducePoint(userId, point, bizType.getType(), String.valueOf(bizId)).checkError();
+            if (order == null || !hasPointSnapshot(order.getPointGiveCalculatePrice(), order.getPointGiveBase(),
+                    order.getPointGiveMultiplier())) {
+                memberPointApi.reducePoint(userId, point, bizType.getType(), String.valueOf(bizId)).checkError();
+            } else {
+                memberPointApi.reducePointWithSnapshot(userId, point, bizType.getType(), String.valueOf(bizId),
+                        order.getPointGiveCalculatePrice(), order.getPointGiveBase(), order.getPointGiveMultiplier()).checkError();
+            }
+        }
+    }
+
+    protected void reducePointWithSnapshot(Long userId, Integer point, MemberPointBizTypeEnum bizType,
+                                           Long bizId, Integer pointCalculatePrice, Integer pointGiveBase,
+                                           Integer pointGiveMultiplier) {
+        if (point != null && point > 0) {
+            if (hasPointSnapshot(pointCalculatePrice, pointGiveBase, pointGiveMultiplier)) {
+                memberPointApi.reducePointWithSnapshot(userId, point, bizType.getType(), String.valueOf(bizId),
+                        pointCalculatePrice, pointGiveBase, pointGiveMultiplier).checkError();
+            } else {
+                memberPointApi.reducePoint(userId, point, bizType.getType(), String.valueOf(bizId)).checkError();
+            }
         }
     }
 
     protected void addPendingPoint(Long userId, Integer point, Long orderItemId) {
+        addPendingPoint(userId, point, orderItemId, null);
+    }
+
+    protected void addPendingPoint(Long userId, Integer point, Long orderItemId, TradeOrderItemDO orderItem) {
         if (point != null && point > 0) {
-            memberPointApi.addPendingPoint(userId, point, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(),
-                    String.valueOf(orderItemId)).checkError();
+            if (orderItem == null || !hasPointSnapshot(orderItem.getPointGiveCalculatePrice(),
+                    orderItem.getPointGiveBase(), orderItem.getPointGiveMultiplier())) {
+                memberPointApi.addPendingPoint(userId, point, MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(),
+                        String.valueOf(orderItemId)).checkError();
+            } else {
+                memberPointApi.addPendingPointWithSnapshot(userId, point,
+                        MemberPointBizTypeEnum.ORDER_GIVE_PENDING.getType(), String.valueOf(orderItemId),
+                        orderItem.getPointGiveCalculatePrice(), orderItem.getPointGiveBase(),
+                        orderItem.getPointGiveMultiplier()).checkError();
+            }
         }
     }
 
@@ -160,6 +210,10 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
 
     private boolean isReceiveTiming(TradeOrderDO order) {
         return MemberPointGiveTimingEnum.RECEIVE.getType().equals(order.getPointGiveTiming());
+    }
+
+    private boolean hasPointSnapshot(Integer pointCalculatePrice, Integer pointGiveBase, Integer pointGiveMultiplier) {
+        return pointCalculatePrice != null || pointGiveBase != null || pointGiveMultiplier != null;
     }
 
 }

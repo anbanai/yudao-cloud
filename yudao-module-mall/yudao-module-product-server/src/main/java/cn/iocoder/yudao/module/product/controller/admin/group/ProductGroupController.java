@@ -1,24 +1,35 @@
 package cn.iocoder.yudao.module.product.controller.admin.group;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
+import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.product.controller.admin.group.vo.*;
 import cn.iocoder.yudao.module.product.controller.app.group.vo.AppProductGroupSpuPageReqVO;
-import cn.iocoder.yudao.module.product.dal.dataobject.group.ProductGroupDO;
+import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuRespVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
+import cn.iocoder.yudao.module.product.service.group.ProductGroupOperationsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.io.IOException;
 
+import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 商品分组")
@@ -29,6 +40,8 @@ public class ProductGroupController {
 
     @Resource
     private ProductGroupService groupService;
+    @Resource
+    private ProductGroupOperationsService operationsService;
 
     @PostMapping("/create")
     @Operation(summary = "创建商品分组")
@@ -64,7 +77,47 @@ public class ProductGroupController {
     @Operation(summary = "获得商品分组分页")
     @PreAuthorize("@ss.hasPermission('product:group:query')")
     public CommonResult<PageResult<ProductGroupRespVO>> getGroupPage(@Valid ProductGroupPageReqVO reqVO) {
-        return success(BeanUtils.toBean(groupService.getGroupPage(reqVO), ProductGroupRespVO.class));
+        return success(operationsService.getGroupPage(reqVO));
+    }
+
+    @GetMapping("/spu-filter-page")
+    @Operation(summary = "按分组筛选商品（保留主分类和商品状态条件）")
+    @PreAuthorize("@ss.hasPermission('product:spu:query')")
+    public CommonResult<PageResult<ProductSpuRespVO>> getFilteredSpuPage(@Valid ProductGroupSpuFilterReqVO reqVO) {
+        return success(operationsService.getSpuPage(reqVO));
+    }
+
+    @GetMapping("/spu-filter-count")
+    @Operation(summary = "获得分组筛选下的商品状态数量")
+    @PreAuthorize("@ss.hasPermission('product:spu:query')")
+    public CommonResult<Map<Integer, Long>> getFilteredSpuCount(@Valid ProductGroupSpuFilterReqVO reqVO) {
+        return success(operationsService.getSpuCounts(reqVO));
+    }
+
+    @GetMapping("/spu-filter-export")
+    @Operation(summary = "导出按分组筛选的商品")
+    @PreAuthorize("@ss.hasPermission('product:spu:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportFilteredSpus(@Valid ProductGroupSpuFilterReqVO reqVO, HttpServletResponse response)
+            throws IOException {
+        ExcelUtils.write(response, "商品列表.xls", "数据", ProductSpuRespVO.class,
+                operationsService.getSpuExportList(reqVO));
+    }
+
+    @GetMapping("/spu-group-map")
+    @Operation(summary = "批量获得商品所属分组")
+    @PreAuthorize("@ss.hasPermission('product:spu:query')")
+    public CommonResult<Map<Long, List<Long>>> getSpuGroupMap(
+            @RequestParam("spuIds") @NotEmpty @Size(max = 200) List<@NotNull @Positive Long> spuIds) {
+        return success(operationsService.getSpuGroupMap(spuIds));
+    }
+
+    @PostMapping("/spu-batch-update")
+    @Operation(summary = "批量添加或移除商品分组（保留其他分组关系）")
+    @PreAuthorize("@ss.hasPermission('product:spu:update') or @ss.hasPermission('product:group:update')")
+    public CommonResult<Boolean> updateSpuGroups(@Valid @RequestBody ProductGroupSpuUpdateReqVO reqVO) {
+        operationsService.updateSpuGroups(reqVO);
+        return success(true);
     }
 
     @GetMapping("/list-all-simple")

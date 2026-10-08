@@ -39,6 +39,9 @@ public class AfterSalePageReqVO extends PageParam {
     @InEnum(value = AfterSaleWayEnum.class, message = "售后方式必须是 {value}")
     private Integer way;
 
+    @Schema(description = "逆向物流状态", example = "IN_TRANSIT")
+    private String returnShipmentStatus;
+
     @Schema(description = "订单编号", example = "18078")
     private String orderNo;
 

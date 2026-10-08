@@ -44,6 +44,12 @@ public interface CouponApi {
     CommonResult<List<Long>> takeCouponsByAdmin(@RequestBody Map<Long, Integer> giveCoupons,
                                                 @RequestParam("userId") Long userId);
 
+    @PostMapping(PREFIX + "/take-for-benefit")
+    @Operation(summary = "按权益领取业务单号幂等发放一张优惠券")
+    CommonResult<Long> takeCouponForBenefit(@RequestParam("templateId") Long templateId,
+                                            @RequestParam("userId") Long userId,
+                                            @RequestParam("bizId") String bizId);
+
     @PostMapping(PREFIX + "/invalidate-by-admin")
     @Operation(summary = "【管理员】作废指定用户的指定优惠劵")
     @Parameters({

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS "promotion_coupon_template"
     "total_count"          int      NOT NULL,
     "take_limit_count"     int      NOT NULL,
     "take_type"            int      NOT NULL,
+    "source_biz_id"        varchar,
     "use_price"            int      NOT NULL,
     "product_scope"        int      NOT NULL,
     "product_scope_values" varchar,
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS "promotion_coupon"
     "status"               int      NOT NULL,
     "user_id"              bigint   NOT NULL,
     "take_type"            int      NOT NULL,
+    "source_biz_id"        varchar(64),
     "use_price"            int      NOT NULL,
     "valid_start_time"     datetime NOT NULL,
     "valid_end_time"       datetime NOT NULL,
@@ -74,7 +76,9 @@ CREATE TABLE IF NOT EXISTS "promotion_coupon"
     "updater"              varchar           DEFAULT '',
     "update_time"          datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     "deleted"              bit      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY ("id")
+    "tenant_id"             bigint   NOT NULL DEFAULT 0,
+    PRIMARY KEY ("id"),
+    UNIQUE ("source_biz_id", "tenant_id")
 ) COMMENT '优惠劵';
 
 CREATE TABLE IF NOT EXISTS "promotion_reward_activity"

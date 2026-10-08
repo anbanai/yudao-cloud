@@ -15,6 +15,10 @@ public class ProductBrandBaseVO {
     @NotNull(message = "品牌名称不能为空")
     private String name;
 
+    @Schema(description = "品牌默认归属商家编号", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "品牌归属商家不能为空")
+    private Long merchantId;
+
     @Schema(description = "品牌图片", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "品牌图片不能为空")
     private String picUrl;

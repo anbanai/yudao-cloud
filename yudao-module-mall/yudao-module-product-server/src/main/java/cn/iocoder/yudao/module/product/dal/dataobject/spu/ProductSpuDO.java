@@ -67,6 +67,8 @@ public class ProductSpuDO extends BaseDO {
      * 关联 {@link ProductBrandDO#getId()}
      */
     private Long brandId;
+    /** 商品实际销售商家编号 */
+    private Long merchantId;
     /**
      * 商品封面图
      */

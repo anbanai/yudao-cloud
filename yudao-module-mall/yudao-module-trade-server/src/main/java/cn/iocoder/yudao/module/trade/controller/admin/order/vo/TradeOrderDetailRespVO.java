@@ -17,6 +17,9 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
      */
     private List<Item> items;
 
+    /** 按商家拆分的履约订单 */
+    private List<TradeOrderSubRespVO> subOrders;
+
     /**
      * 下单用户信息
      */

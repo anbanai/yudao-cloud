@@ -178,11 +178,42 @@ class MemberPointRecordServiceImplTest {
         assertEquals(MemberPointRecordStatusEnum.EFFECTIVE.getStatus(), captor.getValue().getStatus());
     }
 
+    @Test
+    void createPointRecord_rewardRollbackUsesOnlyAvailableGrantAmount() {
+        MemberPointRecordMapper mapper = mock(MemberPointRecordMapper.class);
+        MemberUserService userService = mock(MemberUserService.class);
+        MemberPointBatchService batchService = mock(MemberPointBatchService.class);
+        MemberPointRecordDO source = new MemberPointRecordDO().setId(7L).setPoint(12)
+                .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus());
+        when(mapper.selectByUserIdAndBizTypeAndBizId(2L,
+                MemberPointBizTypeEnum.ORDER_GIVE.getType(), "11")).thenReturn(source);
+        when(batchService.rollbackGrant(2L, 7L, 12, "11")).thenReturn(4);
+        when(userService.getUserForUpdate(2L)).thenReturn(new MemberUserDO().setPoint(20));
+        when(userService.updateUserPoint(2L, -4)).thenReturn(true);
+        MemberPointRecordServiceImpl service = service(mapper, userService, batchService);
+
+        service.createPointRecord(2L, -12, MemberPointBizTypeEnum.ORDER_GIVE_CANCEL, "11");
+
+        verify(batchService).rollbackGrant(2L, 7L, 12, "11");
+        verify(userService).updateUserPoint(2L, -4);
+        ArgumentCaptor<MemberPointRecordDO> captor = ArgumentCaptor.forClass(MemberPointRecordDO.class);
+        verify(mapper).insert(captor.capture());
+        assertEquals(-4, captor.getValue().getPoint());
+        assertEquals(16, captor.getValue().getTotalPoint());
+    }
+
     private static MemberPointRecordServiceImpl service(MemberPointRecordMapper mapper,
                                                          MemberUserService userService) {
+        return service(mapper, userService, null);
+    }
+
+    private static MemberPointRecordServiceImpl service(MemberPointRecordMapper mapper,
+                                                         MemberUserService userService,
+                                                         MemberPointBatchService batchService) {
         MemberPointRecordServiceImpl service = new MemberPointRecordServiceImpl();
         ReflectionTestUtils.setField(service, "memberPointRecordMapper", mapper);
         ReflectionTestUtils.setField(service, "memberUserService", userService);
+        ReflectionTestUtils.setField(service, "memberPointBatchService", batchService);
         return service;
     }
 }

@@ -30,3 +30,22 @@ python3 script/oss/migrate_aliyun_oss_image_metadata.py \
 ```
 
 脚本只迁移 JPEG、PNG、WebP、GIF 和 AVIF；SVG 等可能包含主动内容的格式会跳过。建议先用 `--max-objects 10` 小批量验证，并用 `curl -I` 检查 `Content-Type`、`Content-Disposition` 和 `Cache-Control`。不要把 AccessKey 写入脚本、仓库或命令历史；使用临时凭证或环境变量。
+
+如果整个 Bucket 都是公开图片且没有统一目录前缀，必须显式使用 `--all-objects`。先限制数量预览：
+
+```bash
+python3 script/oss/migrate_aliyun_oss_image_metadata.py \
+  --all-objects \
+  --max-objects 10
+```
+
+确认抽样结果后，整桶执行：
+
+```bash
+python3 script/oss/migrate_aliyun_oss_image_metadata.py \
+  --all-objects \
+  --execute \
+  --confirm-bucket teaworthshare \
+  --public-cache \
+  --sleep-ms 50
+```

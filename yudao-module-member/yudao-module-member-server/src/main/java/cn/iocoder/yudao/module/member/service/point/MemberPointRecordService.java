@@ -40,7 +40,17 @@ public interface MemberPointRecordService {
      */
     void createPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId);
 
+    default void createPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId,
+                                   Integer pointCalculatePrice, Integer pointGiveBase, Integer pointGiveMultiplier) {
+        createPointRecord(userId, point, bizType, bizId);
+    }
+
     void createPendingPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId);
+
+    default void createPendingPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId,
+                                          Integer pointCalculatePrice, Integer pointGiveBase, Integer pointGiveMultiplier) {
+        createPendingPointRecord(userId, point, bizType, bizId);
+    }
 
     void effectPendingPointRecord(Long userId, MemberPointBizTypeEnum bizType, String bizId);
 

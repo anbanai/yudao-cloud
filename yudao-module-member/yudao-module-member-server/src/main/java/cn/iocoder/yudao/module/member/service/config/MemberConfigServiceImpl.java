@@ -30,7 +30,7 @@ public class MemberConfigServiceImpl implements MemberConfigService {
         if (saveReqVO.getPointTradeGiveTiming() == null) {
             Integer pointGiveTiming = dbConfig == null ? null : dbConfig.getPointTradeGiveTiming();
             saveReqVO.setPointTradeGiveTiming(pointGiveTiming != null
-                    ? pointGiveTiming : MemberPointGiveTimingEnum.PAY.getType());
+                    ? pointGiveTiming : MemberPointGiveTimingEnum.RECEIVE.getType());
         } else if (MemberPointGiveTimingEnum.getByType(saveReqVO.getPointTradeGiveTiming()) == null) {
             throw new IllegalArgumentException("不支持的积分发放时机");
         }

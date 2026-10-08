@@ -67,6 +67,15 @@ knife4j:
   setting:
     language: zh_cn
 
+--- #################### 监控相关配置 ####################
+
+# Actuator 监控端点的配置项
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true # 开启后可通过 /actuator/health/liveness 与 /actuator/health/readiness 供 Kubernetes 探针使用
+
 # 工作流 Flowable 配置
 flowable:
   # 1. false: 默认值，Flowable 启动时，对比数据库表中保存的版本，如果不匹配。将抛出异常
@@ -374,7 +383,12 @@ yudao:
   trade:
     logistics:
       sf:
-        callback-token: ${SF_LOGISTICS_CALLBACK_TOKEN:} # 顺丰回调 URL 的 token，生产环境必须配置至少 16 位
+        return-shipment-enabled: ${SF_RETURN_SHIPMENT_ENABLED:false}
+        return-shipment-api-service-code: ${SF_RETURN_SHIPMENT_API_SERVICE_CODE:EXP_RECE_CREATE_ORDER}
+        return-shipment-express-type-id: ${SF_RETURN_SHIPMENT_EXPRESS_TYPE_ID:}
+        return-shipment-fee-unit: ${SF_RETURN_SHIPMENT_FEE_UNIT:fen}
+        return-shipment-estimated-fee-per-kg: ${SF_RETURN_SHIPMENT_ESTIMATED_FEE_PER_KG:0}
+        callback-signing-secret: ${SF_LOGISTICS_CALLBACK_SIGNING_SECRET:} # 顺丰回调 HMAC 密钥，生产环境必须配置至少 32 位
         template-100x150-code: ${SF_LOGISTICS_TEMPLATE_100X150_CODE:} # 顺丰分配的 100x150 云打印模板代码
         label-host-suffixes: ${SF_LOGISTICS_LABEL_HOST_SUFFIXES:sf-express.com,sf-express.cn} # 面单下载域名白名单
       printbridge:

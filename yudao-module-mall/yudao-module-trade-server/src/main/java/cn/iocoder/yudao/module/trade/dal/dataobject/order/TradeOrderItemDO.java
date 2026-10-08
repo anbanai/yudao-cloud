@@ -40,6 +40,8 @@ public class TradeOrderItemDO extends BaseDO {
      * 关联 {@link TradeOrderDO#getId()}
      */
     private Long orderId;
+    /** 商家履约子订单编号 */
+    private Long subOrderId;
     /**
      * 购物车项编号
      *
@@ -54,6 +56,9 @@ public class TradeOrderItemDO extends BaseDO {
      * 关联 ProductSkuDO 的 spuId 编号
      */
     private Long spuId;
+    /** 商家编号及名称快照 */
+    private Long merchantId;
+    private String merchantName;
     /**
      * 商品 SPU 名称
      *
@@ -153,6 +158,12 @@ public class TradeOrderItemDO extends BaseDO {
      * 目的：用于后续取消或者售后订单时，需要扣减赠送
      */
     private Integer givePoint;
+    /** 消费返积分计算基数快照，单位：分 */
+    private Integer pointGiveCalculatePrice;
+    /** 消费返积分倍率快照，千分比 */
+    private Integer pointGiveMultiplier;
+    /** 未乘会员倍率的基础消费积分 */
+    private Integer pointGiveBase;
     /**
      * VIP 减免金额，单位：分
      */
@@ -208,4 +219,3 @@ public class TradeOrderItemDO extends BaseDO {
     }
 
 }
-

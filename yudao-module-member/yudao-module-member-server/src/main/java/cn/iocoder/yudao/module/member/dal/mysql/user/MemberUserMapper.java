@@ -110,4 +110,13 @@ public interface MemberUserMapper extends BaseMapperX<MemberUserDO> {
         return update(null, lambdaUpdateWrapper);
     }
 
+    /** Decrease points for an order reward rollback, allowing a tracked negative balance. */
+    default int updatePointDecrAllowNegative(Long id, Integer incrCount) {
+        Assert.isTrue(incrCount < 0);
+        LambdaUpdateWrapper<MemberUserDO> lambdaUpdateWrapper = new LambdaUpdateWrapper<MemberUserDO>()
+                .setSql(" point = point + " + incrCount)
+                .eq(MemberUserDO::getId, id);
+        return update(null, lambdaUpdateWrapper);
+    }
+
 }

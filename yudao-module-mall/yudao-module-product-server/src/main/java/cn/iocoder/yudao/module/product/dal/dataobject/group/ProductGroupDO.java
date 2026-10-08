@@ -22,6 +22,7 @@ public class ProductGroupDO extends TenantBaseDO {
     private String name;
     private Integer sort;
     private Integer status;
+    private Boolean storefrontVisible;
     private String remark;
 
     public boolean isEnabled() {

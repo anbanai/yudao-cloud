@@ -48,7 +48,7 @@ public class AlipayPcPayClientTest extends AbstractAlipayClientTest {
                 eq(Method.GET.name()))).thenReturn(response);
         // 准备请求参数
         String outTradeNo = randomString();
-        Integer price = randomInteger();
+        Integer price = 12345;
         PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(notifyUrl, outTradeNo, price);
         reqDTO.setDisplayMode(null);
 
@@ -77,7 +77,7 @@ public class AlipayPcPayClientTest extends AbstractAlipayClientTest {
                 eq(Method.POST.name()))).thenReturn(response);
         // 准备请求参数
         String outTradeNo = randomString();
-        Integer price = randomInteger();
+        Integer price = 12345;
         PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(notifyUrl, outTradeNo, price);
         reqDTO.setDisplayMode(PayOrderDisplayModeEnum.FORM.getMode());
 
@@ -110,7 +110,7 @@ public class AlipayPcPayClientTest extends AbstractAlipayClientTest {
                 eq(Method.GET.name()))).thenReturn(response);
         // 准备请求参数
         String outTradeNo = randomString();
-        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, randomInteger());
+        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, 12345);
         reqDTO.setDisplayMode(PayOrderDisplayModeEnum.URL.getMode());
 
         // 调用

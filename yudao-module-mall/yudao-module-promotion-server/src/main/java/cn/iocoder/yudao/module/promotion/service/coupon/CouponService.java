@@ -70,6 +70,8 @@ public interface CouponService {
      */
     List<Long> takeCouponsByAdmin(Map<Long, Integer> giveCoupons, Long userId);
 
+    Long takeCouponForBenefit(Long templateId, Long userId, String bizId);
+
     /**
      * 【管理员】作废指定用户的指定优惠劵
      *

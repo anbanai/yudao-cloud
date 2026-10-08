@@ -195,4 +195,10 @@ public interface MemberUserService {
      */
     boolean updateUserPoint(Long userId, Integer point);
 
+    /**
+     * Decrease points for an order reward rollback even when the user has already spent them.
+     * This creates a debt that future grants can settle.
+     */
+    boolean updateUserPointForRewardRollback(Long userId, Integer point);
+
 }

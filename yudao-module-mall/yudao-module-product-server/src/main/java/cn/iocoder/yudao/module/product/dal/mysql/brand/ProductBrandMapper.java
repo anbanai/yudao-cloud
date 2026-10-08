@@ -17,6 +17,7 @@ public interface ProductBrandMapper extends BaseMapperX<ProductBrandDO> {
         return selectPage(reqVO, new LambdaQueryWrapperX<ProductBrandDO>()
                 .likeIfPresent(ProductBrandDO::getName, reqVO.getName())
                 .eqIfPresent(ProductBrandDO::getStatus, reqVO.getStatus())
+                .eqIfPresent(ProductBrandDO::getMerchantId, reqVO.getMerchantId())
                 .betweenIfPresent(ProductBrandDO::getCreateTime, reqVO.getCreateTime())
                 .orderByDesc(ProductBrandDO::getId));
     }

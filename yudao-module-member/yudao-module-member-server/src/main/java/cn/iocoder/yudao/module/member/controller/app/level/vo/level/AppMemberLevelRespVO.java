@@ -19,6 +19,9 @@ public class AppMemberLevelRespVO {
     @Schema(description = "享受折扣", requiredMode = Schema.RequiredMode.REQUIRED, example = "98")
     private Integer discountPercent;
 
+    @Schema(description = "消费返积分倍率，千分比", example = "1200")
+    private Integer pointTradeGiveMultiplier;
+
     @Schema(description = "等级图标", example = "https://www.iocoder.cn/yudao.jpg")
     private String icon;
 

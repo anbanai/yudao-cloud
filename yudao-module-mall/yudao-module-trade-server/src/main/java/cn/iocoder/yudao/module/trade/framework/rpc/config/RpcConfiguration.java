@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.trade.framework.rpc.config;
 
 import cn.iocoder.yudao.module.member.api.address.MemberAddressApi;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.member.api.config.MemberConfigApi;
 import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
 import cn.iocoder.yudao.module.member.api.point.MemberPointApi;
@@ -35,7 +36,8 @@ import org.springframework.context.annotation.Configuration;
         MemberUserApi.class, MemberPointApi.class, MemberLevelApi.class, MemberAddressApi.class, MemberConfigApi.class,
         ProductSpuApi.class, ProductSkuApi.class, ProductCommentApi.class, ProductCategoryApi.class,
         PayOrderApi.class, PayRefundApi.class, PayTransferApi.class, PayWalletApi.class,
-        AdminUserApi.class, NotifyMessageSendApi.class, SocialClientApi.class, SocialUserApi.class
+        AdminUserApi.class, NotifyMessageSendApi.class, SocialClientApi.class, SocialUserApi.class,
+        ConfigApi.class
 })
 public class RpcConfiguration {
 }

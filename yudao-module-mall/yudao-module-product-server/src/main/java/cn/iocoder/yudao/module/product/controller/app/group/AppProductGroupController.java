@@ -9,12 +9,16 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuRespVO
 import cn.iocoder.yudao.module.product.dal.dataobject.group.ProductGroupDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
+import cn.iocoder.yudao.module.product.service.group.ProductGroupOperationsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.annotation.security.PermitAll;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,13 +38,31 @@ public class AppProductGroupController {
 
     @Resource
     private ProductGroupService groupService;
+    @Resource
+    private ProductGroupOperationsService operationsService;
+
+    @GetMapping("/list")
+    @Operation(summary = "获得商城公开且启用的商品分组")
+    @PermitAll
+    public CommonResult<List<AppProductGroupSimpleRespVO>> getPublicGroupList() {
+        return success(BeanUtils.toBean(operationsService.getPublicGroups(null), AppProductGroupSimpleRespVO.class));
+    }
+
+    @GetMapping("/list-by-spu-id")
+    @Operation(summary = "获得在售商品的公开分组")
+    @PermitAll
+    public CommonResult<List<AppProductGroupSimpleRespVO>> getGroupsBySpuId(
+            @RequestParam("spuId") @Positive Long spuId) {
+        return success(BeanUtils.toBean(operationsService.getPublicGroupsBySpuId(spuId), AppProductGroupSimpleRespVO.class));
+    }
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得启用的商品分组列表")
     @PermitAll
     public CommonResult<List<AppProductGroupSimpleRespVO>> getGroupList(
-            @RequestParam("ids") @Size(max = 15, message = "最多查询 15 个商品分组") Set<Long> ids) {
-        List<ProductGroupDO> groups = groupService.getGroupList(ids, true);
+            @RequestParam("ids") @NotEmpty @Size(max = 15, message = "最多查询 15 个商品分组")
+            Set<@NotNull @Positive Long> ids) {
+        List<ProductGroupDO> groups = operationsService.getPublicGroups(ids);
         return success(BeanUtils.toBean(groups, AppProductGroupSimpleRespVO.class));
     }
 

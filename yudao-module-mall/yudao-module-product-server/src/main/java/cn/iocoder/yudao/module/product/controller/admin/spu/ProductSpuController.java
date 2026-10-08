@@ -13,6 +13,8 @@ import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.group.ProductGroupService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
+import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +47,8 @@ public class ProductSpuController {
     private ProductSkuService productSkuService;
     @Resource
     private ProductGroupService productGroupService;
+    @Resource
+    private ProductMerchantService merchantService;
 
     @PostMapping("/create")
     @Operation(summary = "创建商品 SPU")
@@ -92,6 +96,7 @@ public class ProductSpuController {
         List<ProductSkuDO> skus = productSkuService.getSkuListBySpuId(spu.getId());
         ProductSpuRespVO respVO = ProductSpuConvert.INSTANCE.convert(spu, skus);
         respVO.setGroupIds(productGroupService.getGroupIdsBySpuId(spu.getId()));
+        fillMerchantName(respVO);
         return success(respVO);
     }
 
@@ -110,8 +115,10 @@ public class ProductSpuController {
     @Parameter(name = "spuIds", description = "spu 编号列表", required = true, example = "[1,2,3]")
     @PreAuthorize("@ss.hasPermission('product:spu:query')")
     public CommonResult<List<ProductSpuRespVO>> getSpuList(@RequestParam("spuIds") Collection<Long> spuIds) {
-        return success(ProductSpuConvert.INSTANCE.convertForSpuDetailRespListVO(
-                productSpuService.getSpuList(spuIds), productSkuService.getSkuListBySpuId(spuIds)));
+        List<ProductSpuRespVO> result = ProductSpuConvert.INSTANCE.convertForSpuDetailRespListVO(
+                productSpuService.getSpuList(spuIds), productSkuService.getSkuListBySpuId(spuIds));
+        result.forEach(this::fillMerchantName);
+        return success(result);
     }
 
     @GetMapping("/page")
@@ -119,7 +126,9 @@ public class ProductSpuController {
     @PreAuthorize("@ss.hasPermission('product:spu:query')")
     public CommonResult<PageResult<ProductSpuRespVO>> getSpuPage(@Valid ProductSpuPageReqVO pageVO) {
         PageResult<ProductSpuDO> pageResult = productSpuService.getSpuPage(pageVO);
-        return success(BeanUtils.toBean(pageResult, ProductSpuRespVO.class));
+        PageResult<ProductSpuRespVO> result = BeanUtils.toBean(pageResult, ProductSpuRespVO.class);
+        result.getList().forEach(this::fillMerchantName);
+        return success(result);
     }
 
     @GetMapping("/get-count")
@@ -138,8 +147,19 @@ public class ProductSpuController {
         reqVO.setPageSize(PAGE_SIZE_NONE);
         List<ProductSpuDO> list = productSpuService.getSpuPage(reqVO).getList();
         // 导出 Excel
-        ExcelUtils.write(response, "商品列表.xls", "数据", ProductSpuRespVO.class,
-                BeanUtils.toBean(list, ProductSpuRespVO.class));
+        List<ProductSpuRespVO> result = BeanUtils.toBean(list, ProductSpuRespVO.class);
+        result.forEach(this::fillMerchantName);
+        ExcelUtils.write(response, "商品列表.xls", "数据", ProductSpuRespVO.class, result);
+    }
+
+    private void fillMerchantName(ProductSpuRespVO spu) {
+        if (spu.getMerchantId() == null) {
+            return;
+        }
+        ProductMerchantDO merchant = merchantService.getMerchant(spu.getMerchantId());
+        if (merchant != null) {
+            spu.setMerchantName(merchant.getStoreName() != null ? merchant.getStoreName() : merchant.getName());
+        }
     }
 
 }

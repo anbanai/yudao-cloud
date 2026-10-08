@@ -49,7 +49,7 @@ public class AlipayBarPayClientTest extends AbstractAlipayClientTest {
         // mock 方法
         String outTradeNo = randomString();
         String notifyUrl = randomURL();
-        Integer price = randomInteger();
+        Integer price = 12345;
         String authCode = randomString();
         AlipayTradePayResponse response = randomPojo(AlipayTradePayResponse.class, o -> o.setSubCode(""));
         when(defaultAlipayClient.execute(argThat((ArgumentMatcher<AlipayTradePayRequest>) request -> {
@@ -102,7 +102,7 @@ public class AlipayBarPayClientTest extends AbstractAlipayClientTest {
                 .thenReturn(response);
         // 准备请求参数
         String authCode = randomString();
-        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, randomInteger());
+        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, 12345);
         Map<String, String> extraParam = new HashMap<>();
         extraParam.put("auth_code", authCode);
         reqDTO.setChannelExtras(extraParam);
@@ -126,7 +126,7 @@ public class AlipayBarPayClientTest extends AbstractAlipayClientTest {
     @DisplayName("支付宝条码支付：没有传条码")
     public void testUnifiedOrder_emptyAuthCode() {
         // 准备参数
-        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), randomString(), randomInteger());
+        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), randomString(), 12345);
 
         // 调用，并断言
         assertThrows(ServiceException.class, () -> client.unifiedOrder(reqDTO));
@@ -147,7 +147,7 @@ public class AlipayBarPayClientTest extends AbstractAlipayClientTest {
         // 准备请求参数
         String authCode = randomString();
         String outTradeNo = randomString();
-        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, randomInteger());
+        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, 12345);
         Map<String, String> extraParam = new HashMap<>();
         extraParam.put("auth_code", authCode);
         reqDTO.setChannelExtras(extraParam);

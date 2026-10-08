@@ -27,6 +27,7 @@ public interface ErrorCodeConstants {
     ErrorCode ORDER_DELIVERY_FAIL_COMBINATION_RECORD_STATUS_NOT_SUCCESS = new ErrorCode(1_011_000_022, "交易订单发货失败，拼团未成功");
     ErrorCode ORDER_DELIVERY_FAIL_BARGAIN_RECORD_STATUS_NOT_SUCCESS = new ErrorCode(1_011_000_023, "交易订单发货失败，砍价未成功");
     ErrorCode ORDER_DELIVERY_FAIL_DELIVERY_TYPE_NOT_EXPRESS = new ErrorCode(1_011_000_024, "交易订单发货失败，发货类型不是快递");
+    ErrorCode ORDER_DELIVERY_FAIL_SUB_ORDER_REQUIRED = new ErrorCode(1_011_000_041, "交易订单发货失败，多商家订单必须指定商家履约订单");
     ErrorCode ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID = new ErrorCode(1_011_000_025, "交易订单取消失败，订单不是【待支付】状态");
     ErrorCode ORDER_UPDATE_PRICE_FAIL_PAID = new ErrorCode(1_011_000_026, "支付订单调价失败，原因：支付订单已付款,不能调价");
     ErrorCode ORDER_UPDATE_PRICE_FAIL_ALREADY = new ErrorCode(1_011_000_027, "支付订单调价失败，原因：已经修改过价格");
@@ -43,6 +44,7 @@ public interface ErrorCodeConstants {
     ErrorCode ORDER_CREATE_FAIL_INSUFFICIENT_USER_POINTS = new ErrorCode(1_011_000_038, "交易订单创建失败，原因：用户积分不足");
     ErrorCode ORDER_PICK_UP_FAIL_STATUS_NOT_UNDELIVERED = new ErrorCode(1_011_000_039, "交易订单自提失败，订单不是【待核销】状态");
     ErrorCode ORDER_CREATE_PRICE_CHANGED = new ErrorCode(1_011_000_040, "订单价格或积分抵扣已变化，请重新确认");
+    ErrorCode ORDER_CREATE_MERCHANT_REQUIRED = new ErrorCode(1_011_000_042, "交易订单创建失败，商品缺少有效商家归属，请先完成数据迁移");
 
     // ========== After Sale 模块 1-011-000-100 ==========
     ErrorCode AFTER_SALE_NOT_FOUND = new ErrorCode(1_011_000_100, "售后单不存在");
@@ -63,6 +65,14 @@ public interface ErrorCodeConstants {
     ErrorCode AFTER_SALE_CANCEL_FAIL_STATUS_NOT_APPLY_OR_AGREE_OR_BUYER_DELIVERY =
             new ErrorCode(1_011_000_115, "取消售后单失败，售后单状态不是【待审核】或【卖家同意】或【商家待收货】");
     ErrorCode AFTER_SALE_CREATE_FAIL_ORDER_STATUS_COMBINATION_IN_PROGRESS = new ErrorCode(1_011_000_116, "订单拼团中，无法申请售后");
+    ErrorCode RETURN_SHIPMENT_PROVIDER_UNAVAILABLE = new ErrorCode(1_011_000_117, "当前暂不支持上门取件，请填写其他物流单号");
+    ErrorCode RETURN_SHIPMENT_ALREADY_EXISTS = new ErrorCode(1_011_000_118, "该售后单已存在退货物流单");
+    ErrorCode RETURN_SHIPMENT_ADDRESS_INVALID = new ErrorCode(1_011_000_119, "取件地址无效或不属于当前用户");
+    ErrorCode RETURN_SHIPMENT_WEIGHT_INVALID = new ErrorCode(1_011_000_120, "包裹重量不符合服务商要求");
+    ErrorCode RETURN_SHIPMENT_APPOINTMENT_INVALID = new ErrorCode(1_011_000_121, "预约取件时间无效");
+    ErrorCode RETURN_SHIPMENT_CANCEL_NOT_ALLOWED = new ErrorCode(1_011_000_122, "当前退货物流状态不允许取消");
+    ErrorCode RETURN_SHIPMENT_REFUND_FEE_NOT_READY = new ErrorCode(1_011_000_123, "退货运费尚未确认，暂不能退款");
+    ErrorCode RETURN_SHIPMENT_REFUND_FEE_EXCEEDS_REFUND = new ErrorCode(1_011_000_124, "退货运费超过可退款金额，暂不能退款");
 
     // ========== Cart 模块 1-011-002-000 ==========
     ErrorCode CARD_ITEM_NOT_FOUND = new ErrorCode(1_011_002_000, "购物车项不存在");

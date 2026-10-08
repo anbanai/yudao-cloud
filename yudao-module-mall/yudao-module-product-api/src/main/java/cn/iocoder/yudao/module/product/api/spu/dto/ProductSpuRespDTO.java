@@ -38,6 +38,10 @@ public class ProductSpuRespDTO {
      * 商品分类编号
      */
     private Long categoryId;
+    /** 商品实际销售商家编号 */
+    private Long merchantId;
+    /** 商家名称快照 */
+    private String merchantName;
     /**
      * 商品封面图
      */

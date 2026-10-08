@@ -23,6 +23,12 @@ public class AppMemberUserInfoRespVO {
     @Schema(description = "用户手机号", requiredMode = Schema.RequiredMode.REQUIRED, example = "15601691300")
     private String mobile;
 
+    private Boolean phoneVerified;
+
+    private Boolean identityLinked;
+
+    private Boolean phoneSharing;
+
     @Schema(description = "邮箱", example = "member@iocoder.cn")
     private String email;
 

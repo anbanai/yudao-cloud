@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `tenant_id` bigint NOT NULL DEFAULT 0,
   `order_id` bigint NOT NULL,
+  `sub_order_id` bigint DEFAULT NULL COMMENT '商家履约订单编号',
   `order_no` varchar(64) NOT NULL,
   `account_id` bigint NOT NULL,
   `logistics_id` bigint NOT NULL,
@@ -63,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_logistics_active_order` (`tenant_id`,`active_order_id`),
+  KEY `idx_logistics_active_order` (`tenant_id`,`active_order_id`),
   UNIQUE KEY `uk_logistics_provider_order` (`tenant_id`,`provider_order_no`),
   UNIQUE KEY `uk_logistics_waybill_no` (`tenant_id`,`waybill_no`),
   KEY `idx_logistics_waybill_status` (`tenant_id`,`status`)

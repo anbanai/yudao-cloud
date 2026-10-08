@@ -37,6 +37,20 @@ public class MemberPointApiImpl implements MemberPointApi {
     }
 
     @Override
+    public CommonResult<Boolean> addPointWithSnapshot(Long userId, Integer point, Integer bizType, String bizId,
+                                                      Integer pointCalculatePrice, Integer pointGiveBase,
+                                                      Integer pointGiveMultiplier) {
+        Assert.isTrue(point > 0);
+        MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
+        if (bizTypeEnum == null) {
+            throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
+        }
+        memberPointRecordService.createPointRecord(userId, point, bizTypeEnum, bizId,
+                pointCalculatePrice, pointGiveBase, pointGiveMultiplier);
+        return success(true);
+    }
+
+    @Override
     public CommonResult<Boolean> reducePoint(Long userId, Integer point, Integer bizType, String bizId) {
         Assert.isTrue(point > 0);
         MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
@@ -48,6 +62,20 @@ public class MemberPointApiImpl implements MemberPointApi {
     }
 
     @Override
+    public CommonResult<Boolean> reducePointWithSnapshot(Long userId, Integer point, Integer bizType, String bizId,
+                                                         Integer pointCalculatePrice, Integer pointGiveBase,
+                                                         Integer pointGiveMultiplier) {
+        Assert.isTrue(point > 0);
+        MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
+        if (bizTypeEnum == null) {
+            throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
+        }
+        memberPointRecordService.createPointRecord(userId, -point, bizTypeEnum, bizId,
+                pointCalculatePrice, pointGiveBase == null ? null : -pointGiveBase, pointGiveMultiplier);
+        return success(true);
+    }
+
+    @Override
     public CommonResult<Boolean> addPendingPoint(Long userId, Integer point, Integer bizType, String bizId) {
         Assert.isTrue(point > 0);
         MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
@@ -55,6 +83,20 @@ public class MemberPointApiImpl implements MemberPointApi {
             throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
         }
         memberPointRecordService.createPendingPointRecord(userId, point, bizTypeEnum, bizId);
+        return success(true);
+    }
+
+    @Override
+    public CommonResult<Boolean> addPendingPointWithSnapshot(Long userId, Integer point, Integer bizType, String bizId,
+                                                             Integer pointCalculatePrice, Integer pointGiveBase,
+                                                             Integer pointGiveMultiplier) {
+        Assert.isTrue(point > 0);
+        MemberPointBizTypeEnum bizTypeEnum = MemberPointBizTypeEnum.getByType(bizType);
+        if (bizTypeEnum == null) {
+            throw exception(POINT_RECORD_BIZ_NOT_SUPPORT);
+        }
+        memberPointRecordService.createPendingPointRecord(userId, point, bizTypeEnum, bizId,
+                pointCalculatePrice, pointGiveBase, pointGiveMultiplier);
         return success(true);
     }
 

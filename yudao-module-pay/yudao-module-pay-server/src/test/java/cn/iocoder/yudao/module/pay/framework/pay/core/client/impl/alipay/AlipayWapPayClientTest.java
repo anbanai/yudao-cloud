@@ -46,7 +46,7 @@ public class AlipayWapPayClientTest extends AbstractAlipayClientTest {
     public void testUnifiedOrder_success() throws AlipayApiException {
         // mock 方法
         String h5Body = randomString();
-        Integer price = randomInteger();
+        Integer price = 12345;
         AlipayTradeWapPayResponse response = randomPojo(AlipayTradeWapPayResponse.class, o -> {
             o.setSubCode("");
             o.setBody(h5Body);
@@ -91,7 +91,7 @@ public class AlipayWapPayClientTest extends AbstractAlipayClientTest {
         when(defaultAlipayClient.pageExecute(argThat((ArgumentMatcher<AlipayTradeWapPayRequest>) request -> true),
                 eq(Method.GET.name()))).thenReturn(response);
         String outTradeNo = randomString();
-        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, randomInteger());
+        PayOrderUnifiedReqDTO reqDTO = buildOrderUnifiedReqDTO(randomURL(), outTradeNo, 12345);
 
         // 调用
         PayOrderRespDTO resp = client.unifiedOrder(reqDTO);

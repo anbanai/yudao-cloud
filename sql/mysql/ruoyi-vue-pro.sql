@@ -7089,6 +7089,7 @@ DROP TABLE IF EXISTS `product_group`;
 CREATE TABLE `product_group` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品分组编号',
   `name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品分组名称',
+  `storefront_visible` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否在商城公开',
   `sort` int NOT NULL DEFAULT 0 COMMENT '排序',
   `status` tinyint NOT NULL COMMENT '状态：0 开启，1 禁用',
   `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '备注',

@@ -32,6 +32,17 @@ public interface TradeOrderItemMapper extends BaseMapperX<TradeOrderItemDO> {
         return selectList(TradeOrderItemDO::getOrderId, orderIds);
     }
 
+    default List<TradeOrderItemDO> selectListBySubOrderId(Long subOrderId) {
+        return selectList(TradeOrderItemDO::getSubOrderId, subOrderId);
+    }
+
+    /** Explicit tenant scope for report queries; the legacy order DO is not TenantBaseDO. */
+    default List<TradeOrderItemDO> selectListByOrderIdsAndTenant(Collection<Long> orderIds, Long tenantId) {
+        return selectList(new LambdaQueryWrapperX<TradeOrderItemDO>()
+                .in(TradeOrderItemDO::getOrderId, orderIds)
+                .apply("tenant_id = {0}", tenantId));
+    }
+
     default TradeOrderItemDO selectByIdAndUserId(Long orderItemId, Long loginUserId) {
         return selectOne(new LambdaQueryWrapperX<TradeOrderItemDO>()
                 .eq(TradeOrderItemDO::getId, orderItemId)

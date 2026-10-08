@@ -24,6 +24,8 @@ public class ProductGroupSaveReqVO {
     @NotNull(message = "状态不能为空")
     @InEnum(CommonStatusEnum.class)
     private Integer status;
+    @Schema(description = "是否在商城公开；创建时未传默认公开，更新时未传保留原值")
+    private Boolean storefrontVisible;
     @Schema(description = "备注")
     private String remark;
 }

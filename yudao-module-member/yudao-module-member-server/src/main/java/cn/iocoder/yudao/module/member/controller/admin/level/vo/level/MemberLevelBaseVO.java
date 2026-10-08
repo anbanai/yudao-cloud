@@ -37,6 +37,11 @@ public class MemberLevelBaseVO {
     @Range(min = 0, max = 100, message = "享受折扣的范围为 0-100")
     private Integer discountPercent;
 
+    @Schema(description = "消费返积分倍率，按千分比传输，例如 1.2 倍传 1200", requiredMode = Schema.RequiredMode.REQUIRED, example = "1000")
+    @NotNull(message = "消费返积分倍率不能为空")
+    @Range(min = 0, max = 10000, message = "消费返积分倍率范围为 0-10000")
+    private Integer pointTradeGiveMultiplier = 1000;
+
     @Schema(description = "等级图标", example = "https://www.iocoder.cn/yudao.jpg")
     @URL(message = "等级图标必须是 URL 格式")
     private String icon;

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.controller.admin.order;
 import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.*;
@@ -92,13 +93,16 @@ public class TradeOrderController {
         }
         // 查询订单项
         List<TradeOrderItemDO> orderItems = tradeOrderQueryService.getOrderItemListByOrderId(id);
+        List<cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO> subOrders = tradeOrderQueryService.getOrderSubListByOrderId(id);
 
         // 拼接数据
         MemberUserRespDTO user = memberUserApi.getUser(order.getUserId()).getCheckedData();
         MemberUserRespDTO brokerageUser = order.getBrokerageUserId() != null ?
                 memberUserApi.getUser(order.getBrokerageUserId()).getCheckedData() : null;
         List<TradeOrderLogDO> orderLogs = tradeOrderLogService.getOrderLogListByOrderId(id);
-        return success(TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser));
+        TradeOrderDetailRespVO result = TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser);
+        result.setSubOrders(BeanUtils.toBean(subOrders, TradeOrderSubRespVO.class));
+        return success(result);
     }
 
     @GetMapping("/get-express-track-list")

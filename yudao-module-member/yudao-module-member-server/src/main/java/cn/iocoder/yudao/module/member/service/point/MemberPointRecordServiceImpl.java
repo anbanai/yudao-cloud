@@ -44,6 +44,9 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
     @Resource
     private MemberUserService memberUserService;
 
+    @Resource
+    private MemberPointBatchService memberPointBatchService;
+
     @Override
     public PageResult<MemberPointRecordDO> getPointRecordPage(MemberPointRecordPageReqVO pageReqVO) {
         // 根据用户昵称查询出用户 ids
@@ -68,6 +71,13 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId) {
+        createPointRecord(userId, point, bizType, bizId, null, null, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId,
+                                  Integer pointCalculatePrice, Integer pointGiveBase, Integer pointGiveMultiplier) {
         if (point == 0) {
             return;
         }
@@ -75,6 +85,15 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         if (isOrderGiveBizType(bizType)
                 && memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(userId, bizType.getType(), bizId) != null) {
             return;
+        }
+        int rollbackPoint = 0;
+        if (point < 0 && isRewardRollbackBizType(bizType) && memberPointBatchService != null) {
+            Long sourceRecordId = findRewardSourceRecordId(userId, bizType, bizId);
+            rollbackPoint = memberPointBatchService.rollbackGrant(userId, sourceRecordId, -point, bizId);
+            if (rollbackPoint <= 0) {
+                return;
+            }
+            point = -rollbackPoint;
         }
         // 1. 校验用户积分余额
         Integer userPoint = ObjectUtil.defaultIfNull(user.getPoint(), 0);
@@ -99,8 +118,27 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
                 .setTitle(bizType.getName()).setDescription(StrUtil.format(bizType.getDescription(), point))
                 .setPoint(point).setTotalPoint(totalPoint)
                 .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus())
-                .setEffectiveTime(LocalDateTime.now());
+                .setEffectiveTime(LocalDateTime.now())
+                .setPointCalculatePrice(pointCalculatePrice).setPointGiveBase(pointGiveBase)
+                .setPointGiveMultiplier(pointGiveMultiplier);
         memberPointRecordMapper.insert(record);
+        if (memberPointBatchService != null && point > 0
+                && (bizType == MemberPointBizTypeEnum.ORDER_USE_CANCEL
+                || bizType == MemberPointBizTypeEnum.ORDER_USE_CANCEL_ITEM)) {
+            memberPointBatchService.restore(userId, record.getId(), point, bizId);
+        } else if (memberPointBatchService != null && point > 0) {
+            memberPointBatchService.grant(record);
+        } else if (memberPointBatchService != null && bizType == MemberPointBizTypeEnum.ORDER_USE) {
+            memberPointBatchService.consume(userId, record.getId(), -point, bizId);
+        }
+    }
+
+    private Long findRewardSourceRecordId(Long userId, MemberPointBizTypeEnum rollbackType, String bizId) {
+        MemberPointBizTypeEnum sourceType = rollbackType == MemberPointBizTypeEnum.ORDER_GIVE_CANCEL
+                ? MemberPointBizTypeEnum.ORDER_GIVE : MemberPointBizTypeEnum.ORDER_GIVE_PENDING;
+        MemberPointRecordDO source = memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(
+                userId, sourceType.getType(), bizId);
+        return source == null ? null : source.getId();
     }
 
     private boolean isOrderGiveBizType(MemberPointBizTypeEnum bizType) {
@@ -117,6 +155,13 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createPendingPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId) {
+        createPendingPointRecord(userId, point, bizType, bizId, null, null, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createPendingPointRecord(Long userId, Integer point, MemberPointBizTypeEnum bizType, String bizId,
+                                         Integer pointCalculatePrice, Integer pointGiveBase, Integer pointGiveMultiplier) {
         if (point == null || point <= 0) {
             return;
         }
@@ -130,7 +175,9 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
                 .setUserId(userId).setBizId(bizId).setBizType(bizType.getType())
                 .setTitle(bizType.getName()).setDescription(StrUtil.format(bizType.getDescription(), point))
                 .setPoint(point).setTotalPoint(totalPoint)
-                .setStatus(MemberPointRecordStatusEnum.PENDING.getStatus());
+                .setStatus(MemberPointRecordStatusEnum.PENDING.getStatus())
+                .setPointCalculatePrice(pointCalculatePrice).setPointGiveBase(pointGiveBase)
+                .setPointGiveMultiplier(pointGiveMultiplier);
         memberPointRecordMapper.insert(record);
     }
 
@@ -154,6 +201,10 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         }
         memberPointRecordMapper.updateById(new MemberPointRecordDO().setId(record.getId())
                 .setTotalPoint(totalPoint).setEffectiveTime(LocalDateTime.now()));
+        record.setTotalPoint(totalPoint).setEffectiveTime(LocalDateTime.now());
+        if (memberPointBatchService != null) {
+            memberPointBatchService.grant(record);
+        }
     }
 
     @Override
@@ -195,9 +246,15 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         if (point <= 0) {
             return;
         }
-        int changedPoint = -point;
+        int rollbackPoint = memberPointBatchService == null ? point
+                : memberPointBatchService.rollbackGrant(userId, giveRecord.getId(), point, orderItemId);
+        if (rollbackPoint <= 0) {
+            return;
+        }
+        int changedPoint = -rollbackPoint;
         int totalPoint = ObjectUtil.defaultIfNull(user.getPoint(), 0) + changedPoint;
-        if (!memberUserService.updateUserPoint(userId, changedPoint)) {
+        if (!memberUserService.updateUserPoint(userId, changedPoint)
+                && !memberUserService.updateUserPointForRewardRollback(userId, changedPoint)) {
             throw exception(USER_POINT_NOT_ENOUGH);
         }
         MemberPointRecordDO rollbackRecord = new MemberPointRecordDO()
@@ -206,7 +263,10 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
                 .setDescription(StrUtil.format(rollbackBizType.getDescription(), changedPoint))
                 .setPoint(changedPoint).setTotalPoint(totalPoint)
                 .setStatus(MemberPointRecordStatusEnum.EFFECTIVE.getStatus())
-                .setEffectiveTime(LocalDateTime.now());
+                .setEffectiveTime(LocalDateTime.now())
+                .setPointCalculatePrice(giveRecord.getPointCalculatePrice())
+                .setPointGiveBase(giveRecord.getPointGiveBase() == null ? null : -giveRecord.getPointGiveBase())
+                .setPointGiveMultiplier(giveRecord.getPointGiveMultiplier());
         memberPointRecordMapper.insert(rollbackRecord);
     }
 

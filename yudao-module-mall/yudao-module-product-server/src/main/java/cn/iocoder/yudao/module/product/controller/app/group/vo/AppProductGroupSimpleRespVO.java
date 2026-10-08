@@ -8,4 +8,7 @@ import lombok.Data;
 public class AppProductGroupSimpleRespVO {
     private Long id;
     private String name;
+    private Integer sort;
+    private Integer status;
+    private Boolean storefrontVisible;
 }

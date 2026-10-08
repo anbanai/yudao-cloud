@@ -27,6 +27,8 @@ public class ProductBrandDO extends BaseDO {
      */
     @TableId
     private Long id;
+    /** 品牌默认归属商家编号 */
+    private Long merchantId;
     /**
      * 品牌名称
      */
