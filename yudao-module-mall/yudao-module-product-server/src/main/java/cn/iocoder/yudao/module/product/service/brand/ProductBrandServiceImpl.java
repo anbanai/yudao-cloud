@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.service.brand;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.brand.vo.ProductBrandCreateReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.brand.vo.ProductBrandListReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.brand.vo.ProductBrandPageReqVO;
@@ -34,6 +35,9 @@ public class ProductBrandServiceImpl implements ProductBrandService {
     private ProductBrandMapper brandMapper;
 
     @Resource
+    private FileApi fileApi;
+
+    @Resource
     private ProductMerchantService merchantService;
 
     @Override
@@ -41,6 +45,7 @@ public class ProductBrandServiceImpl implements ProductBrandService {
         // 校验
         validateBrandNameUnique(null, createReqVO.getName());
         merchantService.validateMerchantAvailable(createReqVO.getMerchantId());
+        validateProductImage(createReqVO.getPicUrl());
 
         // 插入
         ProductBrandDO brand = ProductBrandConvert.INSTANCE.convert(createReqVO);
@@ -55,9 +60,16 @@ public class ProductBrandServiceImpl implements ProductBrandService {
         validateBrandExists(updateReqVO.getId());
         validateBrandNameUnique(updateReqVO.getId(), updateReqVO.getName());
         merchantService.validateMerchantAvailable(updateReqVO.getMerchantId());
+        validateProductImage(updateReqVO.getPicUrl());
         // 更新
         ProductBrandDO updateObj = ProductBrandConvert.INSTANCE.convert(updateReqVO);
         brandMapper.updateById(updateObj);
+    }
+
+    private void validateProductImage(String url) {
+        if (!Boolean.TRUE.equals(fileApi.validateImageUrl(url, "product").getCheckedData())) {
+            throw exception(SPU_IMAGE_INVALID);
+        }
     }
 
     @Override
@@ -123,6 +135,16 @@ public class ProductBrandServiceImpl implements ProductBrandService {
     @Override
     public List<ProductBrandDO> getBrandListByStatus(Integer status) {
         return brandMapper.selectListByStatus(status);
+    }
+
+    @Override
+    public List<ProductBrandDO> getBrandListByStatusAndMerchantId(Integer status, Long merchantId) {
+        return brandMapper.selectListByStatusAndMerchantId(status, merchantId);
+    }
+
+    @Override
+    public List<ProductBrandDO> getBrandList(ProductBrandListReqVO listReqVO, Long merchantId) {
+        return brandMapper.selectListByMerchantId(listReqVO, merchantId);
     }
 
 }

@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategoryListReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategorySaveReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
@@ -36,6 +37,8 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
     @Resource
     private ProductCategoryMapper productCategoryMapper;
     @Resource
+    private FileApi fileApi;
+    @Resource
     @Lazy // 循环依赖，避免报错
     private ProductSpuService productSpuService;
 
@@ -43,6 +46,7 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
     public Long createCategory(ProductCategorySaveReqVO createReqVO) {
         // 校验父分类存在
         validateParentProductCategory(createReqVO.getParentId());
+        validateProductImage(createReqVO.getPicUrl());
 
         // 插入
         ProductCategoryDO category = BeanUtils.toBean(createReqVO, ProductCategoryDO.class);
@@ -57,10 +61,17 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
         validateProductCategoryExists(updateReqVO.getId());
         // 校验父分类存在
         validateParentProductCategory(updateReqVO.getParentId());
+        validateProductImage(updateReqVO.getPicUrl());
 
         // 更新
         ProductCategoryDO updateObj = BeanUtils.toBean(updateReqVO, ProductCategoryDO.class);
         productCategoryMapper.updateById(updateObj);
+    }
+
+    private void validateProductImage(String url) {
+        if (!Boolean.TRUE.equals(fileApi.validateImageUrl(url, "product").getCheckedData())) {
+            throw exception(SPU_IMAGE_INVALID);
+        }
     }
 
     @Override

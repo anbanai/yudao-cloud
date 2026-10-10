@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.product.service.comment;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.product.api.comment.dto.ProductCommentCreateReqDTO;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.*;
@@ -39,6 +41,9 @@ public class ProductCommentServiceImpl implements ProductCommentService {
     private ProductCommentMapper productCommentMapper;
 
     @Resource
+    private FileApi fileApi;
+
+    @Resource
     private ProductSpuService productSpuService;
 
     @Resource
@@ -54,6 +59,7 @@ public class ProductCommentServiceImpl implements ProductCommentService {
         ProductSkuDO sku = validateSku(createReqVO.getSkuId());
         // 校验 SPU
         ProductSpuDO spu = validateSpu(sku.getSpuId());
+        validateProductImages(createReqVO.getPicUrls());
 
         // 创建评论
         ProductCommentDO comment = ProductCommentConvert.INSTANCE.convert(createReqVO, spu, sku);
@@ -66,6 +72,7 @@ public class ProductCommentServiceImpl implements ProductCommentService {
         ProductSkuDO sku = validateSku(createReqDTO.getSkuId());
         // 校验 SPU
         ProductSpuDO spu = validateSpu(sku.getSpuId());
+        validateProductImages(createReqDTO.getPicUrls());
         // 校验评论
         validateCommentExists(createReqDTO.getUserId(), createReqDTO.getOrderItemId());
         // 获取用户详细信息
@@ -75,6 +82,18 @@ public class ProductCommentServiceImpl implements ProductCommentService {
         ProductCommentDO comment = ProductCommentConvert.INSTANCE.convert(createReqDTO, spu, sku, user);
         productCommentMapper.insert(comment);
         return comment.getId();
+    }
+
+    private void validateProductImages(List<String> urls) {
+        for (String url : urls == null ? List.<String>of() : urls) {
+            validateProductImage(url);
+        }
+    }
+
+    private void validateProductImage(String url) {
+        if (!Boolean.TRUE.equals(fileApi.validateImageUrl(url, "product").getCheckedData())) {
+            throw exception(SPU_IMAGE_INVALID);
+        }
     }
 
     /**
