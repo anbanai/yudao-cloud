@@ -25,7 +25,7 @@ public final class FileUploadPolicy {
         String extension = normalizeExtension(name);
         String actualType = detectType(content);
         if (!scene.getExtensions().contains(extension) || !isAllowedImageType(scene, actualType)
-                || (declaredType != null && !declaredType.isBlank() && !isSameImageType(declaredType, actualType))) {
+                || (isSpecificType(declaredType) && !isSameImageType(declaredType, actualType))) {
             throw exception(FILE_UPLOAD_TYPE_NOT_SUPPORTED, scene.getValue(), scene.getExtensions());
         }
     }
@@ -101,14 +101,14 @@ public final class FileUploadPolicy {
         if (scene == FileUploadSceneEnum.MERCHANT_QUALIFICATION) {
             return "application/pdf".equals(type) || "image/jpeg".equals(type) || "image/png".equals(type);
         }
-        return isAllowedImageType(scene, type);
+        return !isSpecificType(type) || isAllowedImageType(scene, type);
     }
 
     private static boolean isAllowedImageType(FileUploadSceneEnum scene, String type) {
         if (type == null) {
             return false;
         }
-        String normalized = type.toLowerCase(Locale.ROOT).split(";", 2)[0].trim();
+        String normalized = normalizeImageType(type);
         return switch (scene) {
             case MATERIAL -> normalized.equals("image/gif") || normalized.equals("image/jpeg")
                     || normalized.equals("image/png") || normalized.equals("image/bmp");
@@ -121,8 +121,20 @@ public final class FileUploadPolicy {
     }
 
     private static boolean isSameImageType(String declaredType, String actualType) {
-        return declaredType.toLowerCase(Locale.ROOT).split(";", 2)[0].trim()
-                .equals(actualType.toLowerCase(Locale.ROOT).split(";", 2)[0].trim());
+        return normalizeImageType(declaredType).equals(normalizeImageType(actualType));
+    }
+
+    private static boolean isSpecificType(String type) {
+        if (type == null || type.isBlank()) {
+            return false;
+        }
+        String normalized = normalizeImageType(type);
+        return !"application/octet-stream".equals(normalized);
+    }
+
+    private static String normalizeImageType(String type) {
+        String normalized = type.toLowerCase(Locale.ROOT).split(";", 2)[0].trim();
+        return "image/jpg".equals(normalized) ? "image/jpeg" : normalized;
     }
 
 }

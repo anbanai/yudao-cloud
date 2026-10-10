@@ -87,7 +87,7 @@ public class FileServiceImpl implements FileService {
     public String createFile(byte[] content, String name, String directory, String type, FileUploadSceneEnum scene) {
         FileUploadPolicy.validateImage(scene, name, content, type);
         FileClient client = getPublicMasterFileClient();
-        return createFile(client, content, name, directory, type, false).getUrl();
+        return createFile(client, content, name, directory, type, false, scene).getUrl();
     }
 
     @Override
@@ -98,16 +98,19 @@ public class FileServiceImpl implements FileService {
         if (client == null || !client.isPrivatePresignedGetSupported()) {
             throw exception(FILE_PRIVATE_MASTER_NOT_EXISTS);
         }
-        return createFile(client, content, name, directory, type, true);
+        return createFile(client, content, name, directory, type, true, FileUploadSceneEnum.GENERAL);
     }
 
     private FileDO createFile(FileClient client, byte[] content, String name, String directory, String type,
-                              boolean removeUrlQuery) throws Exception {
+                              boolean removeUrlQuery, FileUploadSceneEnum scene) throws Exception {
         // 1.1 处理 name 的合法性，禁止携带目录路径
         name = FilePathUtils.validateFileName(name);
 
         // 1.2.1 处理 type 为空的情况
-        if (StrUtil.isEmpty(type)) {
+        boolean detectType = StrUtil.isEmpty(type)
+                || (scene != null && scene != FileUploadSceneEnum.GENERAL
+                && "application/octet-stream".equalsIgnoreCase(StrUtil.subBefore(type, ";", true).trim()));
+        if (detectType) {
             type = FileTypeUtils.getMineType(content, name);
         }
         // 1.2.2 处理 name 为空的情况

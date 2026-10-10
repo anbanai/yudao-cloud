@@ -25,14 +25,15 @@ import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
@@ -66,9 +67,6 @@ public class ProductSpuServiceImpl implements ProductSpuService {
 
     @Resource
     private FileApi fileApi;
-
-    private static final Pattern HTML_IMAGE_SRC = Pattern.compile(
-            "<img\\b[^>]*\\bsrc\\s*=\\s*[\\\"']([^\\\"']+)[\\\"']", Pattern.CASE_INSENSITIVE);
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -176,13 +174,42 @@ public class ProductSpuServiceImpl implements ProductSpuService {
             reqVO.getSkus().stream().map(ProductSkuSaveReqVO::getPicUrl).forEach(imageUrls::add);
         }
         if (reqVO.getDescription() != null) {
-            Matcher matcher = HTML_IMAGE_SRC.matcher(reqVO.getDescription());
-            while (matcher.find()) {
-                imageUrls.add(matcher.group(1));
-            }
-            if (reqVO.getDescription().toLowerCase(Locale.ROOT).contains("data:image/")) {
+            Document description = Jsoup.parseBodyFragment(reqVO.getDescription());
+            if (description.select("svg").size() > 0
+                    || description.select("link[href]").stream().anyMatch(element ->
+                    Arrays.stream(element.attr("rel").split("\\s+"))
+                            .anyMatch("stylesheet"::equalsIgnoreCase))
+                    || description.select("style").stream()
+                    .anyMatch(element -> containsCssImageReference(element.data()))
+                    || description.getAllElements().stream()
+                    .anyMatch(element -> containsCssImageReference(element.attr("style")))) {
                 throw exception(SPU_IMAGE_INVALID);
             }
+            for (Element image : description.select(
+                    "img[src], img[data-src], img[original-src], img[srcset], source[srcset], video[poster]")) {
+                String source = image.attr("src");
+                if (source.isBlank()) {
+                    source = image.attr("data-src");
+                }
+                if (!source.isBlank()) {
+                    imageUrls.add(source);
+                }
+                if (image.hasAttr("original-src")) {
+                    imageUrls.add(image.attr("original-src"));
+                }
+                if (image.hasAttr("poster")) {
+                    imageUrls.add(image.attr("poster"));
+                }
+                if (image.hasAttr("srcset")) {
+                    Arrays.stream(image.attr("srcset").split(","))
+                            .map(candidate -> candidate.trim().split("\\s+", 2)[0])
+                            .filter(url -> !url.isBlank())
+                            .forEach(imageUrls::add);
+                }
+            }
+        }
+        if (imageUrls.stream().anyMatch(this::isDataImageReference)) {
+            throw exception(SPU_IMAGE_INVALID);
         }
         imageUrls.stream().filter(this::isExternalImageReference).distinct().forEach(url -> {
             if (!Boolean.TRUE.equals(fileApi.validateImageUrl(url, "product").getCheckedData())) {
@@ -192,7 +219,20 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     }
 
     private boolean isExternalImageReference(String url) {
-        return url != null && !url.isBlank() && !url.startsWith("data:");
+        return url != null && !url.isBlank() && !isDataImageReference(url);
+    }
+
+    private boolean isDataImageReference(String url) {
+        return url != null && url.stripLeading().regionMatches(true, 0, "data:", 0, 5);
+    }
+
+    private boolean containsCssImageReference(String style) {
+        if (style == null) {
+            return false;
+        }
+        String normalized = style.toLowerCase(Locale.ROOT);
+        return normalized.contains("url") || normalized.contains("image-set") || normalized.contains("@import")
+                || style.contains("\\") || style.contains("/*") || style.contains("*/");
     }
 
     @Override

@@ -10,6 +10,7 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.*;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
+import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileUploadPolicy;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -49,6 +50,8 @@ public class FileController {
             schema = @Schema(type = "string", format = "binary"))
     public CommonResult<String> uploadFile(@Valid FileUploadReqVO uploadReqVO) throws Exception {
         MultipartFile file = uploadReqVO.getFile();
+        FileUploadPolicy.validateMetadata(uploadReqVO.getUploadScene(), file.getOriginalFilename(),
+                file.getContentType(), file.getSize());
         byte[] content = IoUtil.readBytes(file.getInputStream());
         return success(fileService.createFile(content, file.getOriginalFilename(),
                 uploadReqVO.getDirectory(), file.getContentType(), uploadReqVO.getUploadScene()));

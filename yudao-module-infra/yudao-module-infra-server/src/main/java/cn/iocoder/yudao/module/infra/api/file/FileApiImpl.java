@@ -72,6 +72,7 @@ public class FileApiImpl implements FileApi {
             return success(false);
         }
         try {
+            FileUploadPolicy.validateMetadata(uploadScene, file.getName(), file.getType(), file.getSize());
             byte[] content = fileService.getFileContent(file.getConfigId(), file.getPath());
             FileUploadPolicy.validateImage(uploadScene, file.getName(), content, file.getType());
             return success(true);

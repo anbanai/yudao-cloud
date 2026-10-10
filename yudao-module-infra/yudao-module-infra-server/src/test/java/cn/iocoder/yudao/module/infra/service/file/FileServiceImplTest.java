@@ -151,6 +151,22 @@ public class FileServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testCreateProductImage_octetStreamMimeTypeDetectsImageType() throws Exception {
+        byte[] content = ResourceUtil.readBytes("file/erweima.jpg");
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getMasterFileClient()).thenReturn(client);
+        when(client.upload(same(content), anyString(), eq("image/jpeg"))).thenReturn("https://cdn.example/product.jpg");
+        when(client.getId()).thenReturn(10L);
+
+        String url = fileService.createFile(content, "product.jpg", "products", "application/octet-stream",
+                FileUploadSceneEnum.PRODUCT);
+
+        assertEquals("https://cdn.example/product.jpg", url);
+        FileDO file = fileMapper.selectOne(FileDO::getUrl, url);
+        assertEquals("image/jpeg", file.getType());
+    }
+
+    @Test
     public void testCreateFile_missingPublicMaster() {
         when(fileConfigService.getMasterFileClient()).thenReturn(null);
 

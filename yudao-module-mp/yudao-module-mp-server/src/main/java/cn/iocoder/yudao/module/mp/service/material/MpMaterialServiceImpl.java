@@ -69,7 +69,7 @@ public class MpMaterialServiceImpl implements MpMaterialService {
         }
 
         // 第二步，尝试从临时素材中下载
-        String url = downloadMedia(accountId, mediaId);
+        String url = downloadMedia(accountId, mediaId, type);
         if (url == null) {
             return null;
         }
@@ -101,7 +101,7 @@ public class MpMaterialServiceImpl implements MpMaterialService {
             result = mpService.getMaterialService().mediaUpload(reqVO.getType(), file);
             // 上传到文件服务
             mediaId = ObjUtil.defaultIfNull(result.getMediaId(), result.getThumbMediaId());
-            url = uploadFile(mediaId, file);
+            url = uploadFile(mediaId, file, reqVO.getType());
         } catch (WxErrorException e) {
             throw exception(MATERIAL_UPLOAD_FAIL, e.getError().getErrorMsg());
         } finally {
@@ -137,7 +137,7 @@ public class MpMaterialServiceImpl implements MpMaterialService {
                     MpMaterialConvert.INSTANCE.convert(name, file, reqVO.getTitle(), reqVO.getIntroduction()));
             // 上传到文件服务
             mediaId = ObjUtil.defaultIfNull(result.getMediaId(), result.getMediaId());
-            url = uploadFile(mediaId, file);
+            url = uploadFile(mediaId, file, reqVO.getType());
         } catch (WxErrorException e) {
             throw exception(MATERIAL_UPLOAD_FAIL, e.getError().getErrorMsg());
         } finally {
@@ -210,14 +210,14 @@ public class MpMaterialServiceImpl implements MpMaterialService {
      * @param mediaId 媒体文件编号
      * @return 上传后的 URL
      */
-    public String downloadMedia(Long accountId, String mediaId) {
+    public String downloadMedia(Long accountId, String mediaId, String type) {
         WxMpService mpService = mpServiceFactory.getMpService(accountId);
         for (int i = 0; i < 3; i++) {
             try {
                 // 第一步，从公众号下载媒体文件
                 File file = mpService.getMaterialService().mediaDownload(mediaId);
                 // 第二步，上传到文件服务
-                return uploadFile(mediaId, file);
+                return uploadFile(mediaId, file, type);
             } catch (WxErrorException e) {
                 log.error("[mediaDownload][media({}) 第 ({}) 次下载失败]", mediaId, i);
             }
@@ -225,12 +225,18 @@ public class MpMaterialServiceImpl implements MpMaterialService {
         return null;
     }
 
-    private String uploadFile(String mediaId, File file) {
+    private String uploadFile(String mediaId, File file, String materialType) {
         String path = mediaId + "." + FileTypeUtil.getType(file);
-        return fileApi.createFile(FileUtil.readBytes(file), path, null, null, FileUploadSceneEnum.MATERIAL);
+        byte[] content = FileUtil.readBytes(file);
+        if ("image".equalsIgnoreCase(materialType) || "thumb".equalsIgnoreCase(materialType)) {
+            return fileApi.createFile(content, path, null, null, FileUploadSceneEnum.MATERIAL);
+        }
+        return fileApi.createFile(content, path, null, null);
     }
 
     private void validateImageUpload(org.springframework.web.multipart.MultipartFile file) throws IOException {
+        FileUploadPolicy.validateMetadata(FileUploadSceneEnum.MATERIAL, file.getOriginalFilename(),
+                file.getContentType(), file.getSize());
         FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL, file.getOriginalFilename(),
                 file.getBytes(), file.getContentType());
     }

@@ -25,11 +25,23 @@ class FileUploadPolicyTest {
         assertDoesNotThrow(() -> FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL,
                 "banner.jpg", imageBytes("JPEG"), "image/jpeg"));
         assertDoesNotThrow(() -> FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL,
+                "banner.jpg", imageBytes("JPEG"), "image/jpg"));
+        assertDoesNotThrow(() -> FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL,
                 "banner.png", imageBytes("PNG"), "image/png"));
         assertDoesNotThrow(() -> FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL,
                 "banner.bmp", imageBytes("BMP"), "image/bmp"));
+        assertDoesNotThrow(() -> FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL,
+                "banner.jpg", imageBytes("JPEG"), "application/octet-stream"));
+        assertDoesNotThrow(() -> FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL,
+                "banner.jpg", imageBytes("JPEG"), null));
         assertDoesNotThrow(() -> FileUploadPolicy.validateMetadata(FileUploadSceneEnum.MATERIAL,
                 "banner.jpg", "image/jpeg", 10L * 1024 * 1024));
+        assertDoesNotThrow(() -> FileUploadPolicy.validateMetadata(FileUploadSceneEnum.MATERIAL,
+                "banner.jpg", "image/jpg", 10L * 1024 * 1024));
+        assertDoesNotThrow(() -> FileUploadPolicy.validateMetadata(FileUploadSceneEnum.MATERIAL,
+                "banner.jpg", "application/octet-stream", 10L * 1024 * 1024));
+        assertDoesNotThrow(() -> FileUploadPolicy.validateMetadata(FileUploadSceneEnum.MATERIAL,
+                "banner.jpg", null, 10L * 1024 * 1024));
         AssertUtils.assertServiceException(() -> FileUploadPolicy.validateImage(
                 FileUploadSceneEnum.MATERIAL, "banner.gif", new byte[10 * 1024 * 1024 + 1], "image/gif"),
                 FILE_UPLOAD_SIZE_EXCEEDED, "material", 10);
