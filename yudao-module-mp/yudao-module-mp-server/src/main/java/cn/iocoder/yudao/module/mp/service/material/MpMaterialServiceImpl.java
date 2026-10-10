@@ -6,6 +6,8 @@ import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
+import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileUploadPolicy;
 import cn.iocoder.yudao.module.mp.controller.admin.material.vo.MpMaterialPageReqVO;
 import cn.iocoder.yudao.module.mp.controller.admin.material.vo.MpMaterialUploadNewsImageReqVO;
 import cn.iocoder.yudao.module.mp.controller.admin.material.vo.MpMaterialUploadPermanentReqVO;
@@ -82,6 +84,9 @@ public class MpMaterialServiceImpl implements MpMaterialService {
 
     @Override
     public MpMaterialDO uploadTemporaryMaterial(MpMaterialUploadTemporaryReqVO reqVO) throws IOException {
+        if ("image".equalsIgnoreCase(reqVO.getType())) {
+            validateImageUpload(reqVO.getFile());
+        }
         WxMpService mpService = mpServiceFactory.getRequiredMpService(reqVO.getAccountId());
         // 第一步，上传到公众号
         File file = null;
@@ -113,6 +118,9 @@ public class MpMaterialServiceImpl implements MpMaterialService {
 
     @Override
     public MpMaterialDO uploadPermanentMaterial(MpMaterialUploadPermanentReqVO reqVO) throws IOException {
+        if ("image".equalsIgnoreCase(reqVO.getType())) {
+            validateImageUpload(reqVO.getFile());
+        }
         WxMpService mpService = mpServiceFactory.getRequiredMpService(reqVO.getAccountId());
         // 第一步，上传到公众号
         String name = StrUtil.blankToDefault(reqVO.getName(), reqVO.getFile().getName());
@@ -146,6 +154,7 @@ public class MpMaterialServiceImpl implements MpMaterialService {
 
     @Override
     public String uploadNewsImage(MpMaterialUploadNewsImageReqVO reqVO) throws IOException {
+        validateImageUpload(reqVO.getFile());
         WxMpService mpService = mpServiceFactory.getRequiredMpService(reqVO.getAccountId());
         File file = null;
         try {
@@ -218,7 +227,12 @@ public class MpMaterialServiceImpl implements MpMaterialService {
 
     private String uploadFile(String mediaId, File file) {
         String path = mediaId + "." + FileTypeUtil.getType(file);
-        return fileApi.createFile(FileUtil.readBytes(file), path);
+        return fileApi.createFile(FileUtil.readBytes(file), path, null, null, FileUploadSceneEnum.MATERIAL);
+    }
+
+    private void validateImageUpload(org.springframework.web.multipart.MultipartFile file) throws IOException {
+        FileUploadPolicy.validateImage(FileUploadSceneEnum.MATERIAL, file.getOriginalFilename(),
+                file.getBytes(), file.getContentType());
     }
 
 }

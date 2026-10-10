@@ -34,6 +34,10 @@ public interface ErrorCodeConstants {
     ErrorCode FILE_NOT_EXISTS = new ErrorCode(1_001_003_001, "文件不存在");
     ErrorCode FILE_IS_EMPTY = new ErrorCode(1_001_003_002, "文件为空");
     ErrorCode FILE_PATH_INVALID = new ErrorCode(1_001_003_003, "文件路径不正确");
+    ErrorCode FILE_UPLOAD_SIZE_EXCEEDED = new ErrorCode(1_001_003_004, "{} 场景文件大小不能超过 {}MB");
+    ErrorCode FILE_UPLOAD_TYPE_NOT_SUPPORTED = new ErrorCode(1_001_003_005, "{} 场景仅支持文件格式：{}");
+    ErrorCode FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED = new ErrorCode(1_001_003_006,
+            "{} 场景图片请通过服务端上传，以校验文件内容和大小");
 
     // ========== 代码生成器 1-001-004-000 ==========
     ErrorCode CODEGEN_TABLE_EXISTS = new ErrorCode(1_001_004_002, "表定义已经存在");

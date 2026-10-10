@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.test.core.util.AssertUtils;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileCreateReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePageReqVO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
 import cn.iocoder.yudao.module.infra.dal.mysql.file.FileMapper;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.FileClient;
 import jakarta.annotation.Resource;
@@ -26,6 +27,7 @@ import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.*;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PATH_INVALID;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PUBLIC_MASTER_NOT_EXISTS;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
@@ -293,6 +295,7 @@ public class FileServiceImplTest extends BaseDbUnitTest {
             o.setPath("avatar/test.jpg");
             o.setName("test.jpg");
             o.setUrl("https://www.iocoder.cn/test.jpg?token=123");
+            o.setScene(null);
         });
 
         // 调用
@@ -323,11 +326,32 @@ public class FileServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testPresignPutUrl_rejectsRestrictedImageScene() {
+        assertServiceException(() -> fileService.presignPutUrl("product.jpg", "product", "image/jpeg",
+                FileUploadSceneEnum.PRODUCT), FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED, "product");
+    }
+
+    @Test
+    public void testCreateFileByPresignedPath_rejectsRestrictedImageScene() {
+        FileCreateReqVO reqVO = randomPojo(FileCreateReqVO.class, o -> {
+            o.setPath("product/test.jpg");
+            o.setName("test.jpg");
+            o.setType("image/jpeg");
+            o.setSize(1024L);
+            o.setScene(FileUploadSceneEnum.PRODUCT.getValue());
+        });
+
+        assertServiceException(() -> fileService.createFile(reqVO),
+                FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED, "product");
+    }
+
+    @Test
     public void testCreateFileByPresignedPath_nameInvalid() {
         // 准备参数
         FileCreateReqVO reqVO = randomPojo(FileCreateReqVO.class, o -> {
             o.setPath("avatar/test.jpg");
             o.setName("../test.jpg");
+            o.setScene(null);
         });
 
         // 调用，并断言异常
@@ -340,6 +364,7 @@ public class FileServiceImplTest extends BaseDbUnitTest {
         FileCreateReqVO reqVO = randomPojo(FileCreateReqVO.class, o -> {
             o.setPath("../test.jpg");
             o.setName("test.jpg");
+            o.setScene(null);
         });
 
         // 调用，并断言异常

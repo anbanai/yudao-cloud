@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.infra.controller.admin.file.vo.file;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -29,5 +31,13 @@ public class FileCreateReqVO {
 
     @Schema(description = "文件大小", example = "2048", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long size;
+
+    @Schema(description = "上传业务场景：product 商品图片，material 素材图片")
+    private String scene;
+
+    @JsonIgnore
+    public FileUploadSceneEnum getUploadScene() {
+        return FileUploadSceneEnum.fromValue(scene);
+    }
 
 }

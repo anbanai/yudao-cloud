@@ -1,10 +1,14 @@
 package cn.iocoder.yudao.module.infra.api.file;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateReqDTO;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
+import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileUploadPolicy;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,7 +26,8 @@ public class FileApiImpl implements FileApi {
     @Override
     public CommonResult<String> createFile(FileCreateReqDTO createReqDTO) {
         return success(fileService.createFile(createReqDTO.getContent(), createReqDTO.getName(),
-                createReqDTO.getDirectory(), createReqDTO.getType()));
+                createReqDTO.getDirectory(), createReqDTO.getType(),
+                FileUploadSceneEnum.fromValue(createReqDTO.getScene())));
     }
 
     @Override
@@ -40,6 +45,39 @@ public class FileApiImpl implements FileApi {
     @Override
     public CommonResult<String> presignGetUrl(Long fileId, Integer expirationSeconds) {
         return success(fileService.presignGetUrl(fileId, expirationSeconds));
+    }
+
+    @Override
+    public CommonResult<Boolean> isFileCreatedByCurrentUser(Long fileId) {
+        Long userId = SecurityFrameworkUtils.getLoginUserId();
+        if (userId == null) {
+            return success(false);
+        }
+        try {
+            FileDO file = fileService.getFile(fileId);
+            return success(userId.toString().equals(file.getCreator()));
+        } catch (ServiceException ignored) {
+            return success(false);
+        }
+    }
+
+    @Override
+    public CommonResult<Boolean> validateImageUrl(String url, String scene) {
+        FileUploadSceneEnum uploadScene = FileUploadSceneEnum.fromValue(scene);
+        if (uploadScene == FileUploadSceneEnum.GENERAL) {
+            return success(false);
+        }
+        FileDO file = fileService.getFileByUrl(url);
+        if (file == null) {
+            return success(false);
+        }
+        try {
+            byte[] content = fileService.getFileContent(file.getConfigId(), file.getPath());
+            FileUploadPolicy.validateImage(uploadScene, file.getName(), content, file.getType());
+            return success(true);
+        } catch (Exception ignored) {
+            return success(false);
+        }
     }
 
     @Override

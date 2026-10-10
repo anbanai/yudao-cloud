@@ -37,6 +37,8 @@ public interface ErrorCodeConstants {
     ErrorCode SPU_SAVE_FAIL_COUPON_TEMPLATE_NOT_EXISTS = new ErrorCode(1_008_005_002, "商品 SPU 保存失败，原因：优惠劵不存在");
     ErrorCode SPU_NOT_ENABLE = new ErrorCode(1_008_005_003, "商品 SPU【{}】不处于上架状态");
     ErrorCode SPU_NOT_RECYCLE = new ErrorCode(1_008_005_004, "商品 SPU 不处于回收站状态");
+    ErrorCode SPU_IMAGE_INVALID = new ErrorCode(1_008_005_005,
+            "商品图片无效，仅支持 3MB 以内的 JPG、PNG、BMP 图片");
 
     // ========== 商品 SKU 1-008-006-000 ==========
     ErrorCode SKU_NOT_EXISTS = new ErrorCode(1_008_006_000, "商品 SKU 不存在");
@@ -65,5 +67,15 @@ public interface ErrorCodeConstants {
     ErrorCode MERCHANT_QUALIFICATION_NOT_EXISTS = new ErrorCode(1_008_010_003, "商家资质不存在");
     ErrorCode MERCHANT_REVIEW_STATUS_ERROR = new ErrorCode(1_008_010_004, "商家当前状态不允许执行审核操作");
     ErrorCode BRAND_MERCHANT_MISMATCH = new ErrorCode(1_008_010_005, "品牌不属于当前商家");
+    ErrorCode MERCHANT_APPLICATION_NOT_EXISTS = new ErrorCode(1_008_010_006, "商家申请版本不存在");
+    ErrorCode MERCHANT_APPLICATION_STATUS_ERROR = new ErrorCode(1_008_010_007, "商家申请当前状态不允许执行此操作");
+    ErrorCode MERCHANT_APPLICATION_QUALIFICATION_REQUIRED = new ErrorCode(1_008_010_008, "请补充必需的商家资质");
+    ErrorCode MERCHANT_APPLICATION_NOT_OWNER = new ErrorCode(1_008_010_009, "无权访问该商家申请");
+    ErrorCode MERCHANT_BUSINESS_TYPE_NOT_EXISTS = new ErrorCode(1_008_010_010, "经营类型不存在或已停用");
+    ErrorCode MERCHANT_BUSINESS_TYPE_CODE_EXISTS = new ErrorCode(1_008_010_011, "经营类型编码已存在");
+    ErrorCode MERCHANT_BUSINESS_TYPE_IN_USE = new ErrorCode(1_008_010_012, "经营类型已被申请使用，无法删除");
+    ErrorCode MERCHANT_IDENTITY_BIND_FAILED = new ErrorCode(1_008_010_013, "商家账号绑定失败");
+    ErrorCode MERCHANT_APPLICATION_INFO_INCOMPLETE = new ErrorCode(1_008_010_014, "商家申请资料不完整");
+    ErrorCode MERCHANT_APPLICATION_FILE_INVALID = new ErrorCode(1_008_010_015, "商家资质文件无效或不属于当前账号");
 
 }

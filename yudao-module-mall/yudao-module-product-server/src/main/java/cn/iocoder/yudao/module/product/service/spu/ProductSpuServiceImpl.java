@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategoryListReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSkuSaveReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuPageReqVO;
@@ -30,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
@@ -61,6 +64,12 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     @Resource
     private ProductMerchantService merchantService;
 
+    @Resource
+    private FileApi fileApi;
+
+    private static final Pattern HTML_IMAGE_SRC = Pattern.compile(
+            "<img\\b[^>]*\\bsrc\\s*=\\s*[\\\"']([^\\\"']+)[\\\"']", Pattern.CASE_INSENSITIVE);
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createSpu(ProductSpuSaveReqVO createReqVO) {
@@ -71,6 +80,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验 SKU
         List<ProductSkuSaveReqVO> skuSaveReqList = createReqVO.getSkus();
         productSkuService.validateSkuList(skuSaveReqList, createReqVO.getSpecType());
+        validateProductImages(createReqVO);
 
         ProductSpuDO spu = BeanUtils.toBean(createReqVO, ProductSpuDO.class);
         // 初始化 SPU 中 SKU 相关属性
@@ -96,6 +106,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验SKU
         List<ProductSkuSaveReqVO> skuSaveReqList = updateReqVO.getSkus();
         productSkuService.validateSkuList(skuSaveReqList, updateReqVO.getSpecType());
+        validateProductImages(updateReqVO);
 
         // 更新 SPU
         ProductSpuDO updateObj = BeanUtils.toBean(updateReqVO, ProductSpuDO.class).setStatus(spu.getStatus());
@@ -153,6 +164,35 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         if (!Objects.equals(merchantId, brand.getMerchantId())) {
             throw exception(BRAND_MERCHANT_MISMATCH);
         }
+    }
+
+    private void validateProductImages(ProductSpuSaveReqVO reqVO) {
+        List<String> imageUrls = new ArrayList<>();
+        imageUrls.add(reqVO.getPicUrl());
+        if (reqVO.getSliderPicUrls() != null) {
+            imageUrls.addAll(reqVO.getSliderPicUrls());
+        }
+        if (reqVO.getSkus() != null) {
+            reqVO.getSkus().stream().map(ProductSkuSaveReqVO::getPicUrl).forEach(imageUrls::add);
+        }
+        if (reqVO.getDescription() != null) {
+            Matcher matcher = HTML_IMAGE_SRC.matcher(reqVO.getDescription());
+            while (matcher.find()) {
+                imageUrls.add(matcher.group(1));
+            }
+            if (reqVO.getDescription().toLowerCase(Locale.ROOT).contains("data:image/")) {
+                throw exception(SPU_IMAGE_INVALID);
+            }
+        }
+        imageUrls.stream().filter(this::isExternalImageReference).distinct().forEach(url -> {
+            if (!Boolean.TRUE.equals(fileApi.validateImageUrl(url, "product").getCheckedData())) {
+                throw exception(SPU_IMAGE_INVALID);
+            }
+        });
+    }
+
+    private boolean isExternalImageReference(String url) {
+        return url != null && !url.isBlank() && !url.startsWith("data:");
     }
 
     @Override
@@ -232,6 +272,15 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         Map<Long, ProductSpuDO> spuMap = convertMap(productSpuMapper.selectByIds(ids), ProductSpuDO::getId);
         // 需要按照 ids 顺序返回。例如说：店铺装修选择了 [3, 1, 2] 三个商品，返回结果还是 [3, 1, 2]  这样的顺序
         return convertList(ids, spuMap::get);
+    }
+
+    @Override
+    public List<ProductSpuDO> getAvailableSpuList(Collection<Long> ids) {
+        if (CollUtil.isEmpty(ids)) {
+            return Collections.emptyList();
+        }
+        Map<Long, ProductSpuDO> spuMap = convertMap(productSpuMapper.selectAvailableByIds(ids), ProductSpuDO::getId);
+        return convertList(ids, spuMap::get).stream().filter(Objects::nonNull).toList();
     }
 
     @Override

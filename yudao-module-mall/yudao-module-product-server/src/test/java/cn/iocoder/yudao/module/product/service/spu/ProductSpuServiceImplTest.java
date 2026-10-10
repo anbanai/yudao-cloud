@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.product.service.spu;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategoryListReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSkuSaveReqVO;
@@ -26,6 +28,10 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_IMAGE_INVALID;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
@@ -49,6 +55,8 @@ class ProductSpuServiceImplTest {
     private ProductGroupService productGroupService;
     @Mock
     private ProductMerchantService merchantService;
+    @Mock
+    private FileApi fileApi;
 
     @Test
     void testGetAppSpuPageExpandsAllSelectedCategoryChildren() {
@@ -89,6 +97,23 @@ class ProductSpuServiceImplTest {
         assertEquals(9L, spuCaptor.getValue().getCategoryId());
         verify(categoryService).validateCategory(9L);
         verify(productGroupService).syncSpuGroups(100L, null);
+    }
+
+    @Test
+    void testCreateSpuRejectsImageUrlOutsideProductImagePolicy() {
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setName("商品")
+                .setKeyword("关键词").setIntroduction("简介").setDescription("详情")
+                .setCategoryId(9L).setBrandId(8L).setMerchantId(1L)
+                .setPicUrl("https://example.com/large.gif").setSpecType(false)
+                .setSkus(List.of(new ProductSkuSaveReqVO().setPicUrl("https://example.com/sku.png")
+                        .setPrice(100).setStock(1)));
+        when(categoryService.getCategoryLevel(9L)).thenReturn(2);
+        when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
+        when(fileApi.validateImageUrl(anyString(), eq("product"))).thenReturn(CommonResult.success(false));
+
+        assertServiceException(() -> productSpuService.createSpu(reqVO), SPU_IMAGE_INVALID);
+
+        verify(productSpuMapper, org.mockito.Mockito.never()).insert(any(ProductSpuDO.class));
     }
 
     @Test

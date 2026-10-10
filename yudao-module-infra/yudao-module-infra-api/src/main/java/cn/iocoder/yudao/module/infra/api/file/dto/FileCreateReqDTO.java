@@ -18,6 +18,9 @@ public class FileCreateReqDTO {
     @Schema(description = "文件的 MIME 类型", example = "image/png")
     private String type;
 
+    @Schema(description = "上传业务场景：product 商品图片，material 素材图片")
+    private String scene;
+
     @Schema(description = "文件内容", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "文件内容不能为空")
     private byte[] content;

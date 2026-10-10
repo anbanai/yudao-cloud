@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.infra.api.file;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateReqDTO;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
 import cn.iocoder.yudao.module.infra.enums.ApiConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,6 +56,12 @@ public interface FileApi {
         return createFile(new FileCreateReqDTO().setName(name).setDirectory(directory).setType(type).setContent(content)).getCheckedData();
     }
 
+    default String createFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
+                              String name, String directory, String type, FileUploadSceneEnum scene) {
+        return createFile(new FileCreateReqDTO().setName(name).setDirectory(directory).setType(type)
+                .setScene(scene == null ? null : scene.getValue()).setContent(content)).getCheckedData();
+    }
+
     @PostMapping(PREFIX + "/create")
     @Operation(summary = "保存文件，并返回文件的访问路径")
     CommonResult<String> createFile(@Valid @RequestBody FileCreateReqDTO createReqDTO);
@@ -86,6 +93,15 @@ public interface FileApi {
     CommonResult<String> presignGetUrl(@RequestParam("id") Long fileId,
                                        @RequestParam(value = "expirationSeconds", required = false)
                                        Integer expirationSeconds);
+
+    @GetMapping(PREFIX + "/created-by-current-user")
+    @Operation(summary = "校验文件是否由当前用户上传")
+    CommonResult<Boolean> isFileCreatedByCurrentUser(@RequestParam("id") Long fileId);
+
+    @GetMapping(PREFIX + "/validate-image-url")
+    @Operation(summary = "校验图片 URL 的上传限制")
+    CommonResult<Boolean> validateImageUrl(@RequestParam("url") String url,
+                                           @RequestParam("scene") String scene);
 
     /**
      * 判断公开默认文件存储是否为 HTTPS 私有 S3，并支持短时效下载签名。

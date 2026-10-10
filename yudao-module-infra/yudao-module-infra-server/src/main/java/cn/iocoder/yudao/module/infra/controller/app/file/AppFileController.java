@@ -39,7 +39,7 @@ public class AppFileController {
         MultipartFile file = uploadReqVO.getFile();
         byte[] content = IoUtil.readBytes(file.getInputStream());
         return success(fileService.createFile(content, file.getOriginalFilename(),
-                uploadReqVO.getDirectory(), file.getContentType()));
+                uploadReqVO.getDirectory(), file.getContentType(), uploadReqVO.getUploadScene()));
     }
 
     @GetMapping("/presigned-url")
@@ -52,8 +52,10 @@ public class AppFileController {
     public CommonResult<FilePresignedUrlRespVO> getFilePresignedUrl(
             @RequestParam("name") String name,
             @RequestParam(value = "directory", required = false) String directory,
-            @RequestParam(value = "type", required = false) String type) {
-        return success(fileService.presignPutUrl(name, directory, type));
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "scene", required = false) String scene) {
+        return success(fileService.presignPutUrl(name, directory, type,
+                cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum.fromValue(scene)));
     }
 
     @PostMapping("/create")

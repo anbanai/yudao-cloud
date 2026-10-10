@@ -17,6 +17,8 @@ import cn.iocoder.yudao.module.infra.dal.mysql.file.FileMapper;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.FileClient;
 import cn.iocoder.yudao.module.infra.framework.file.core.utils.FilePathUtils;
 import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileTypeUtils;
+import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileUploadPolicy;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
@@ -30,6 +32,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PRIVATE_MASTER_NOT_EXISTS;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PUBLIC_MASTER_NOT_EXISTS;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED;
 
 /**
  * 文件 Service 实现类
@@ -76,6 +79,13 @@ public class FileServiceImpl implements FileService {
     @Override
     @SneakyThrows
     public String createFile(byte[] content, String name, String directory, String type) {
+        return createFile(content, name, directory, type, FileUploadSceneEnum.GENERAL);
+    }
+
+    @Override
+    @SneakyThrows
+    public String createFile(byte[] content, String name, String directory, String type, FileUploadSceneEnum scene) {
+        FileUploadPolicy.validateImage(scene, name, content, type);
         FileClient client = getPublicMasterFileClient();
         return createFile(client, content, name, directory, type, false).getUrl();
     }
@@ -177,6 +187,15 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public FilePresignedUrlRespVO presignPutUrl(String name, String directory, String type) {
+        return presignPutUrl(name, directory, type, FileUploadSceneEnum.GENERAL);
+    }
+
+    @Override
+    public FilePresignedUrlRespVO presignPutUrl(String name, String directory, String type,
+                                                FileUploadSceneEnum scene) {
+        if (scene != null && scene != FileUploadSceneEnum.GENERAL) {
+            throw exception(FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED, scene.getValue());
+        }
         // 1. 生成上传的 path，需要保证唯一
         String path = generateUploadPath(name, directory);
 
@@ -228,6 +247,10 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Long createFile(FileCreateReqVO createReqVO) {
+        FileUploadSceneEnum scene = createReqVO.getUploadScene();
+        if (scene != null && scene != FileUploadSceneEnum.GENERAL) {
+            throw exception(FILE_UPLOAD_SCENE_DIRECT_UPLOAD_NOT_SUPPORTED, scene.getValue());
+        }
         // 1.1 校验参数的合法性
         FilePathUtils.validatePath(createReqVO.getPath());
         createReqVO.setName(FilePathUtils.validateFileName(createReqVO.getName()));
@@ -302,6 +325,15 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileDO getFileByConfigIdAndPath(Long configId, String path) {
         return fileMapper.selectLatestByConfigIdAndPath(configId, path);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FileDO getFileByUrl(String url) {
+        if (StrUtil.isBlank(url)) {
+            return null;
+        }
+        return fileMapper.selectByUrl(HttpUtils.removeUrlQuery(url));
     }
 
 }

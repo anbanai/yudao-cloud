@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileCreateReq
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePageReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePresignedUrlRespVO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
+import cn.iocoder.yudao.module.infra.enums.FileUploadSceneEnum;
 import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
@@ -36,6 +37,11 @@ public interface FileService {
     String createFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
                       String name, String directory, String type);
 
+    default String createFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
+                              String name, String directory, String type, FileUploadSceneEnum scene) {
+        return createFile(content, name, directory, type);
+    }
+
     /**
      * 保存私有文件，并返回持久化记录。
      */
@@ -58,6 +64,11 @@ public interface FileService {
     default FilePresignedUrlRespVO presignPutUrl(@NotEmpty(message = "文件名不能为空") String name,
                                                  String directory, String type) {
         return presignPutUrl(name, directory);
+    }
+
+    default FilePresignedUrlRespVO presignPutUrl(@NotEmpty(message = "文件名不能为空") String name,
+                                                 String directory, String type, FileUploadSceneEnum scene) {
+        return presignPutUrl(name, directory, type);
     }
     /**
      * 生成文件预签名地址信息，用于读取
@@ -121,5 +132,7 @@ public interface FileService {
      * @return 文件
      */
     FileDO getFileByConfigIdAndPath(Long configId, String path);
+
+    FileDO getFileByUrl(String url);
 
 }
