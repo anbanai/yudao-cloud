@@ -2,11 +2,14 @@ package cn.iocoder.yudao.module.pay.api.refund.dto;
 
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.validation.InEnum;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
+
+import java.util.List;
 
 /**
  * 退款单创建 Request DTO
@@ -66,5 +69,15 @@ public class PayRefundCreateReqDTO {
     @NotNull(message = "退款金额不能为空")
     @Min(value = 1, message = "退款金额必须大于零")
     private Integer price;
+
+    // ========== 资金分配相关字段 ==========
+
+    /**
+     * 退款资金分配明细，金额单位：分。
+     *
+     * <p>列表为空时保持现有退款行为。</p>
+     */
+    @Valid
+    private List<PayRefundFundAllocationDTO> fundAllocation;
 
 }

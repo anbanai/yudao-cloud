@@ -34,6 +34,9 @@ public class PayOrderUnifiedReqDTO {
      */
     @NotEmpty(message = "外部订单编号不能为空")
     private String outTradeNo;
+    /** 由支付资金快照赋值，独立于调用方 channelExtras。 */
+    private String parentMerchantNo;
+    private String collectionMerchantNo;
     /**
      * 商品标题
      */

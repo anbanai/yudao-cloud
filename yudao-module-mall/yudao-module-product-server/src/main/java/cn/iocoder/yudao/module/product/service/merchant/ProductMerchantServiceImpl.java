@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantMapper;
 import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,8 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
 
     @Resource
     private ProductMerchantMapper merchantMapper;
+    @Resource
+    private ProductMerchantPayOnboardingService merchantPayOnboardingService;
 
     @Override
     public Long createMerchant(ProductMerchantSaveReqVO reqVO) {
@@ -64,6 +67,7 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void approveMerchant(Long id, Long reviewerId) {
         ProductMerchantDO merchant = validateExists(id);
         if (!ProductMerchantStatusEnum.PENDING.getStatus().equals(merchant.getStatus())) {
@@ -72,6 +76,7 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
         merchantMapper.updateById(new ProductMerchantDO().setId(id)
                 .setStatus(ProductMerchantStatusEnum.APPROVED.getStatus())
                 .setReviewerId(reviewerId).setReviewTime(LocalDateTime.now()).setRejectReason(null));
+        merchantPayOnboardingService.enqueueApprovedMerchant(id);
     }
 
     @Override

@@ -92,8 +92,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
             throw ex;
         } catch (Throwable ex) {
             // 系统异常，则包装成 PayException 异常抛出
-            log.error("[unifiedOrder][客户端({}) request({}) 发起支付异常]",
-                    getId(), toJsonString(reqDTO), ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(unifiedOrder) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[unifiedOrder][客户端({}) request({}) 发起支付异常]",
+                        getId(), toJsonString(reqDTO), ex);
+            }
             throw buildPayException(ex);
         }
         return resp;
@@ -109,8 +113,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
         } catch (ServiceException ex) { // 业务异常，都是实现类已经翻译，所以直接抛出即可
             throw ex;
         } catch (Throwable ex) {
-            log.error("[parseOrderNotify][客户端({}) params({}) body({}) headers({}) 解析失败]",
-                    getId(), params, body, headers, ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(parseOrderNotify) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[parseOrderNotify][客户端({}) params({}) body({}) headers({}) 解析失败]",
+                        getId(), params, body, headers, ex);
+            }
             throw buildPayException(ex);
         }
     }
@@ -125,8 +133,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
         } catch (ServiceException ex) { // 业务异常，都是实现类已经翻译，所以直接抛出即可
             throw ex;
         } catch (Throwable ex) {
-            log.error("[getOrder][客户端({}) outTradeNo({}) 查询支付单异常]",
-                    getId(), outTradeNo, ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(getOrder) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[getOrder][客户端({}) outTradeNo({}) 查询支付单异常]",
+                        getId(), outTradeNo, ex);
+            }
             throw buildPayException(ex);
         }
     }
@@ -147,8 +159,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
             throw ex;
         } catch (Throwable ex) {
             // 系统异常，则包装成 PayException 异常抛出
-            log.error("[unifiedRefund][客户端({}) request({}) 发起退款异常]",
-                    getId(), toJsonString(reqDTO), ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(unifiedRefund) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[unifiedRefund][客户端({}) request({}) 发起退款异常]",
+                        getId(), toJsonString(reqDTO), ex);
+            }
             throw buildPayException(ex);
         }
         return resp;
@@ -163,8 +179,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
         } catch (ServiceException ex) { // 业务异常，都是实现类已经翻译，所以直接抛出即可
             throw ex;
         } catch (Throwable ex) {
-            log.error("[parseRefundNotify][客户端({}) params({}) body({}) headers({}) 解析失败]",
-                    getId(), params, body, headers, ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(parseRefundNotify) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[parseRefundNotify][客户端({}) params({}) body({}) headers({}) 解析失败]",
+                        getId(), params, body, headers, ex);
+            }
             throw buildPayException(ex);
         }
     }
@@ -179,8 +199,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
         } catch (ServiceException ex) { // 业务异常，都是实现类已经翻译，所以直接抛出即可
             throw ex;
         } catch (Throwable ex) {
-            log.error("[getRefund][客户端({}) outTradeNo({}) outRefundNo({}) 查询退款单异常]",
-                    getId(), outTradeNo, outRefundNo, ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(getRefund) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[getRefund][客户端({}) outTradeNo({}) outRefundNo({}) 查询退款单异常]",
+                        getId(), outTradeNo, outRefundNo, ex);
+            }
             throw buildPayException(ex);
         }
     }
@@ -197,8 +221,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
             throw ex;
         } catch (Throwable ex) {
             // 系统异常，则包装成 PayException 异常抛出
-            log.error("[unifiedTransfer][客户端({}) request({}) 发起转账异常]",
-                    getId(), toJsonString(reqDTO), ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(unifiedTransfer) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[unifiedTransfer][客户端({}) request({}) 发起转账异常]",
+                        getId(), toJsonString(reqDTO), ex);
+            }
             throw buildPayException(ex);
         }
         return resp;
@@ -211,8 +239,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
         } catch (ServiceException ex) { // 业务异常，都是实现类已经翻译，所以直接抛出即可
             throw ex;
         } catch (Throwable ex) {
-            log.error("[doParseTransferNotify][客户端({}) params({}) body({}) headers({}) 解析失败]",
-                    getId(), params, body, headers, ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(parseTransferNotify) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[doParseTransferNotify][客户端({}) params({}) body({}) headers({}) 解析失败]",
+                        getId(), params, body, headers, ex);
+            }
             throw buildPayException(ex);
         }
     }
@@ -227,8 +259,12 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
         } catch (ServiceException ex) { // 业务异常，都是实现类已经翻译，所以直接抛出即可
             throw ex;
         } catch (Throwable ex) {
-            log.error("[getTransfer][客户端({}) outTradeNo({}) 查询转账单异常]",
-                    getId(), outTradeNo, ex);
+            if (redactFailureDetails()) {
+                log.error("[payClient][客户端({}) operation(getTransfer) failed({})]", getId(), ex.getClass().getSimpleName());
+            } else {
+                log.error("[getTransfer][客户端({}) outTradeNo({}) 查询转账单异常]",
+                        getId(), outTradeNo, ex);
+            }
             throw buildPayException(ex);
         }
     }
@@ -241,7 +277,15 @@ public abstract class AbstractPayClient<Config extends PayClientConfig> implemen
 
     // ========== 各种工具方法 ==========
 
+    /** 含身份资料或 SDK 原始报文的渠道必须屏蔽异常原文及异常链。 */
+    protected boolean redactFailureDetails() {
+        return false;
+    }
+
     private PayClientException buildPayException(Throwable ex) {
+        if (redactFailureDetails()) {
+            return new PayClientException(new IllegalStateException("支付渠道请求异常: " + ex.getClass().getSimpleName()));
+        }
         if (ex instanceof PayClientException) {
             return (PayClientException) ex;
         }

@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.pay.dal.mysql.channel.PayChannelMapper;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.NonePayClientConfig;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.alipay.AlipayPayClientConfig;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.weixin.WxPayClientConfig;
+import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.yeepay.YeepayPayClientConfig;
 import jakarta.annotation.Resource;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
@@ -82,7 +83,9 @@ public class PayChannelServiceImpl implements PayChannelService {
      */
     private PayClientConfig parseConfig(String code, String configStr) {
         // 解析配置
-        Class<? extends PayClientConfig> payClass = PayChannelEnum.isAlipay(code) ? AlipayPayClientConfig.class
+        Class<? extends PayClientConfig> payClass = PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(code)
+                ? YeepayPayClientConfig.class
+                : PayChannelEnum.isAlipay(code) ? AlipayPayClientConfig.class
                 : PayChannelEnum.isWeixin(code) ? WxPayClientConfig.class
                 : NonePayClientConfig.class;
         if (ObjectUtil.isNull(payClass)) {
@@ -136,6 +139,15 @@ public class PayChannelServiceImpl implements PayChannelService {
     }
 
     @Override
+    public PayChannelDO validExistingPayChannel(Long id) {
+        PayChannelDO channel = validateChannelExists(id);
+        if (!PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(channel.getCode())) {
+            validPayChannel(channel);
+        }
+        return channel;
+    }
+
+    @Override
     public PayChannelDO validPayChannel(Long appId, String code) {
         PayChannelDO channel = payChannelMapper.selectByAppIdAndCode(appId, code);
         validPayChannel(channel);
@@ -163,7 +175,7 @@ public class PayChannelServiceImpl implements PayChannelService {
 
     @Override
     public PayClient getPayClient(Long id) {
-        PayChannelDO channel = validPayChannel(id);
+        PayChannelDO channel = validExistingPayChannel(id);
         return payClientFactory.createOrUpdatePayClient(id, channel.getCode(), channel.getConfig());
     }
 

@@ -166,4 +166,10 @@ public class PayRefundDO extends BaseDO {
      */
     private String channelNotifyData;
 
+    /** 创建退款单时保存的不可变资金分配快照，JSON 格式。 */
+    private String fundAllocationData;
+
+    /** 渠道退款请求发送前提交的时间；结果未知时只查询原退款号，禁止重复发送。 */
+    private LocalDateTime requestSubmittedTime;
+
 }

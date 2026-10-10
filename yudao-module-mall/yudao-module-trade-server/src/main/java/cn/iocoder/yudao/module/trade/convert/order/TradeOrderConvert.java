@@ -12,6 +12,7 @@ import cn.iocoder.yudao.framework.ip.core.utils.AreaUtils;
 import cn.iocoder.yudao.module.member.api.address.dto.MemberAddressRespDTO;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderDividePlanDTO;
 import cn.iocoder.yudao.module.pay.enums.DictTypeConstants;
 import cn.iocoder.yudao.module.product.api.comment.dto.ProductCommentCreateReqDTO;
 import cn.iocoder.yudao.module.product.api.property.dto.ProductPropertyValueDetailRespDTO;
@@ -32,6 +33,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderLogDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderItemAfterSaleStatusEnum;
 import cn.iocoder.yudao.module.trade.framework.delivery.core.client.dto.ExpressTrackRespDTO;
 import cn.iocoder.yudao.module.trade.framework.order.config.TradeOrderProperties;
@@ -114,6 +116,27 @@ public interface TradeOrderConvert {
         // 订单相关字段
         createReqDTO.setPrice(order.getPayPrice()).setExpireTime(addTime(orderProperties.getPayExpireTime()));
         return createReqDTO;
+    }
+
+    /**
+     * Builds the payment-time merchant allocation snapshot from persisted merchant sub-orders.
+     * The payment module resolves and verifies the YeePay merchant number later, so this method
+     * only carries platform merchant and immutable amount identifiers across the service boundary.
+     */
+    default List<PayOrderDividePlanDTO> convertDividePlan(TradeOrderDO order,
+                                                            List<TradeOrderSubDO> subOrders) {
+        if (subOrders == null || subOrders.isEmpty()) {
+            return List.of();
+        }
+        return CollectionUtils.convertList(subOrders, subOrder -> {
+            if (subOrder.getMerchantId() == null || subOrder.getId() == null
+                    || subOrder.getPayPrice() == null || subOrder.getPayPrice() <= 0) {
+                throw new IllegalArgumentException("商家子订单分账快照无效");
+            }
+            return new PayOrderDividePlanDTO().setTradeOrderId(order.getId())
+                    .setTradeOrderSubId(subOrder.getId()).setMerchantId(subOrder.getMerchantId())
+                    .setAmount(subOrder.getPayPrice());
+        });
     }
 
     default PageResult<TradeOrderPageItemRespVO> convertPage(PageResult<TradeOrderDO> pageResult,

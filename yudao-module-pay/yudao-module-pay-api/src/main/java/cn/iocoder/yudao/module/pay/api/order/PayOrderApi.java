@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pay.api.order;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderUpdatePriceReqDTO;
 import cn.iocoder.yudao.module.pay.enums.ApiConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,5 +39,9 @@ public interface PayOrderApi {
     })
     CommonResult<Boolean> updatePayOrderPrice(@RequestParam("id") Long id,
                                               @RequestParam("payPrice") Integer payPrice);
+
+    @PutMapping(PREFIX + "/update-price-with-divide-plan")
+    @Operation(summary = "原子更新支付价格和商家分账计划")
+    CommonResult<Boolean> updatePayOrderPriceWithDividePlan(@Valid @RequestBody PayOrderUpdatePriceReqDTO reqDTO);
 
 }

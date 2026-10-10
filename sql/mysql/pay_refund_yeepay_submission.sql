@@ -1,0 +1,3 @@
+-- 此升级已合并到 yeepay_existing_payment_upgrade.sql，请使用该可重复执行的统一升级脚本。
+-- 统一脚本会添加 request_submitted_time，并把已有易宝退款标记为已领取提交许可，
+-- 使迁移后的恢复流程只查询原退款号，避免重复退款申请。

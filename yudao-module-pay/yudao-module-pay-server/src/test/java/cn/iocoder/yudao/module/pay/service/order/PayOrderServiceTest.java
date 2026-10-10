@@ -504,7 +504,7 @@ public class PayOrderServiceTest extends BaseDbAndRedisUnitTest {
             PayOrderRespDTO notify = randomPojo(PayOrderRespDTO.class);
             // mock 方法（channel）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
 
             // 调用
             orderService.notifyOrder(channelId, notify);
@@ -911,7 +911,7 @@ public class PayOrderServiceTest extends BaseDbAndRedisUnitTest {
             when(client.getOrder(eq("P110"))).thenReturn(respDTO);
             // mock 方法（PayChannelDO）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
 
             // 调用
             int count = orderService.syncOrder(minCreateTime);
@@ -945,7 +945,7 @@ public class PayOrderServiceTest extends BaseDbAndRedisUnitTest {
             when(client.getOrder(eq("P110"))).thenReturn(respDTO);
             // mock 方法（PayChannelDO）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
 
             // 调用
             int count = orderService.syncOrder(minCreateTime);
@@ -1057,7 +1057,7 @@ public class PayOrderServiceTest extends BaseDbAndRedisUnitTest {
             when(client.getOrder(eq("P110"))).thenReturn(respDTO);
             // mock 方法（PayChannelDO）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
 
             // 调用
             int count = orderService.expireOrder();

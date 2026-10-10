@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Mapper
 public interface PayRefundMapper extends BaseMapperX<PayRefundDO> {
@@ -44,6 +45,12 @@ public interface PayRefundMapper extends BaseMapperX<PayRefundDO> {
     default int updateByIdAndStatus(Long id, Integer status, PayRefundDO update) {
         return update(update, new LambdaQueryWrapper<PayRefundDO>()
                 .eq(PayRefundDO::getId, id).eq(PayRefundDO::getStatus, status));
+    }
+
+    default int markRequestSubmitted(Long id, Integer status, LocalDateTime submittedTime) {
+        return update(new PayRefundDO().setRequestSubmittedTime(submittedTime), new LambdaQueryWrapper<PayRefundDO>()
+                .eq(PayRefundDO::getId, id).eq(PayRefundDO::getStatus, status)
+                .isNull(PayRefundDO::getRequestSubmittedTime));
     }
 
     default PageResult<PayRefundDO> selectPage(PayRefundPageReqVO reqVO) {

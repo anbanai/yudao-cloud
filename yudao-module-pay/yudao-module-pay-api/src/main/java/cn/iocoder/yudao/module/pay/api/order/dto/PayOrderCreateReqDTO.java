@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.pay.api.order.dto;
 
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.validation.InEnum;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -10,6 +11,7 @@ import org.hibernate.validator.constraints.Length;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 支付单创建 Request DTO
@@ -74,5 +76,15 @@ public class PayOrderCreateReqDTO implements Serializable {
      */
     @NotNull(message = "支付过期时间不能为空")
     private LocalDateTime expireTime;
+
+    // ========== 分账相关字段 ==========
+
+    /**
+     * 分账计划，金额单位：分。
+     *
+     * <p>列表为空时保持现有单商户支付行为。</p>
+     */
+    @Valid
+    private List<PayOrderDividePlanDTO> dividePlan;
 
 }

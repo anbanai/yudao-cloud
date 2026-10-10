@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pay.api.order;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderUpdatePriceReqDTO;
 import cn.iocoder.yudao.module.pay.convert.order.PayOrderConvert;
 import cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO;
 import cn.iocoder.yudao.module.pay.service.order.PayOrderService;
@@ -34,6 +35,12 @@ public class PayOrderApiImpl implements PayOrderApi {
     @Override
     public CommonResult<Boolean> updatePayOrderPrice(Long id, Integer payPrice) {
         payOrderService.updatePayOrderPrice(id, payPrice);
+        return success(true);
+    }
+
+    @Override
+    public CommonResult<Boolean> updatePayOrderPriceWithDividePlan(PayOrderUpdatePriceReqDTO reqDTO) {
+        payOrderService.updatePayOrderPrice(reqDTO.getId(), reqDTO.getPayPrice(), reqDTO.getDividePlan());
         return success(true);
     }
 

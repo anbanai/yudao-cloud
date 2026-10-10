@@ -77,5 +77,7 @@ public interface ErrorCodeConstants {
     ErrorCode MERCHANT_IDENTITY_BIND_FAILED = new ErrorCode(1_008_010_013, "商家账号绑定失败");
     ErrorCode MERCHANT_APPLICATION_INFO_INCOMPLETE = new ErrorCode(1_008_010_014, "商家申请资料不完整");
     ErrorCode MERCHANT_APPLICATION_FILE_INVALID = new ErrorCode(1_008_010_015, "商家资质文件无效或不属于当前账号");
+    ErrorCode MERCHANT_PAY_MATERIALS_INVALID = new ErrorCode(1_008_010_018, "支付入网资料不完整或格式无效");
+    ErrorCode MERCHANT_PAY_ONBOARDING_NOT_EXISTS = new ErrorCode(1_008_010_019, "商家支付入网任务不存在");
 
 }

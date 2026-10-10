@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.pay.framework.pay.core.client.PayClient;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.PayClientFactory;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.alipay.AlipayPayClientConfig;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.weixin.WxPayClientConfig;
+import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.yeepay.YeepayPayClientConfig;
 import jakarta.annotation.Resource;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
@@ -314,6 +315,32 @@ public class PayChannelServiceTest extends BaseDbUnitTest {
         PayClient<?> client = channelService.getPayClient(id);
         // 断言
         assertSame(client, mockClient);
+    }
+
+    @Test
+    public void testGetPayClient_disabledYeepay_keepsExistingTasksAvailable() {
+        PayChannelDO channel = randomPojo(PayChannelDO.class, value -> value
+                .setCode(PayChannelEnum.YEEPAY_WX_LITE.getCode())
+                .setConfig(new YeepayPayClientConfig())
+                .setStatus(CommonStatusEnum.DISABLE.getStatus()));
+        channelMapper.insert(channel);
+        PayClient<?> mockClient = mock(PayClient.class);
+        when(payClientFactory.createOrUpdatePayClient(eq(channel.getId()), eq(channel.getCode()), eq(channel.getConfig())))
+                .thenReturn(mockClient);
+
+        assertSame(mockClient, channelService.getPayClient(channel.getId()));
+        assertServiceException(() -> channelService.validPayChannel(channel.getAppId(), channel.getCode()),
+                CHANNEL_IS_DISABLE);
+    }
+
+    @Test
+    public void testGetPayClient_disabledWx_preservesOriginalGate() {
+        PayChannelDO channel = randomPojo(PayChannelDO.class, value -> value
+                .setCode(PayChannelEnum.WX_LITE.getCode()).setConfig(randomWxPayClientConfig())
+                .setStatus(CommonStatusEnum.DISABLE.getStatus()));
+        channelMapper.insert(channel);
+
+        assertServiceException(() -> channelService.getPayClient(channel.getId()), CHANNEL_IS_DISABLE);
     }
 
     public WxPayClientConfig randomWxPayClientConfig() {

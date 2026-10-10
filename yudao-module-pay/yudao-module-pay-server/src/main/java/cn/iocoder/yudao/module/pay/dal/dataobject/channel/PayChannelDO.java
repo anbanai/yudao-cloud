@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.NonePayClientC
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.alipay.AlipayAppPayClient;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.alipay.AlipayPayClientConfig;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.weixin.WxPayClientConfig;
+import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.yeepay.YeepayPayClientConfig;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -101,6 +102,8 @@ public class PayChannelDO extends TenantBaseDO {
                     return JsonUtils.parseObject2(json, AlipayPayClientConfig.class);
                 case "WxPayClientConfig":
                     return JsonUtils.parseObject2(json, WxPayClientConfig.class);
+                case "YeepayPayClientConfig":
+                    return JsonUtils.parseObject2(json, YeepayPayClientConfig.class);
                 case "NonePayClientConfig":
                     return JsonUtils.parseObject2(json, NonePayClientConfig.class);
                 default:

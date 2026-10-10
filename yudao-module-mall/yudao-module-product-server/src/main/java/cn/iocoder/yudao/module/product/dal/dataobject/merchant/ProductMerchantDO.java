@@ -1,8 +1,10 @@
 package cn.iocoder.yudao.module.product.dal.dataobject.merchant;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.module.product.framework.merchant.core.MerchantSensitiveTypeHandler;
 import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
@@ -10,7 +12,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /** 平台商家 DO。 */
-@TableName("product_merchant")
+@TableName(value = "product_merchant", autoResultMap = true)
 @KeySequence("product_merchant_seq")
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -26,9 +28,17 @@ public class ProductMerchantDO extends BaseDO {
     private String storeName;
     private String logoUrl;
     private String companyName;
+    @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
+    @ToString.Exclude
     private String creditCode;
+    @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
+    @ToString.Exclude
     private String legalPerson;
+    @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
+    @ToString.Exclude
     private String contactName;
+    @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
+    @ToString.Exclude
     private String contactMobile;
     private Integer status;
     private Long reviewerId;

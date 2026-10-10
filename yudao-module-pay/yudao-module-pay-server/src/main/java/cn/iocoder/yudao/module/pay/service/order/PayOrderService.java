@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pay.service.order;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.dto.order.PayOrderRespDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderDividePlanDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderExportReqVO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderPageReqVO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderSubmitReqVO;
@@ -122,6 +123,9 @@ public interface PayOrderService {
      * @param payPrice   支付单价格
      */
     void updatePayOrderPrice(Long id, Integer payPrice);
+
+    /** 同一事务更新价格及商家计划；易宝预支付准备后禁止更改。 */
+    void updatePayOrderPrice(Long id, Integer payPrice, List<PayOrderDividePlanDTO> dividePlan);
 
     /**
      * 获得支付订单

@@ -75,6 +75,15 @@ public interface PayChannelService {
     PayChannelDO validPayChannel(Long id);
 
     /**
+     * 校验原支付单关联的渠道。易宝停用仅阻止新支付，原单回调、查询和资金任务继续执行。
+     * 其他渠道保持原有启用状态校验。
+     *
+     * @param id 原支付单保存的渠道编号
+     * @return 渠道信息
+     */
+    PayChannelDO validExistingPayChannel(Long id);
+
+    /**
      * 支付渠道的合法性
      *
      * 如果不合法，抛出 {@link ServiceException} 业务异常
@@ -102,7 +111,7 @@ public interface PayChannelService {
     List<PayChannelDO> getChannelListByAppId(Long appId);
 
     /**
-     * 获得指定编号的支付客户端
+     * 获得原单使用的支付客户端。发起新支付前必须另行调用 validPayChannel。
      *
      * @param id 编号
      * @return 支付客户端

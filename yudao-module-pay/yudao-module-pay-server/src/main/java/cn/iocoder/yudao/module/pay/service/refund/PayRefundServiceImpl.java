@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.pay.service.refund;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.spring.SpringUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.PayClient;
@@ -8,33 +9,46 @@ import cn.iocoder.yudao.module.pay.framework.pay.core.client.dto.refund.PayRefun
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.dto.refund.PayRefundUnifiedReqDTO;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundCreateReqDTO;
+import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundFundAllocationDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.refund.vo.PayRefundExportReqVO;
 import cn.iocoder.yudao.module.pay.controller.admin.refund.vo.PayRefundPageReqVO;
 import cn.iocoder.yudao.module.pay.convert.refund.PayRefundConvert;
 import cn.iocoder.yudao.module.pay.dal.dataobject.app.PayAppDO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.channel.PayChannelDO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO;
+import cn.iocoder.yudao.module.pay.dal.dataobject.payfund.PayFundOrderDO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.refund.PayRefundDO;
 import cn.iocoder.yudao.module.pay.dal.mysql.refund.PayRefundMapper;
 import cn.iocoder.yudao.module.pay.dal.redis.no.PayNoRedisDAO;
 import cn.iocoder.yudao.module.pay.enums.notify.PayNotifyTypeEnum;
+import cn.iocoder.yudao.module.pay.enums.PayChannelEnum;
 import cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum;
 import cn.iocoder.yudao.module.pay.enums.refund.PayRefundStatusEnum;
 import cn.iocoder.yudao.module.pay.framework.pay.config.PayProperties;
+import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.yeepay.YeepayPayClient;
 import cn.iocoder.yudao.module.pay.service.app.PayAppService;
 import cn.iocoder.yudao.module.pay.service.channel.PayChannelService;
 import cn.iocoder.yudao.module.pay.service.notify.PayNotifyService;
 import cn.iocoder.yudao.module.pay.service.order.PayOrderService;
+import cn.iocoder.yudao.module.pay.service.payfund.PayFundService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
+import java.util.Objects;
+import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
+import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray;
 import static cn.iocoder.yudao.module.pay.enums.ErrorCodeConstants.*;
 
 /**
@@ -64,6 +78,10 @@ public class PayRefundServiceImpl implements PayRefundService {
     @Resource
     private PayNotifyService notifyService;
 
+    /** 资金域可选注入，保证普通渠道退款和独立测试不受影响。 */
+    @Autowired(required = false)
+    private ObjectProvider<PayFundService> payFundServiceProvider;
+
     @Override
     public PayRefundDO getRefund(Long id) {
         return refundMapper.selectById(id);
@@ -90,13 +108,14 @@ public class PayRefundServiceImpl implements PayRefundService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long createRefund(PayRefundCreateReqDTO reqDTO) {
         // 1.1 校验 App
         PayAppDO app = appService.validPayApp(reqDTO.getAppKey());
         // 1.2 校验支付订单
         PayOrderDO order = validatePayOrderCanRefund(reqDTO, app.getId());
         // 1.3 校验支付渠道是否有效
-        PayChannelDO channel = channelService.validPayChannel(order.getChannelId());
+        PayChannelDO channel = channelService.validExistingPayChannel(order.getChannelId());
         PayClient<?> client = channelService.getPayClient(channel.getId());
         if (client == null) {
             log.error("[refund][渠道编号({}) 找不到对应的支付客户端]", channel.getId());
@@ -122,28 +141,75 @@ public class PayRefundServiceImpl implements PayRefundService {
                 .setStatus(PayRefundStatusEnum.WAITING.getStatus())
                 .setPayPrice(order.getPrice()).setRefundPrice(reqDTO.getPrice());
         refundMapper.insert(refund);
-        try {
-            // 2.2 向渠道发起退款申请
-            PayRefundUnifiedReqDTO unifiedReqDTO = new PayRefundUnifiedReqDTO()
-                    .setPayPrice(order.getPrice())
-                    .setRefundPrice(reqDTO.getPrice())
-                    .setOutTradeNo(order.getNo())
-                    .setOutRefundNo(refund.getNo())
-                    .setNotifyUrl(genChannelRefundNotifyUrl(channel))
-                    .setReason(reqDTO.getReason());
-            PayRefundRespDTO refundRespDTO = client.unifiedRefund(unifiedReqDTO);
-            // 2.3 处理退款返回
-            getSelf().notifyRefund(channel, refundRespDTO);
-        } catch (Throwable e) {
-            // 注意：这里仅打印异常，不进行抛出。
-            // 原因是：虽然调用支付渠道进行退款发生异常（网络请求超时），实际退款成功。这个结果，后续通过退款回调、或者退款轮询补偿可以拿到。
-            // 最终，在异常的情况下，支付中心会异步回调业务的退款回调接口，提供退款结果
-            log.error("[createPayRefund][退款 id({}) requestDTO({}) 发生异常]",
-                    refund.getId(), reqDTO, e);
-        }
 
-        // 返回退款编号
-        return refund.getId();
+        PayFundService payFundService = getPayFundService();
+        if (payFundService != null && PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(channel.getCode())) {
+            List<PayRefundFundAllocationDTO> resolvedFundAllocation =
+                    payFundService.prepareRefund(refund, order, channel, reqDTO.getFundAllocation());
+            refundMapper.updateById(new PayRefundDO().setId(refund.getId())
+                    .setFundAllocationData(toJsonString(resolvedFundAllocation)));
+        }
+        Long refundId = refund.getId();
+        // 外层业务可能还有事务；必须等待最终提交，回滚时不产生渠道资金操作。
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                TenantUtils.execute(channel.getTenantId(), () -> getSelf().submitRefundAfterCommit(refundId));
+            }
+        });
+        return refundId;
+    }
+
+    /** 提交后暂停原事务资源，资金归还和退款申请均在稳定记录提交后执行。 */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void submitRefundAfterCommit(Long refundId) {
+        PayRefundDO refund = refundMapper.selectById(refundId);
+        if (refund == null || !PayRefundStatusEnum.WAITING.getStatus().equals(refund.getStatus())) {
+            return;
+        }
+        if (PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(refund.getChannelCode())) {
+            syncRefund(refund);
+            return;
+        }
+        try {
+            PayChannelDO channel = channelService.validExistingPayChannel(refund.getChannelId());
+            PayClient<?> client = channelService.getPayClient(channel.getId());
+            getSelf().notifyRefund(channel, client.unifiedRefund(buildRefundRequest(refund, channel)));
+        } catch (Throwable e) {
+            log.error("[submitRefundAfterCommit][退款 id({}) 请求结果待查询，异常类型({})]",
+                    refundId, e.getClass().getSimpleName());
+        }
+    }
+
+    /** 原退款号只能获得一次自动提交许可，许可提交后发生崩溃也不能换号重发。 */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markRefundSubmitted(Long refundId) {
+        return refundMapper.markRequestSubmitted(refundId, PayRefundStatusEnum.WAITING.getStatus(),
+                LocalDateTime.now()) == 1;
+    }
+
+    private PayRefundUnifiedReqDTO buildRefundRequest(PayRefundDO refund, PayChannelDO channel) {
+        PayRefundUnifiedReqDTO request = new PayRefundUnifiedReqDTO().setPayPrice(refund.getPayPrice()).setRefundPrice(refund.getRefundPrice())
+                .setOutTradeNo(refund.getOrderNo()).setUniqueOrderNo(refund.getChannelOrderNo())
+                .setOutRefundNo(refund.getNo()).setNotifyUrl(genChannelRefundNotifyUrl(channel))
+                .setReason(refund.getReason()).setFundAllocation(parseArray(refund.getFundAllocationData(),
+                        PayRefundFundAllocationDTO.class));
+        if (PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(refund.getChannelCode())) {
+            PayFundOrderDO fundOrder = requireRefundFundOrder(refund);
+            request.setParentMerchantNo(fundOrder.getParentMerchantNo())
+                    .setCollectionMerchantNo(fundOrder.getCollectionMerchantNo());
+        }
+        return request;
+    }
+
+    private PayFundOrderDO requireRefundFundOrder(PayRefundDO refund) {
+        PayFundService service = getPayFundService();
+        PayFundOrderDO fundOrder = service == null ? null : service.getFundOrderByPayOrderId(refund.getOrderId());
+        if (fundOrder == null || !Objects.equals(fundOrder.getChannelId(), refund.getChannelId())
+                || StrUtil.isBlank(fundOrder.getParentMerchantNo()) || StrUtil.isBlank(fundOrder.getCollectionMerchantNo())) {
+            throw new IllegalStateException("易宝退款缺少原支付渠道及商编快照，需人工核实");
+        }
+        return fundOrder;
     }
 
     /**
@@ -163,7 +229,7 @@ public class PayRefundServiceImpl implements PayRefundService {
         }
 
         // 校验金额，退款金额不能大于原定的金额
-        if (reqDTO.getPrice() + order.getRefundPrice() > order.getPrice()) {
+        if ((long) reqDTO.getPrice() + order.getRefundPrice() > order.getPrice()) {
             throw exception(REFUND_PRICE_EXCEED);
         }
         // 是否有退款中的订单
@@ -187,7 +253,7 @@ public class PayRefundServiceImpl implements PayRefundService {
     @Override
     public void notifyRefund(Long channelId, PayRefundRespDTO notify) {
         // 校验支付渠道是否有效
-        PayChannelDO channel = channelService.validPayChannel(channelId);
+        PayChannelDO channel = channelService.validExistingPayChannel(channelId);
         // 更新退款订单
         TenantUtils.execute(channel.getTenantId(), () -> getSelf().notifyRefund(channel, notify));
     }
@@ -201,6 +267,17 @@ public class PayRefundServiceImpl implements PayRefundService {
     // 注意，如果是方法内调用该方法，需要通过 getSelf().notifyRefund(channel, notify) 调用，否则事务不生效
     @Transactional(rollbackFor = Exception.class)
     public void notifyRefund(PayChannelDO channel, PayRefundRespDTO notify) {
+        if (PayRefundStatusEnum.WAITING.getStatus().equals(notify.getStatus())) {
+            PayRefundDO refund = refundMapper.selectByAppIdAndNo(channel.getAppId(), notify.getOutRefundNo());
+            if (refund == null || !Objects.equals(channel.getId(), refund.getChannelId())) {
+                throw exception(REFUND_NOT_FOUND);
+            }
+            if (StrUtil.isNotBlank(notify.getChannelRefundNo())) {
+                refundMapper.updateByIdAndStatus(refund.getId(), PayRefundStatusEnum.WAITING.getStatus(),
+                        new PayRefundDO().setChannelRefundNo(notify.getChannelRefundNo()));
+            }
+            return;
+        }
         // 情况一：退款成功
         if (PayRefundStatusEnum.isSuccess(notify.getStatus())) {
             notifyRefundSuccess(channel, notify);
@@ -216,7 +293,7 @@ public class PayRefundServiceImpl implements PayRefundService {
         // 1.1 查询 PayRefundDO
         PayRefundDO refund = refundMapper.selectByAppIdAndNo(
                 channel.getAppId(), notify.getOutRefundNo());
-        if (refund == null) {
+        if (refund == null || !Objects.equals(channel.getId(), refund.getChannelId())) {
             throw exception(REFUND_NOT_FOUND);
         }
         if (PayRefundStatusEnum.isSuccess(refund.getStatus())) { // 如果已经是成功，直接返回，不用重复更新
@@ -241,6 +318,11 @@ public class PayRefundServiceImpl implements PayRefundService {
         // 2. 更新订单
         orderService.updateOrderRefundPrice(refund.getOrderId(), refund.getRefundPrice());
 
+        PayFundService payFundService = getPayFundService();
+        if (payFundService != null) {
+            payFundService.onRefundResult(refund, notify);
+        }
+
         // 3. 插入退款通知记录
         notifyService.createPayNotifyTask(PayNotifyTypeEnum.REFUND.getType(),
                 refund.getId());
@@ -250,7 +332,7 @@ public class PayRefundServiceImpl implements PayRefundService {
         // 1.1 查询 PayRefundDO
         PayRefundDO refund = refundMapper.selectByAppIdAndNo(
                 channel.getAppId(), notify.getOutRefundNo());
-        if (refund == null) {
+        if (refund == null || !Objects.equals(channel.getId(), refund.getChannelId())) {
             throw exception(REFUND_NOT_FOUND);
         }
         if (PayRefundStatusEnum.isFailure(refund.getStatus())) { // 如果已经是成功，直接返回，不用重复更新
@@ -272,12 +354,18 @@ public class PayRefundServiceImpl implements PayRefundService {
         }
         log.info("[notifyRefundFailure][退款订单({}) 更新为退款失败]", refund.getId());
 
+        PayFundService payFundService = getPayFundService();
+        if (payFundService != null) {
+            payFundService.onRefundResult(refund, notify);
+        }
+
         // 2. 插入退款通知记录
         notifyService.createPayNotifyTask(PayNotifyTypeEnum.REFUND.getType(),
                 refund.getId());
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public int syncRefund() {
         // 1. 查询指定创建时间内的待退款订单
         List<PayRefundDO> refunds = refundMapper.selectListByStatus(PayRefundStatusEnum.WAITING.getStatus());
@@ -300,13 +388,43 @@ public class PayRefundServiceImpl implements PayRefundService {
      */
     private boolean syncRefund(PayRefundDO refund) {
         try {
-            // 1.1 查询退款订单信息
+            PayChannelDO channel = channelService.validExistingPayChannel(refund.getChannelId());
             PayClient<?> payClient = channelService.getPayClient(refund.getChannelId());
             if (payClient == null) {
                 log.error("[syncRefund][渠道编号({}) 找不到对应的支付客户端]", refund.getChannelId());
                 return false;
             }
-            PayRefundRespDTO respDTO = payClient.getRefund(refund.getOrderNo(), refund.getNo());
+            PayFundService payFundService = getPayFundService();
+            if (PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(refund.getChannelCode())
+                    && refund.getRequestSubmittedTime() == null && StrUtil.isBlank(refund.getChannelRefundNo())) {
+                // 归还资金也必须使用原支付快照，缺少快照时不能先向当前渠道商编发起资金操作。
+                requireRefundFundOrder(refund);
+                if (payFundService != null && (!payFundService.executeRefundPreparation(refund.getId())
+                        || !payFundService.isRefundReady(refund.getId()))) {
+                    return false;
+                }
+                refund = refundMapper.selectById(refund.getId());
+                PayRefundUnifiedReqDTO request = buildRefundRequest(refund, channel);
+                if (!getSelf().markRefundSubmitted(refund.getId())) {
+                    return false;
+                }
+                PayRefundRespDTO response = payClient.unifiedRefund(request);
+                getSelf().notifyRefund(channel, response);
+                return PayRefundStatusEnum.isSuccess(response.getStatus())
+                        || PayRefundStatusEnum.isFailure(response.getStatus());
+            }
+            // 1.1 查询退款订单信息
+            PayRefundRespDTO respDTO;
+            if (PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(refund.getChannelCode())) {
+                if (!(payClient instanceof YeepayPayClient yeepayClient)) {
+                    throw new IllegalStateException("易宝退款渠道客户端不匹配");
+                }
+                PayFundOrderDO fundOrder = requireRefundFundOrder(refund);
+                respDTO = yeepayClient.getRefund(refund.getOrderNo(), refund.getNo(),
+                        fundOrder.getParentMerchantNo(), fundOrder.getCollectionMerchantNo(), refund.getRefundPrice());
+            } else {
+                respDTO = payClient.getRefund(refund.getOrderNo(), refund.getNo());
+            }
             // 1.2 回调退款结果
             notifyRefund(refund.getChannelId(), respDTO);
 
@@ -314,9 +432,16 @@ public class PayRefundServiceImpl implements PayRefundService {
             return PayRefundStatusEnum.isSuccess(respDTO.getStatus())
                     || PayRefundStatusEnum.isFailure(respDTO.getStatus());
         } catch (Throwable e) {
-            log.error("[syncRefund][refund({}) 同步退款状态异常]", refund.getId(), e);
+            log.error("[syncRefund][refund({}) 同步退款状态异常，异常类型({})]", refund.getId(), e.getClass().getSimpleName());
             return false;
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public boolean retryRefund(Long refundId) {
+        PayRefundDO refund = refundMapper.selectById(refundId);
+        return refund != null && syncRefund(refund);
     }
 
     /**
@@ -326,6 +451,10 @@ public class PayRefundServiceImpl implements PayRefundService {
      */
     private PayRefundServiceImpl getSelf() {
         return SpringUtil.getBean(getClass());
+    }
+
+    private PayFundService getPayFundService() {
+        return payFundServiceProvider == null ? null : payFundServiceProvider.getIfAvailable();
     }
 
 }

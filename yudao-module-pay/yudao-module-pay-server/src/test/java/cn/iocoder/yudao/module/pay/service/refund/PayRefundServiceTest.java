@@ -264,6 +264,21 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
     }
 
     @Test
+    public void testCreateRefund_cumulativeAmountCannotOverflowAndBypassOriginalPrice() {
+        PayRefundCreateReqDTO reqDTO = randomPojo(PayRefundCreateReqDTO.class,
+                o -> o.setAppKey("demo").setMerchantOrderId("100").setPrice(1_000_000_000));
+        when(appService.validPayApp("demo")).thenReturn(new PayAppDO().setId(1L));
+        when(orderService.getOrder(1L, "100")).thenReturn(new PayOrderDO()
+                .setStatus(PayOrderStatusEnum.REFUND.getStatus())
+                .setPrice(2_000_000_000).setRefundPrice(1_500_000_000));
+
+        assertServiceException(() -> refundService.createRefund(reqDTO), REFUND_PRICE_EXCEED);
+
+        verifyNoInteractions(channelService);
+        assertThat(refundMapper.selectCount()).isZero();
+    }
+
+    @Test
     public void testCreateRefund_orderHasRefunding() {
         // 准备参数
         PayRefundCreateReqDTO reqDTO = randomPojo(PayRefundCreateReqDTO.class,
@@ -303,7 +318,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         // mock 方法（channel）
         PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L)
                 .setCode(PayChannelEnum.ALIPAY_APP.getCode()));
-        when(channelService.validPayChannel(eq(1L))).thenReturn(channel);
+        when(channelService.validExistingPayChannel(eq(1L))).thenReturn(channel);
 
         // 调用，并断言异常
         assertServiceException(() -> refundService.createRefund(reqDTO),
@@ -328,7 +343,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         // mock 方法（channel）
         PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L)
                 .setCode(PayChannelEnum.ALIPAY_APP.getCode()));
-        when(channelService.validPayChannel(eq(1L))).thenReturn(channel);
+        when(channelService.validExistingPayChannel(eq(1L))).thenReturn(channel);
         // mock 方法（client）
         PayClient<?> client = mock(PayClient.class);
         when(channelService.getPayClient(eq(10L))).thenReturn(client);
@@ -360,7 +375,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         // mock 方法（channel）
         PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L)
                 .setCode(PayChannelEnum.ALIPAY_APP.getCode()));
-        when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+        when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
         // mock 方法（client）
         PayClient<?> client = mock(PayClient.class);
         when(channelService.getPayClient(eq(10L))).thenReturn(client);
@@ -384,6 +399,10 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
     @Test
     public void testCreateRefund_invokeSuccess() {
         PayRefundServiceImpl payRefundServiceImpl = mock(PayRefundServiceImpl.class);
+        doAnswer(invocation -> {
+            refundService.submitRefundAfterCommit(invocation.getArgument(0));
+            return null;
+        }).when(payRefundServiceImpl).submitRefundAfterCommit(anyLong());
         try (MockedStatic<SpringUtil> springUtilMockedStatic = mockStatic(SpringUtil.class)) {
             springUtilMockedStatic.when(() -> SpringUtil.getBean(eq(PayRefundServiceImpl.class)))
                     .thenReturn(payRefundServiceImpl);
@@ -404,7 +423,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
             // mock 方法（channel）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L)
                     .setCode(PayChannelEnum.ALIPAY_APP.getCode()));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
             // mock 方法（client）
             PayClient<?> client = mock(PayClient.class);
             when(channelService.getPayClient(eq(10L))).thenReturn(client);
@@ -449,7 +468,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
             PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class);
             // mock 方法（channel）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
 
             // 调用
             refundService.notifyRefund(channelId, refundRespDTO);
@@ -477,7 +496,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.SUCCESS.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 已支付）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.SUCCESS.getStatus()));
         refundMapper.insert(refund);
 
@@ -494,7 +513,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.SUCCESS.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 已支付）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.FAILURE.getStatus()));
         refundMapper.insert(refund);
 
@@ -510,7 +529,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.SUCCESS.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 已支付）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.WAITING.getStatus())
                 .setOrderId(100L).setRefundPrice(23));
         refundMapper.insert(refund);
@@ -531,7 +550,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.SUCCESS.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 已支付）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.WAITING.getStatus())
                 .setOrderId(100L).setRefundPrice(23));
         refundMapper.insert(refund);
@@ -570,7 +589,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.FAILURE.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 退款失败）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.FAILURE.getStatus()));
         refundMapper.insert(refund);
 
@@ -587,7 +606,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.FAILURE.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 已支付）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.SUCCESS.getStatus()));
         refundMapper.insert(refund);
 
@@ -603,7 +622,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
         PayRefundRespDTO refundRespDTO = randomPojo(PayRefundRespDTO.class,
                 o -> o.setStatus(PayRefundStatusEnum.FAILURE.getStatus()).setOutRefundNo("R100"));
         // mock 数据（refund + 已支付）
-        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setNo("R100")
+        PayRefundDO refund = randomPojo(PayRefundDO.class, o -> o.setAppId(1L).setChannelId(10L).setNo("R100")
                 .setStatus(PayRefundStatusEnum.WAITING.getStatus())
                 .setOrderId(100L).setRefundPrice(23));
         refundMapper.insert(refund);
@@ -670,7 +689,7 @@ public class PayRefundServiceTest extends BaseDbAndRedisUnitTest {
             when(client.getRefund(eq("P110"), eq("R220"))).thenReturn(respDTO);
             // mock 方法（channel）
             PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(10L));
-            when(channelService.validPayChannel(eq(10L))).thenReturn(channel);
+            when(channelService.validExistingPayChannel(eq(10L))).thenReturn(channel);
 
             // 调用
             return refundService.syncRefund();

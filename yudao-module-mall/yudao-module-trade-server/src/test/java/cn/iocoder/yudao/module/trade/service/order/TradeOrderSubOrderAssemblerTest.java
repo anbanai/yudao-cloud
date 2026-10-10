@@ -62,6 +62,16 @@ class TradeOrderSubOrderAssemblerTest {
                 .isEqualTo(TradeOrderStatusEnum.DELIVERED.getStatus());
     }
 
+    @Test
+    void aggregateStatus_isCanceledWhenEverySubOrderIsCanceled() {
+        List<TradeOrderSubDO> subOrders = List.of(
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.CANCELED.getStatus()),
+                new TradeOrderSubDO().setStatus(TradeOrderStatusEnum.CANCELED.getStatus()));
+
+        assertThat(TradeOrderSubOrderAssembler.aggregateStatus(subOrders))
+                .isEqualTo(TradeOrderStatusEnum.CANCELED.getStatus());
+    }
+
     private static TradeOrderItemDO item(Long merchantId, String merchantName, int price, int count,
                                          int discount, int coupon, int point, int vip, int delivery,
                                          int adjust, int pay) {

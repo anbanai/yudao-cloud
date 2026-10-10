@@ -7,11 +7,13 @@ import cn.hutool.extra.spring.SpringUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils;
 import cn.iocoder.yudao.framework.common.util.number.MoneyUtils;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.PayClient;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.dto.order.PayOrderRespDTO;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.dto.order.PayOrderUnifiedReqDTO;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderDividePlanDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderExportReqVO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderPageReqVO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderSubmitReqVO;
@@ -25,14 +27,19 @@ import cn.iocoder.yudao.module.pay.dal.mysql.order.PayOrderExtensionMapper;
 import cn.iocoder.yudao.module.pay.dal.mysql.order.PayOrderMapper;
 import cn.iocoder.yudao.module.pay.dal.redis.no.PayNoRedisDAO;
 import cn.iocoder.yudao.module.pay.enums.notify.PayNotifyTypeEnum;
+import cn.iocoder.yudao.module.pay.enums.PayChannelEnum;
 import cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum;
 import cn.iocoder.yudao.module.pay.framework.pay.config.PayProperties;
 import cn.iocoder.yudao.module.pay.service.app.PayAppService;
 import cn.iocoder.yudao.module.pay.service.channel.PayChannelService;
 import cn.iocoder.yudao.module.pay.service.notify.PayNotifyService;
+import cn.iocoder.yudao.module.pay.service.payfund.PayFundService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.annotations.VisibleForTesting;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -40,8 +47,12 @@ import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
@@ -73,6 +84,10 @@ public class PayOrderServiceImpl implements PayOrderService {
     private PayChannelService channelService;
     @Resource
     private PayNotifyService notifyService;
+
+    /** 资金域在按需启用时才参与支付主流程，保持普通渠道和独立单元测试兼容。 */
+    @Autowired(required = false)
+    private ObjectProvider<PayFundService> payFundServiceProvider;
 
     @Override
     public PayOrderDO getOrder(Long id) {
@@ -133,7 +148,9 @@ public class PayOrderServiceImpl implements PayOrderService {
                 // 订单相关字段
                 .setStatus(PayOrderStatusEnum.WAITING.getStatus())
                 // 退款相关字段
-                .setRefundPrice(0);
+                .setRefundPrice(0)
+                // 分账计划在支付单创建时保存，支付侧后续不再从交易商品实时重算。
+                .setDividePlanData(CollUtil.isEmpty(reqDTO.getDividePlan()) ? null : toJsonString(reqDTO.getDividePlan()));
         orderMapper.insert(order);
         return order.getId();
     }
@@ -146,13 +163,16 @@ public class PayOrderServiceImpl implements PayOrderService {
         PayChannelDO channel = validateChannelCanSubmit(order.getAppId(), reqVO.getChannelCode());
         PayClient<?> client = channelService.getPayClient(channel.getId());
 
-        // 2. 插入 PayOrderExtensionDO
-        String no = noRedisDAO.generate(payProperties.getOrderNoPrefix());
-        PayOrderExtensionDO orderExtension = PayOrderConvert.INSTANCE.convert(reqVO, userIp)
-                .setOrderId(order.getId()).setNo(no)
-                .setChannelId(channel.getId()).setChannelCode(channel.getCode())
-                .setStatus(PayOrderStatusEnum.WAITING.getStatus());
-        orderExtensionMapper.insert(orderExtension);
+        // 2. 易宝聚合支付必须复用同一外部单号；普通渠道继续为每次提交生成拓展单。
+        PayFundService payFundService = getPayFundService();
+        PayOrderExtensionDO orderExtension;
+        if (PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(channel.getCode())) {
+            orderExtension = getSelf().prepareYeepayOrderExtension(order.getId(), channel, reqVO, userIp);
+            // 调价与资金快照准备共用行锁，使用准备完成后的金额和计划，避免旧读覆盖新价格。
+            order = orderMapper.selectById(order.getId());
+        } else {
+            orderExtension = createOrderExtension(order.getId(), channel, reqVO, userIp);
+        }
 
         // 3. 调用三方接口
         PayOrderUnifiedReqDTO unifiedOrderReqDTO = PayOrderConvert.INSTANCE.convert2(reqVO, userIp)
@@ -163,6 +183,20 @@ public class PayOrderServiceImpl implements PayOrderService {
                 .setReturnUrl(reqVO.getReturnUrl())
                 // 订单相关字段
                 .setPrice(order.getPrice()).setExpireTime(order.getExpireTime());
+        if (payFundService != null && PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(channel.getCode())) {
+            Map<String, String> channelExtras = unifiedOrderReqDTO.getChannelExtras() == null
+                    ? new LinkedHashMap<>() : new LinkedHashMap<>(unifiedOrderReqDTO.getChannelExtras());
+            // 预支付使用支付前已落库的不可变资金快照，不能从当前交易或商家资料重新计算。
+            channelExtras.put("divideDetail", payFundService.buildPrePayDivideDetail(order));
+            unifiedOrderReqDTO.setChannelExtras(channelExtras);
+            var originalFund = payFundService.getFundOrderByPayOrderId(order.getId());
+            if (originalFund == null || StrUtil.isBlank(originalFund.getParentMerchantNo())
+                    || StrUtil.isBlank(originalFund.getCollectionMerchantNo())) {
+                throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+            }
+            unifiedOrderReqDTO.setParentMerchantNo(originalFund.getParentMerchantNo())
+                    .setCollectionMerchantNo(originalFund.getCollectionMerchantNo());
+        }
         PayOrderRespDTO unifiedOrderResp = client.unifiedOrder(unifiedOrderReqDTO);
 
         // 4. 如果调用直接支付成功，则直接更新支付单状态为成功。例如说：付款码支付，免密支付时，就直接验证支付成功
@@ -186,8 +220,59 @@ public class PayOrderServiceImpl implements PayOrderService {
         return PayOrderConvert.INSTANCE.convert(order, unifiedOrderResp);
     }
 
+    /**
+     * 在支付单行锁内创建稳定易宝拓展单和资金快照，事务提交后才请求外部网关。
+     * 同一行锁也用于调价，确保预支付金额与资金快照同时冻结。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public PayOrderExtensionDO prepareYeepayOrderExtension(Long orderId, PayChannelDO channel,
+                                                         PayOrderSubmitReqVO reqVO, String userIp) {
+        PayOrderDO order = lockOrder(orderId);
+        validateOrderWaiting(order);
+        List<PayOrderExtensionDO> extensions = orderExtensionMapper.selectListByOrderId(orderId);
+        PayOrderExtensionDO extension = extensions.stream()
+                .filter(value -> PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(value.getChannelCode()))
+                .min(java.util.Comparator.comparing(PayOrderExtensionDO::getId)).orElse(null);
+        if (extension != null && (!Objects.equals(extension.getChannelId(), channel.getId())
+                || !PayOrderStatusEnum.WAITING.getStatus().equals(extension.getStatus()))) {
+            throw exception(PAY_ORDER_EXTENSION_STATUS_IS_NOT_WAITING);
+        }
+        if (extension == null) {
+            extension = createOrderExtension(orderId, channel, reqVO, userIp);
+        }
+        PayFundService fundService = getPayFundService();
+        if (fundService == null) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        fundService.preparePayment(order, channel, extension.getNo());
+        return extension;
+    }
+
+    private PayOrderExtensionDO createOrderExtension(Long orderId, PayChannelDO channel,
+                                                    PayOrderSubmitReqVO reqVO, String userIp) {
+        PayOrderExtensionDO extension = PayOrderConvert.INSTANCE.convert(reqVO, userIp)
+                .setOrderId(orderId).setNo(noRedisDAO.generate(payProperties.getOrderNoPrefix()))
+                .setChannelId(channel.getId()).setChannelCode(channel.getCode())
+                .setStatus(PayOrderStatusEnum.WAITING.getStatus());
+        orderExtensionMapper.insert(extension);
+        return extension;
+    }
+
+    private PayOrderDO lockOrder(Long id) {
+        return orderMapper.selectOne(new LambdaQueryWrapper<PayOrderDO>()
+                .eq(PayOrderDO::getId, id).last("FOR UPDATE"));
+    }
+
     private PayOrderDO validateOrderCanSubmit(Long id) {
         PayOrderDO order = orderMapper.selectById(id);
+        validateOrderWaiting(order);
+
+        // 【重要】校验是否支付拓展单已支付，只是没有回调、或者数据不正常
+        validateOrderActuallyPaid(id);
+        return order;
+    }
+
+    private void validateOrderWaiting(PayOrderDO order) {
         if (order == null) { // 是否存在
             throw exception(PAY_ORDER_NOT_FOUND);
         }
@@ -201,9 +286,6 @@ public class PayOrderServiceImpl implements PayOrderService {
             throw exception(PAY_ORDER_IS_EXPIRED);
         }
 
-        // 【重要】校验是否支付拓展单已支付，只是没有回调、或者数据不正常
-        validateOrderActuallyPaid(id);
-        return order;
     }
 
     /**
@@ -227,13 +309,26 @@ public class PayOrderServiceImpl implements PayOrderService {
                 log.error("[validateOrderCanSubmit][渠道编号({}) 找不到对应的支付客户端]", orderExtension.getChannelId());
                 return;
             }
-            PayOrderRespDTO respDTO = payClient.getOrder(orderExtension.getNo());
+            PayOrderRespDTO respDTO = queryOrderWithSnapshot(payClient, orderExtension);
             if (respDTO != null && PayOrderStatusEnum.isSuccess(respDTO.getStatus())) {
                 log.warn("[validateOrderCanSubmit][order({}) 的 PayOrderRespDTO({}) 已支付，可能是回调延迟]",
                         id, toJsonString(respDTO));
                 throw exception(PAY_ORDER_EXTENSION_IS_PAID);
             }
         });
+    }
+
+    private PayOrderRespDTO queryOrderWithSnapshot(PayClient<?> client, PayOrderExtensionDO extension) {
+        if (!(client instanceof cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.yeepay.YeepayPayClient yeepay)) {
+            return client.getOrder(extension.getNo());
+        }
+        PayFundService service = getPayFundService();
+        var original = service == null ? null : service.getFundOrderByPayOrderId(extension.getOrderId());
+        if (original == null || StrUtil.isBlank(original.getParentMerchantNo())
+                || StrUtil.isBlank(original.getCollectionMerchantNo())) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        return yeepay.getOrder(extension.getNo(), original.getParentMerchantNo(), original.getCollectionMerchantNo(), original.getAmount());
     }
 
     private PayChannelDO validateChannelCanSubmit(Long appId, String channelCode) {
@@ -262,7 +357,7 @@ public class PayOrderServiceImpl implements PayOrderService {
     @Override
     public void notifyOrder(Long channelId, PayOrderRespDTO notify) {
         // 校验支付渠道是否有效
-        PayChannelDO channel = channelService.validPayChannel(channelId);
+        PayChannelDO channel = channelService.validExistingPayChannel(channelId);
         // 更新支付订单为已支付
         TenantUtils.execute(channel.getTenantId(), () -> getSelf().notifyOrder(channel, notify));
     }
@@ -296,6 +391,11 @@ public class PayOrderServiceImpl implements PayOrderService {
         Boolean paid = updateOrderSuccess(channel, orderExtension, notify);
         if (paid) { // 如果之前已经成功回调，则直接返回，不用重复记录支付通知记录；例如说：支付平台重复回调
             return;
+        }
+
+        PayFundService payFundService = getPayFundService();
+        if (payFundService != null && PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(channel.getCode())) {
+            payFundService.onPaymentSuccess(orderMapper.selectById(orderExtension.getOrderId()), notify);
         }
 
         // 3. 插入支付通知记录
@@ -431,19 +531,87 @@ public class PayOrderServiceImpl implements PayOrderService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updatePayOrderPrice(Long id, Integer payPrice) {
-        PayOrderDO order = orderMapper.selectById(id);
+        updateOrderPriceAndPlan(id, payPrice, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePayOrderPrice(Long id, Integer payPrice, List<PayOrderDividePlanDTO> dividePlan) {
+        if (dividePlan == null) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        updateOrderPriceAndPlan(id, payPrice, dividePlan);
+    }
+
+    private void updateOrderPriceAndPlan(Long id, Integer payPrice, List<PayOrderDividePlanDTO> dividePlan) {
+        PayOrderDO order = lockOrder(id);
         if (order == null) {
             throw exception(PAY_ORDER_NOT_FOUND);
         }
         if (ObjectUtil.notEqual(PayOrderStatusEnum.WAITING.getStatus(), order.getStatus())) {
             throw exception(PAY_ORDER_STATUS_IS_NOT_WAITING);
         }
-        if (ObjectUtil.equal(order.getPrice(), payPrice)) {
+        if (payPrice == null || payPrice <= 0) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        List<PayOrderDividePlanDTO> originalPlan = StrUtil.isBlank(order.getDividePlanData())
+                ? List.of() : JsonUtils.parseArray(order.getDividePlanData(), PayOrderDividePlanDTO.class);
+        boolean priceChanged = ObjectUtil.notEqual(order.getPrice(), payPrice);
+        boolean planChanged = dividePlan != null && !Objects.equals(originalPlan, dividePlan);
+        if (!priceChanged && !planChanged) {
             return;
         }
 
-        orderMapper.updateById(new PayOrderDO().setId(order.getId()).setPrice(payPrice));
+        boolean yeepayPrepared = orderExtensionMapper.selectListByOrderId(id).stream()
+                .anyMatch(extension -> PayChannelEnum.YEEPAY_WX_LITE.getCode().equals(extension.getChannelCode()));
+        if (yeepayPrepared) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        // 旧金额接口不能留下与新价格不相符的分账计划；商家订单必须使用原子更新接口。
+        if (dividePlan == null && CollUtil.isNotEmpty(originalPlan)) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        if (dividePlan != null) {
+            validateUpdatedDividePlan(payPrice, originalPlan, dividePlan);
+        }
+        PayOrderDO update = new PayOrderDO().setId(order.getId()).setPrice(payPrice);
+        if (dividePlan != null) {
+            update.setDividePlanData(toJsonString(dividePlan));
+        }
+        orderMapper.updateById(update);
+    }
+
+    private void validateUpdatedDividePlan(Integer price, List<PayOrderDividePlanDTO> original,
+                                          List<PayOrderDividePlanDTO> updated) {
+        if (CollUtil.isEmpty(original) && CollUtil.isEmpty(updated)) {
+            return;
+        }
+        if (original.size() != updated.size()) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
+        Map<Long, PayOrderDividePlanDTO> originalBySubOrder = new LinkedHashMap<>();
+        original.forEach(plan -> originalBySubOrder.put(plan.getTradeOrderSubId(), plan));
+        Set<Long> subOrderIds = new HashSet<>();
+        long total = 0;
+        for (PayOrderDividePlanDTO plan : updated) {
+            if (plan == null || plan.getAmount() == null || plan.getAmount() <= 0
+                    || !subOrderIds.add(plan.getTradeOrderSubId())) {
+                throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+            }
+            PayOrderDividePlanDTO previous = originalBySubOrder.get(plan.getTradeOrderSubId());
+            if (previous == null || !Objects.equals(previous.getTradeOrderId(), plan.getTradeOrderId())
+                    || !Objects.equals(previous.getMerchantId(), plan.getMerchantId())
+                    || !Objects.equals(previous.getTradeOrderItemId(), plan.getTradeOrderItemId())
+                    || !Objects.equals(previous.getMerchantNo(), plan.getMerchantNo())) {
+                throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+            }
+            total += plan.getAmount();
+        }
+        if (total != price) {
+            throw exception(PAY_ORDER_DIVIDE_PLAN_INVALID);
+        }
     }
 
     @Override
@@ -498,7 +666,7 @@ public class PayOrderServiceImpl implements PayOrderService {
                 log.error("[syncOrder][渠道编号({}) 找不到对应的支付客户端]", orderExtension.getChannelId());
                 return false;
             }
-            PayOrderRespDTO respDTO = payClient.getOrder(orderExtension.getNo());
+            PayOrderRespDTO respDTO = queryOrderWithSnapshot(payClient, orderExtension);
             // 如果查询到订单不存在，PayClient 返回的状态为关闭。但此时不能关闭订单。存在以下一种场景：
             //  拉起渠道支付后，短时间内用户未及时完成支付，但是该订单同步定时任务恰巧自动触发了，主动查询结果为订单不存在。
             //  当用户支付成功之后，该订单状态在渠道的回调中无法从已关闭改为已支付，造成重大影响。
@@ -561,7 +729,7 @@ public class PayOrderServiceImpl implements PayOrderService {
                     log.error("[expireOrder][渠道编号({}) 找不到对应的支付客户端]", orderExtension.getChannelId());
                     return false;
                 }
-                PayOrderRespDTO respDTO = payClient.getOrder(orderExtension.getNo());
+                PayOrderRespDTO respDTO = queryOrderWithSnapshot(payClient, orderExtension);
                 if (PayOrderStatusEnum.isRefund(respDTO.getStatus())) {
                     // 补充说明：按道理，应该是 WAITING => SUCCESS => REFUND 状态，如果直接 WAITING => REFUND 状态，说明中间丢了过程
                     // 此时，需要人工介入，手工补齐数据，保持 WAITING => SUCCESS => REFUND 的过程
@@ -605,6 +773,10 @@ public class PayOrderServiceImpl implements PayOrderService {
      */
     private PayOrderServiceImpl getSelf() {
         return SpringUtil.getBean(getClass());
+    }
+
+    private PayFundService getPayFundService() {
+        return payFundServiceProvider == null ? null : payFundServiceProvider.getIfAvailable();
     }
 
 }

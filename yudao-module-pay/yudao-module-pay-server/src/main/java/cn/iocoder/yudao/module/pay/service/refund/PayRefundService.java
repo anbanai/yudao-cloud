@@ -79,4 +79,7 @@ public interface PayRefundService {
      */
     int syncRefund();
 
+    /** 人工触发指定退款单的资金归还/退款补偿。 */
+    boolean retryRefund(Long refundId);
+
 }

@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.member.enums.point.MemberPointGiveTimingEnum;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderUpdatePriceReqDTO;
 import cn.iocoder.yudao.module.pay.api.refund.PayRefundApi;
 import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundRespDTO;
@@ -320,6 +321,10 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 创建支付单，用于后续的支付
         PayOrderCreateReqDTO payOrderCreateReqDTO = TradeOrderConvert.INSTANCE.convert(
                 order, orderItems, tradeOrderProperties);
+        // The sub-orders were persisted before this method is called. Use their payment-time
+        // amount snapshot so a later product or merchant change cannot affect fund allocation.
+        payOrderCreateReqDTO.setDividePlan(TradeOrderConvert.INSTANCE.convertDividePlan(
+                order, tradeOrderSubMapper.selectListByOrderId(order.getId())));
         Long payOrderId = payOrderApi.createOrder(payOrderCreateReqDTO).getCheckedData();
 
         // 更新到交易单上
@@ -832,15 +837,22 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         List<TradeOrderItemDO> updateItems = new ArrayList<>();
         for (int i = 0; i < orderOrderItems.size(); i++) {
             TradeOrderItemDO item = orderOrderItems.get(i);
+            item.setAdjustPrice(item.getAdjustPrice() + dividePrices.get(i))
+                    .setPayPrice(item.getPayPrice() + dividePrices.get(i));
             updateItems.add(new TradeOrderItemDO().setId(item.getId())
-                    .setAdjustPrice(item.getAdjustPrice() + dividePrices.get(i))
-                    .setPayPrice(item.getPayPrice() + dividePrices.get(i)));
+                    .setAdjustPrice(item.getAdjustPrice()).setPayPrice(item.getPayPrice()));
         }
         tradeOrderItemMapper.updateBatch(updateItems);
-        syncSubOrderAmounts(order.getId(), orderOrderItems);
+        List<TradeOrderSubDO> subOrders = syncSubOrderAmounts(order.getId(), orderOrderItems);
 
         // 4. 更新支付订单
-        payOrderApi.updatePayOrderPrice(order.getPayOrderId(), newPayPrice).checkError();
+        if (subOrders.isEmpty()) {
+            payOrderApi.updatePayOrderPrice(order.getPayOrderId(), newPayPrice).checkError();
+        } else {
+            payOrderApi.updatePayOrderPriceWithDividePlan(new PayOrderUpdatePriceReqDTO()
+                    .setId(order.getPayOrderId()).setPayPrice(newPayPrice)
+                    .setDividePlan(TradeOrderConvert.INSTANCE.convertDividePlan(order, subOrders))).checkError();
+        }
 
         // 5. 记录订单日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), order.getStatus(),
@@ -850,10 +862,10 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     }
 
     /** 调价后同步商家履约订单金额，保证主订单与履约订单快照一致。 */
-    private void syncSubOrderAmounts(Long orderId, List<TradeOrderItemDO> orderItems) {
+    private List<TradeOrderSubDO> syncSubOrderAmounts(Long orderId, List<TradeOrderItemDO> orderItems) {
         List<TradeOrderSubDO> subOrders = tradeOrderSubMapper.selectListByOrderId(orderId);
         if (subOrders.isEmpty()) {
-            return;
+            return subOrders;
         }
         Map<Long, TradeOrderSubDO> subOrderMap = new java.util.HashMap<>();
         subOrders.forEach(subOrder -> subOrderMap.put(subOrder.getMerchantId(), subOrder));
@@ -864,6 +876,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                 continue;
             }
             TradeOrderSubDO calculated = group.subOrder();
+            existing.setPayPrice(calculated.getPayPrice());
             tradeOrderSubMapper.updateById(new TradeOrderSubDO().setId(existing.getId())
                     .setProductCount(calculated.getProductCount()).setTotalPrice(calculated.getTotalPrice())
                     .setDiscountPrice(calculated.getDiscountPrice()).setCouponPrice(calculated.getCouponPrice())
@@ -871,6 +884,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                     .setAdjustPrice(calculated.getAdjustPrice()).setDeliveryPrice(calculated.getDeliveryPrice())
                     .setPayPrice(calculated.getPayPrice()));
         }
+        return subOrders;
     }
 
     @Override

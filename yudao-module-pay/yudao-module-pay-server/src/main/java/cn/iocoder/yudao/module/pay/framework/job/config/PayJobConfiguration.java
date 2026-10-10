@@ -10,6 +10,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class PayJobConfiguration {
 
     public static final String NOTIFY_THREAD_POOL_TASK_EXECUTOR = "NOTIFY_THREAD_POOL_TASK_EXECUTOR";
+    public static final String YEEPAY_EVENT_THREAD_POOL_TASK_EXECUTOR = "YEEPAY_EVENT_THREAD_POOL_TASK_EXECUTOR";
 
     @Bean(NOTIFY_THREAD_POOL_TASK_EXECUTOR)
     public ThreadPoolTaskExecutor notifyThreadPoolTaskExecutor() {
@@ -21,6 +22,19 @@ public class PayJobConfiguration {
         executor.setThreadNamePrefix("notify-task-"); // 配置线程池的前缀
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         // 进行加载
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean(YEEPAY_EVENT_THREAD_POOL_TASK_EXECUTOR)
+    public ThreadPoolTaskExecutor yeepayEventThreadPoolTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(200);
+        executor.setKeepAliveSeconds(60);
+        executor.setThreadNamePrefix("yeepay-event-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.initialize();
         return executor;
     }

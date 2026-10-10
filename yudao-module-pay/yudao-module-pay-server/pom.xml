@@ -89,6 +89,11 @@
             <artifactId>yudao-spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- 监控相关 -->
         <dependency>
@@ -110,6 +115,24 @@
         <dependency>
             <groupId>com.github.binarywang</groupId>
             <artifactId>weixin-java-pay</artifactId>
+        </dependency>
+
+        <!-- 易宝官方 YOP Java SDK：请求签名、响应验签和数字信封能力。 -->
+        <dependency>
+            <groupId>com.yeepay.yop.sdk</groupId>
+            <artifactId>yop-java-sdk</artifactId>
+            <version>4.4.15</version>
+        </dependency>
+        <dependency>
+            <groupId>com.yeepay.yop.sdk</groupId>
+            <artifactId>yop-java-sdk-crypto-inter</artifactId>
+            <version>4.4.15</version>
+        </dependency>
+        <!-- 易宝官方 SDK 的国密实现：SM2 请求签名、SM3 摘要和 SM4 回调解密。 -->
+        <dependency>
+            <groupId>com.yeepay.yop.sdk</groupId>
+            <artifactId>yop-java-sdk-crypto-gm</artifactId>
+            <version>4.4.15</version>
         </dependency>
 
     </dependencies>

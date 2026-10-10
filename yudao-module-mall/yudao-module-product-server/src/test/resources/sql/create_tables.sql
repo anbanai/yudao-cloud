@@ -131,16 +131,58 @@ CREATE TABLE IF NOT EXISTS `product_brand` (
     PRIMARY KEY("id")
 ) COMMENT '商品品牌';
 
+CREATE TABLE IF NOT EXISTS `product_merchant_pay_onboarding` (
+    `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `merchant_id` bigint NOT NULL,
+    `merchant_approval_time` timestamp(6) NOT NULL,
+    `app_key` varchar(64) NOT NULL,
+    `request_no` varchar(64) NOT NULL,
+    `business_role` varchar(32) NOT NULL,
+    `state` varchar(32) NOT NULL,
+    `materials_json` text DEFAULT NULL,
+    `materials_version` int NOT NULL DEFAULT 0,
+    `attempt_count` int NOT NULL DEFAULT 0,
+    `request_accepted` boolean NOT NULL DEFAULT FALSE,
+    `next_retry_time` timestamp DEFAULT NULL,
+    `last_error` varchar(128) DEFAULT NULL,
+    `onboarding_status` int DEFAULT NULL,
+    `sign_url` text DEFAULT NULL,
+    `auth_url` text DEFAULT NULL,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    UNIQUE (`tenant_id`, `merchant_id`, `merchant_approval_time`)
+);
+
+CREATE TABLE IF NOT EXISTS `product_merchant_encryption_migration` (
+    `migration_id` varchar(64) NOT NULL PRIMARY KEY,
+    `state` varchar(32) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS `product_merchant_pay_material_revision` (
+    `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `onboarding_id` bigint NOT NULL,
+    `merchant_id` bigint NOT NULL,
+    `materials_version` int NOT NULL,
+    `business_role` varchar(32) NOT NULL,
+    `operator_id` bigint DEFAULT NULL,
+    `materials_json` text NOT NULL,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    UNIQUE (`tenant_id`, `onboarding_id`, `materials_version`)
+);
+
 CREATE TABLE IF NOT EXISTS `product_merchant` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商家编号',
     `name` varchar(128) NOT NULL COMMENT '商家名称',
     `store_name` varchar(128) DEFAULT NULL COMMENT '店铺名称',
     `logo_url` varchar(512) DEFAULT NULL COMMENT '店铺 logo',
     `company_name` varchar(255) DEFAULT NULL COMMENT '企业主体名称',
-    `credit_code` varchar(64) DEFAULT NULL COMMENT '统一社会信用代码',
-    `legal_person` varchar(64) DEFAULT NULL COMMENT '法人',
-    `contact_name` varchar(64) DEFAULT NULL COMMENT '联系人',
-    `contact_mobile` varchar(32) DEFAULT NULL COMMENT '联系手机',
+    `credit_code` varchar(2048) DEFAULT NULL COMMENT '统一社会信用代码',
+    `legal_person` varchar(2048) DEFAULT NULL COMMENT '法人',
+    `contact_name` varchar(2048) DEFAULT NULL COMMENT '联系人',
+    `contact_mobile` varchar(2048) DEFAULT NULL COMMENT '联系手机',
     `status` tinyint NOT NULL DEFAULT 0 COMMENT '入驻状态',
     `reviewer_id` bigint DEFAULT NULL COMMENT '审核人',
     `review_time` datetime DEFAULT NULL COMMENT '审核时间',
@@ -158,8 +200,8 @@ CREATE TABLE IF NOT EXISTS `product_merchant_qualification` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '资质编号',
     `merchant_id` bigint NOT NULL COMMENT '商家编号',
     `type` varchar(64) NOT NULL COMMENT '资质类型',
-    `certificate_no` varchar(128) DEFAULT NULL COMMENT '证件编号',
-    `file_url` varchar(1024) NOT NULL COMMENT '证件文件',
+    `certificate_no` varchar(2048) DEFAULT NULL COMMENT '证件编号',
+    `file_url` text NOT NULL COMMENT '证件文件',
     `valid_start` date DEFAULT NULL COMMENT '有效期开始',
     `valid_end` date DEFAULT NULL COMMENT '有效期结束',
     `status` tinyint NOT NULL DEFAULT 10 COMMENT '审核状态',

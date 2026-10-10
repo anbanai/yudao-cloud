@@ -31,6 +31,8 @@ public enum PayChannelEnum implements ArrayValuable<String> {
     ALIPAY_BAR("alipay_bar", "支付宝条码支付"),
     ALIPAY_LITE("alipay_lite", "支付宝小程序支付"),
 
+    YEEPAY_WX_LITE("yeepay_wx_lite", "易宝微信小程序聚合支付"),
+
     MOCK("mock", "模拟支付"),
 
     WALLET("wallet", "钱包支付");

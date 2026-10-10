@@ -132,6 +132,9 @@ public class PayOrderDO extends BaseDO {
      */
     private Integer refundPrice;
 
+    /** 创建支付单时保存的不可变分账计划快照，JSON 格式。 */
+    private String dividePlanData;
+
     // ========== 渠道相关字段 ==========
     /**
      * 渠道用户编号

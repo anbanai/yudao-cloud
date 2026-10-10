@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.pay.framework.pay.core.client.PayClientFactory;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.alipay.*;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.wallet.WalletPayClient;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.weixin.*;
+import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.yeepay.YeepayPayClient;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.mock.MockPayClient;
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,6 +45,7 @@ public class PayClientFactoryImpl implements PayClientFactory {
         // 微信支付客户端
         clientClass.put(WX_PUB, WxPubPayClient.class);
         clientClass.put(WX_LITE, WxLitePayClient.class);
+        clientClass.put(YEEPAY_WX_LITE, YeepayPayClient.class);
         clientClass.put(WX_APP, WxAppPayClient.class);
         clientClass.put(WX_BAR, WxBarPayClient.class);
         clientClass.put(WX_NATIVE, WxNativePayClient.class);

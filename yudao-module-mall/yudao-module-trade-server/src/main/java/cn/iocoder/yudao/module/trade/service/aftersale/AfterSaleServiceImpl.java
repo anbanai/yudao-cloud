@@ -9,6 +9,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
 import cn.iocoder.yudao.module.pay.api.refund.PayRefundApi;
 import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundCreateReqDTO;
+import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundFundAllocationDTO;
 import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundRespDTO;
 import cn.iocoder.yudao.module.pay.enums.refund.PayRefundStatusEnum;
 import cn.iocoder.yudao.module.promotion.api.combination.CombinationRecordApi;
@@ -50,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
@@ -408,6 +410,14 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         PayRefundCreateReqDTO createReqDTO = AfterSaleConvert.INSTANCE.convert(userIp, afterSale, tradeOrderProperties)
                 .setUserId(afterSale.getUserId()).setUserType(UserTypeEnum.MEMBER.getValue())
                 .setReason(StrUtil.format("退款【{}】", afterSale.getSpuName()));
+        // 旧订单没有商家履约快照，继续由支付渠道决定退款要求。
+        TradeOrderItemDO orderItem = tradeOrderQueryService.getOrderItem(afterSale.getOrderItemId());
+        if (orderItem != null && orderItem.getSubOrderId() != null && orderItem.getMerchantId() != null) {
+            createReqDTO.setFundAllocation(List.of(new PayRefundFundAllocationDTO()
+                    .setAfterSaleId(afterSale.getId()).setTradeOrderItemId(orderItem.getId())
+                    .setTradeOrderSubId(orderItem.getSubOrderId()).setMerchantId(orderItem.getMerchantId())
+                    .setAmount(afterSale.getRefundPrice())));
+        }
         Long payRefundId = payRefundApi.createRefund(createReqDTO).getCheckedData();
 
         // 更新售后单的退款单号

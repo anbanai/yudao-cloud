@@ -30,6 +30,8 @@ spring:
 mybatis-plus:
   lazy-initialization: true # 单元测试，设置 MyBatis Mapper 延迟加载，加速每个单元测试
   type-aliases-package: ${yudao.info.base-package}.dal.dataobject
+  encryptor:
+    password: product-unit-test-encryption-key
 
 --- #################### 定时任务相关配置 ####################
 
