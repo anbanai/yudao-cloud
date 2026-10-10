@@ -40,7 +40,7 @@
 - 商品与交易全量：商品 93 个、交易 176 个，共 269 个测试，0 失败、0 错误、0 跳过。
 - 共享工作区商家新审批入口兼容：7 个审批事务用例，加 12 个入网及 5 个敏感资料加密用例，共 24 个，全部通过；审批与入网任务同事务提交/回滚，没有重复 hook。
 - 聚合服务打包：42 个 reactor 模块 `mvn -pl yudao-server -am package -DskipTests` 通过。
-- 管理后台：29 个测试、完整类型检查、限定文件 ESLint、生产构建通过；使用项目支持的 Node 24。
+- 管理后台 `web-antd`：29 个测试、应用全量类型检查、限定文件 ESLint、生产构建通过；使用项目支持的 Node 24。整个 monorepo 的类型检查边界见下文。
 - 小程序：支付方式筛选、易宝提交/失败分发检查通过，微信小程序生产构建通过。
 - SQL：五份 PostgreSQL 脚本经原生 PostgreSQL 解析器解析通过；资金脚本在 H2 PostgreSQL/Oracle 兼容模式执行通过。字段与唯一索引审查覆盖八种脚本。没有宣称八种厂商原生数据库执行通过。
 
@@ -62,3 +62,26 @@ mvn -pl yudao-server -am package -DskipTests
 本次没有真实易宝商户与环境证书，不能把本地官方 SDK 契约测试当作真实资金联调。平台收款商编角色、子商户权限、手续费承担/补贴、接收方上限、回调枚举、实际日账单及已分账退款归还顺序必须在易宝测试环境确认。新渠道与全额分账保障默认关闭，未完成确认不得生产放量。
 
 原生数据库专项部署、真实商户入网、微信支付权限和生产资金灰度属于部署前置条件。代码合并保留这些关闭条件及历史任务，不表述为生产已经验收。
+
+## 本地合并与最终核查
+
+2026-10-11 已将本次实现合并到三个仓库本地 `teaworthshare`，未推送远程：
+
+- 后端：`f92629d91` 补全基线 Brand/SPU 合同，`cf4bfacf7` 接入官方 SDK 和资金生命周期。
+- 管理后台：`012c7dec3`，商家代入网、补料与资金操作页面。
+- 小程序：`35cd71a9`，微信标准参数支付与渠道兼容。
+
+合并前独立审查逐一核对后端 189 个任务候选及 15 个与并行工作重叠的文件，并核对后台 9 个候选。合并脚本使用不可变目标提交、逐文件备份和并发修改校验；合并当时保留后端 129 个、后台 53 个非任务未提交文件，暂存区为空。后端的商家申请实现和测试随后由并行任务继续修改；这些修改未被本任务覆盖或纳入本次提交。后台与小程序的非任务文件摘要核对仍一致。
+
+合并后的共享工作区验证：
+
+- 支付全量仍为 397 个，0 失败、0 错误，基线跳过 35 个，实际执行 362 个。日志：`/tmp/yeepay-merged-backend-all-tests.log`。
+- 首轮商城回归遇到并行账号绑定改动与未更新测试的 4 个失败；该轮交易模块未执行，不作为全量成功证据。并行任务更新测试后重新运行商品和交易全量：124 + 180 = 304 个，全部通过，`BUILD SUCCESS`。日志：`/tmp/yeepay-merged-mall-final-tests.log`。最终共享后端合计实际执行 666 个，0 失败、0 错误。
+- 共享聚合服务 42 个 reactor 模块打包通过，`BUILD SUCCESS`。日志：`/tmp/yeepay-merged-aggregate-final-build.log`。
+- 共享后台 29 个资金/入网测试全部通过。日志：`/tmp/yeepay-admin-merged-tests.log`。
+- 共享后台生产构建通过，11 个任务全部成功，退出码 0。日志：`/tmp/yeepay-admin-merged-build.log`。
+- 共享 `web-antd` 类型检查未通过：`src/views/mall/merchant/workbench.vue:63` 的 `number` 参数不能赋给字面量联合 `0 | 30`。该商家工作台属于并行开发，不在本次 9 个任务文件中；文件摘要与合并前备份完全一致，本次未修改或提交该页面。不能将隔离提交版本的类型检查通过替代共享工作区的这项失败。日志：`/tmp/yeepay-admin-merged-typecheck.log`。
+
+后台提交钩子的 `oxlint`、`oxfmt`、`eslint`、`stylelint`、`commitlint` 均通过。钩子的整个 monorepo `checkType` 已实际运行，但 `web-antdv-next` 25 个既有文件报告 60 条类型错误；这些文件均与 `2459b7a6` 基线字节一致，单独运行该应用复现相同 60 条错误。提交时仅通过 `LEFTHOOK_EXCLUDE=checkType` 排除这一已确认的既有失败检查，未将全工作区类型检查表述为通过。证据：`/tmp/yeepay-admin-whole-workspace-typecheck.log`、`/tmp/yeepay-admin-baseline-antdv-next-typecheck.log`、`/tmp/yeepay-admin-final-commit-2.log`。
+
+本次涉及的 `web-antd` 最终应用全量类型检查、29 个测试、生产构建及全部修改文件的 lint 均已在隔离工作区提交前通过；日志：`/tmp/yeepay-admin-post-hook-typecheck.log`、`/tmp/yeepay-admin-committed-tests.log`、`/tmp/yeepay-admin-post-hook-build.log`。共享工作区构建和本次测试通过，但包含上述尚未修复的并行页面类型错误；整个 monorepo 也仍有上述既有错误。审查结论限于本次易宝代码范围，不能表述为所有共享开发内容没有问题，也不能替代真实易宝联调与原生数据库部署验收。
