@@ -13,8 +13,6 @@ import jakarta.validation.Valid;
  */
 public interface MemberAuthService {
 
-    AppAuthLoginRespVO bridgeLogin(AppAuthBridgeLoginReqVO reqVO);
-
     /**
      * 手机 + 密码登录
      *

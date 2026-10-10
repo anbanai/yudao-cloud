@@ -36,20 +36,6 @@ public class AppAuthController {
     @Resource
     private MemberAuthService authService;
 
-    @PostMapping("/bridge-login")
-    @PermitAll
-    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
-    public CommonResult<AppAuthLoginRespVO> bridgeLogin(@RequestBody @Valid AppAuthBridgeLoginReqVO reqVO) {
-        try {
-            return success(authService.bridgeLogin(reqVO));
-        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            // Keep credential-bearing request bodies out of generic exception telemetry.
-            throw cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.unavailable();
-        }
-    }
-
     @Resource
     private SocialClientApi socialClientApi;
 
@@ -61,7 +47,7 @@ public class AppAuthController {
     @PermitAll
     @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<AppAuthLoginRespVO> login(@RequestBody @Valid AppAuthLoginReqVO reqVO) {
-        return success(cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.safely(() -> authService.login(reqVO)));
+        return success(authService.login(reqVO));
     }
 
     @PostMapping("/logout")
@@ -83,7 +69,7 @@ public class AppAuthController {
     @PermitAll
     @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<AppAuthLoginRespVO> refreshToken(@RequestParam("refreshToken") String refreshToken) {
-        return success(cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.safely(() -> authService.refreshToken(refreshToken)));
+        return success(authService.refreshToken(refreshToken));
     }
 
     // ========== 短信登录相关 ==========
@@ -93,7 +79,7 @@ public class AppAuthController {
     @PermitAll
     @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<AppAuthLoginRespVO> smsLogin(@RequestBody @Valid AppAuthSmsLoginReqVO reqVO) {
-        return success(cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.safely(() -> authService.smsLogin(reqVO)));
+        return success(authService.smsLogin(reqVO));
     }
 
     @PostMapping("/send-sms-code")
@@ -134,7 +120,7 @@ public class AppAuthController {
     @PermitAll
     @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<AppAuthLoginRespVO> socialLogin(@RequestBody @Valid AppAuthSocialLoginReqVO reqVO) {
-        return success(cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.safely(() -> authService.socialLogin(reqVO)));
+        return success(authService.socialLogin(reqVO));
     }
 
     @PostMapping("/weixin-mini-app-login")
@@ -142,7 +128,7 @@ public class AppAuthController {
     @PermitAll
     @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<AppAuthLoginRespVO> weixinMiniAppLogin(@RequestBody @Valid AppAuthWeixinMiniAppLoginReqVO reqVO) {
-        return success(cn.iocoder.yudao.module.member.service.identity.IdentityPolicy.safely(() -> authService.weixinMiniAppLogin(reqVO)));
+        return success(authService.weixinMiniAppLogin(reqVO));
     }
 
     @PostMapping("/create-weixin-jsapi-signature")
