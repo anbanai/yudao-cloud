@@ -103,6 +103,10 @@ public class TradeDiscountActivityPriceCalculator implements TradePriceCalculato
      * @return 用户等级
      */
     public MemberLevelRespDTO getMemberLevel(Long userId) {
+        // 商品详情和列表允许未登录访问，未登录用户按普通价格计算。
+        if (userId == null) {
+            return null;
+        }
         MemberUserRespDTO user = memberUserApi.getUser(userId).getCheckedData();
         if (user == null || user.getLevelId() == null || user.getLevelId() <= 0) {
             return null;
