@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageRe
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.ProductConstants;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
+import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import org.apache.ibatis.annotations.*;
@@ -203,4 +204,14 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         update(null, updateWrapper);
     }
 
+
+    default java.util.List<ProductSpuDO> selectAvailableByIds(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
+                .in(ProductSpuDO::getId, ids)
+                .apply("merchant_id IN (SELECT id FROM product_merchant WHERE status = {0} AND deleted = {1})",
+                        ProductMerchantStatusEnum.APPROVED.getStatus(), false));
+    }
 }

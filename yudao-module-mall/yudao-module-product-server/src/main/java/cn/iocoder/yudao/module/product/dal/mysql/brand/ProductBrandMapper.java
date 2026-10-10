@@ -35,4 +35,18 @@ public interface ProductBrandMapper extends BaseMapperX<ProductBrandDO> {
     default List<ProductBrandDO> selectListByStatus(Integer status) {
         return selectList(ProductBrandDO::getStatus, status);
     }
+
+    default List<ProductBrandDO> selectListByStatusAndMerchantId(Integer status, Long merchantId) {
+        return selectList(new LambdaQueryWrapperX<ProductBrandDO>()
+                .eq(ProductBrandDO::getStatus, status)
+                .eq(ProductBrandDO::getMerchantId, merchantId)
+                .orderByAsc(ProductBrandDO::getSort).orderByDesc(ProductBrandDO::getId));
+    }
+
+    default List<ProductBrandDO> selectListByMerchantId(ProductBrandListReqVO reqVO, Long merchantId) {
+        return selectList(new LambdaQueryWrapperX<ProductBrandDO>()
+                .likeIfPresent(ProductBrandDO::getName, reqVO.getName())
+                .eq(ProductBrandDO::getMerchantId, merchantId)
+                .orderByAsc(ProductBrandDO::getSort).orderByDesc(ProductBrandDO::getId));
+    }
 }

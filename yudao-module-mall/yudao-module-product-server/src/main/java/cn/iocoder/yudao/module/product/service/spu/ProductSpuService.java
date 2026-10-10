@@ -68,6 +68,8 @@ public interface ProductSpuService {
      */
     List<ProductSpuDO> getSpuList(Collection<Long> ids);
 
+    List<ProductSpuDO> getAvailableSpuList(Collection<Long> ids);
+
     /**
      * 获得商品 SPU Map
      *

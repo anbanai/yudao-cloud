@@ -86,4 +86,8 @@ public interface ProductBrandService {
      * @return  返回品牌列表
      */
     List<ProductBrandDO> getBrandListByStatus(Integer status);
+
+    List<ProductBrandDO> getBrandListByStatusAndMerchantId(Integer status, Long merchantId);
+
+    List<ProductBrandDO> getBrandList(ProductBrandListReqVO listReqVO, Long merchantId);
 }
