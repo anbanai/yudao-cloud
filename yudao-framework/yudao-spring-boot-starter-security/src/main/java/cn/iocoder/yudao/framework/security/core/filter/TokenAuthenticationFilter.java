@@ -87,7 +87,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 return null;
             }
             // 用户类型不匹配，无权限
-            // 注意：只有 /admin-api/* 和 /app-api/* 有 userType，才需要比对用户类型
+            // 只有已知业务 API 前缀需要校验 token 身份，WebSocket 等路径不做该限制。
             // 类似 WebSocket 的 /ws/* 连接地址，是不需要比对用户类型的
             if (userType != null
                     && ObjectUtil.notEqual(accessToken.getUserType(), userType)) {
@@ -137,7 +137,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             loginUserStr = URLDecoder.decode(loginUserStr, StandardCharsets.UTF_8); // 解码，解决中文乱码问题
             LoginUser loginUser = JsonUtils.parseObject(loginUserStr, LoginUser.class);
             // 用户类型不匹配，无权限
-            // 注意：只有 /admin-api/* 和 /app-api/* 有 userType，才需要比对用户类型
+            // 只有已知业务 API 前缀需要校验 token 身份，WebSocket 等路径不做该限制。
             // 类似 WebSocket 的 /ws/* 连接地址，是不需要比对用户类型的
             Integer userType = WebFrameworkUtils.getLoginUserType(request);
             if (userType != null

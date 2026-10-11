@@ -57,7 +57,7 @@ public class AppFavoriteController {
         // 得到商品 spu 信息
         List<ProductFavoriteDO> favorites = favoritePage.getList();
         List<Long> spuIds = convertList(favorites, ProductFavoriteDO::getSpuId);
-        List<ProductSpuDO> spus = productSpuService.getSpuList(spuIds);
+        List<ProductSpuDO> spus = productSpuService.getAvailableSpuList(spuIds);
 
         // 转换 VO 结果
         PageResult<AppFavoriteRespVO> pageResult = new PageResult<>(favoritePage.getTotal());

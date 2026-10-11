@@ -1,18 +1,20 @@
 package cn.iocoder.yudao.module.product.service.merchant;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantPageReqVO;
-import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantReviewReqVO;
-import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantSaveReqVO;
-import cn.iocoder.yudao.module.product.convert.merchant.ProductMerchantConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantReviewRecordDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantApplicationDO;
 import cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantMapper;
+import cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantApplicationMapper;
+import cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantReviewRecordMapper;
 import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
-
 import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -25,25 +27,9 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
     @Resource
     private ProductMerchantMapper merchantMapper;
     @Resource
-    private ProductMerchantPayOnboardingService merchantPayOnboardingService;
-
-    @Override
-    public Long createMerchant(ProductMerchantSaveReqVO reqVO) {
-        validateNameUnique(null, reqVO.getName());
-        ProductMerchantDO merchant = ProductMerchantConvert.INSTANCE.convert(reqVO);
-        merchant.setStatus(ProductMerchantStatusEnum.DRAFT.getStatus());
-        merchantMapper.insert(merchant);
-        return merchant.getId();
-    }
-
-    @Override
-    public void updateMerchant(ProductMerchantSaveReqVO reqVO) {
-        ProductMerchantDO merchant = validateExists(reqVO.getId());
-        validateNameUnique(reqVO.getId(), reqVO.getName());
-        ProductMerchantDO update = ProductMerchantConvert.INSTANCE.convert(reqVO);
-        update.setStatus(merchant.getStatus());
-        merchantMapper.updateById(update);
-    }
+    private ProductMerchantApplicationMapper applicationMapper;
+    @Resource
+    private ProductMerchantReviewRecordMapper reviewRecordMapper;
 
     @Override
     public ProductMerchantDO getMerchant(Long id) {
@@ -56,52 +42,68 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
     }
 
     @Override
-    public void submitReview(Long id) {
+    public void approveByApplication(Long id, Long reviewerId, Integer expectedStatus) {
         ProductMerchantDO merchant = validateExists(id);
-        if (!ProductMerchantStatusEnum.DRAFT.getStatus().equals(merchant.getStatus())
-                && !ProductMerchantStatusEnum.REJECTED.getStatus().equals(merchant.getStatus())) {
+        if (!java.util.Objects.equals(expectedStatus, merchant.getStatus())) {
             throw exception(MERCHANT_REVIEW_STATUS_ERROR);
         }
-        merchantMapper.updateById(new ProductMerchantDO().setId(id)
-                .setStatus(ProductMerchantStatusEnum.PENDING.getStatus()).setRejectReason(null));
+        int updateCount = merchantMapper.update(new ProductMerchantDO()
+                        .setStatus(ProductMerchantStatusEnum.APPROVED.getStatus())
+                        .setReviewerId(reviewerId).setReviewTime(LocalDateTime.now()).setRejectReason(null),
+                new LambdaUpdateWrapper<ProductMerchantDO>()
+                        .eq(ProductMerchantDO::getId, id)
+                        .eq(ProductMerchantDO::getStatus, expectedStatus));
+        if (updateCount == 0) {
+            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
+        }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void approveMerchant(Long id, Long reviewerId) {
-        ProductMerchantDO merchant = validateExists(id);
-        if (!ProductMerchantStatusEnum.PENDING.getStatus().equals(merchant.getStatus())) {
-            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
-        }
-        merchantMapper.updateById(new ProductMerchantDO().setId(id)
-                .setStatus(ProductMerchantStatusEnum.APPROVED.getStatus())
-                .setReviewerId(reviewerId).setReviewTime(LocalDateTime.now()).setRejectReason(null));
-        merchantPayOnboardingService.enqueueApprovedMerchant(id);
-    }
-
-    @Override
-    public void rejectMerchant(ProductMerchantReviewReqVO reqVO, Long reviewerId) {
-        ProductMerchantDO merchant = validateExists(reqVO.getId());
-        if (!ProductMerchantStatusEnum.PENDING.getStatus().equals(merchant.getStatus())) {
-            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
-        }
-        merchantMapper.updateById(new ProductMerchantDO().setId(reqVO.getId())
-                .setStatus(ProductMerchantStatusEnum.REJECTED.getStatus())
-                .setReviewerId(reviewerId).setReviewTime(LocalDateTime.now()).setRejectReason(reqVO.getReason()));
-    }
-
-    @Override
     public void freezeMerchant(Long id, Long reviewerId) {
-        validateExists(id);
-        merchantMapper.updateById(new ProductMerchantDO().setId(id)
-                .setStatus(ProductMerchantStatusEnum.FROZEN.getStatus()).setReviewerId(reviewerId));
+        ProductMerchantDO merchant = validateExists(id);
+        if (!ProductMerchantStatusEnum.APPROVED.getStatus().equals(merchant.getStatus())) {
+            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int updateCount = merchantMapper.update(new ProductMerchantDO()
+                        .setStatus(ProductMerchantStatusEnum.FROZEN.getStatus())
+                        .setReviewerId(reviewerId).setReviewTime(now),
+                new LambdaUpdateWrapper<ProductMerchantDO>()
+                        .eq(ProductMerchantDO::getId, id)
+                        .eq(ProductMerchantDO::getStatus, ProductMerchantStatusEnum.APPROVED.getStatus()));
+        if (updateCount != 1) {
+            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
+        }
+        appendStatusRecord(merchant, reviewerId, "FREEZE", ProductMerchantStatusEnum.FROZEN.getStatus(), now);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void unfreezeMerchant(Long id, Long reviewerId) {
-        validateExists(id);
-        merchantMapper.updateById(new ProductMerchantDO().setId(id)
-                .setStatus(ProductMerchantStatusEnum.APPROVED.getStatus()).setReviewerId(reviewerId));
+        ProductMerchantDO merchant = validateExists(id);
+        if (!ProductMerchantStatusEnum.FROZEN.getStatus().equals(merchant.getStatus())) {
+            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int updateCount = merchantMapper.update(new ProductMerchantDO()
+                        .setStatus(ProductMerchantStatusEnum.APPROVED.getStatus())
+                        .setReviewerId(reviewerId).setReviewTime(now),
+                new LambdaUpdateWrapper<ProductMerchantDO>()
+                        .eq(ProductMerchantDO::getId, id)
+                        .eq(ProductMerchantDO::getStatus, ProductMerchantStatusEnum.FROZEN.getStatus()));
+        if (updateCount != 1) {
+            throw exception(MERCHANT_REVIEW_STATUS_ERROR);
+        }
+        appendStatusRecord(merchant, reviewerId, "UNFREEZE", ProductMerchantStatusEnum.APPROVED.getStatus(), now);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStoreProfile(Long merchantId, String storeName, String logoUrl, String description) {
+        validateExists(merchantId);
+        merchantMapper.updateById(new ProductMerchantDO().setId(merchantId).setStoreName(storeName)
+                .setLogoUrl(logoUrl).setDescription(description));
     }
 
     @Override
@@ -120,10 +122,15 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
         return merchant;
     }
 
-    private void validateNameUnique(Long id, String name) {
-        ProductMerchantDO merchant = merchantMapper.selectByName(name);
-        if (merchant != null && !merchant.getId().equals(id)) {
-            throw exception(MERCHANT_NAME_EXISTS);
-        }
+    private void appendStatusRecord(ProductMerchantDO merchant, Long reviewerId, String action,
+                                    Integer statusTo, LocalDateTime now) {
+        ProductMerchantApplicationDO application = applicationMapper.selectLatestByMerchantId(merchant.getId());
+        reviewRecordMapper.insert(new ProductMerchantReviewRecordDO().setMerchantId(merchant.getId())
+                .setApplicationId(application == null ? null : application.getId())
+                .setVersionNo(application == null ? null : application.getVersionNo())
+                .setAction(action).setStatusFrom(merchant.getStatus()).setStatusTo(statusTo)
+                .setOperatorId(reviewerId).setOperatorType(UserTypeEnum.ADMIN.getValue())
+                .setReviewerId(reviewerId).setReviewTime(now));
     }
+
 }

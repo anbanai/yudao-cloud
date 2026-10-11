@@ -15,4 +15,9 @@ public interface ProductMerchantQualificationMapper extends BaseMapperX<ProductM
                 .eq(ProductMerchantQualificationDO::getMerchantId, merchantId)
                 .orderByDesc(ProductMerchantQualificationDO::getId));
     }
+
+    default void deleteByMerchantId(Long merchantId) {
+        delete(new LambdaQueryWrapperX<ProductMerchantQualificationDO>()
+                .eq(ProductMerchantQualificationDO::getMerchantId, merchantId));
+    }
 }

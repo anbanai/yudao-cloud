@@ -68,6 +68,9 @@ public interface ProductSpuService {
      */
     List<ProductSpuDO> getSpuList(Collection<Long> ids);
 
+    /**
+     * 获得商城可展示的商品 SPU 列表，会排除不可经营商家的商品。
+     */
     List<ProductSpuDO> getAvailableSpuList(Collection<Long> ids);
 
     /**
@@ -88,6 +91,8 @@ public interface ProductSpuService {
      * @return 商品 SPU 列表
      */
     List<ProductSpuDO> getSpuListByStatus(Integer status);
+
+    List<ProductSpuDO> getSpuListByStatusAndMerchantId(Integer status, Long merchantId);
 
     /**
      * 获得商品 SPU 分页，提供给挂你兰后台使用

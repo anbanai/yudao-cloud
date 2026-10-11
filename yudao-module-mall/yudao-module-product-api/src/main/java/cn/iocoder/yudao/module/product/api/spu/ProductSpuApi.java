@@ -27,6 +27,10 @@ public interface ProductSpuApi {
     @Parameter(name = "ids", description = "SPU 编号列表", required = true, example = "1,3,5")
     CommonResult<List<ProductSpuRespDTO>> getSpuList(@RequestParam("ids") Collection<Long> ids);
 
+    @GetMapping(PREFIX + "/available-list")
+    @Schema(description = "批量查询面客可售 SPU，过滤不可经营商家")
+    CommonResult<List<ProductSpuRespDTO>> getAvailableSpuList(@RequestParam("ids") Collection<Long> ids);
+
     /**
      * 批量查询 SPU MAP
      *

@@ -26,21 +26,6 @@ public class ProductMerchantController {
     @Resource
     private ProductMerchantService merchantService;
 
-    @PostMapping("/create")
-    @Operation(summary = "创建商家")
-    @PreAuthorize("@ss.hasPermission('product:merchant:create')")
-    public CommonResult<Long> createMerchant(@Valid @RequestBody ProductMerchantSaveReqVO reqVO) {
-        return success(merchantService.createMerchant(reqVO));
-    }
-
-    @PutMapping("/update")
-    @Operation(summary = "更新商家")
-    @PreAuthorize("@ss.hasPermission('product:merchant:update')")
-    public CommonResult<Boolean> updateMerchant(@Valid @RequestBody ProductMerchantSaveReqVO reqVO) {
-        merchantService.updateMerchant(reqVO);
-        return success(true);
-    }
-
     @GetMapping("/get")
     @Operation(summary = "获得商家")
     @PreAuthorize("@ss.hasPermission('product:merchant:query')")
@@ -53,30 +38,6 @@ public class ProductMerchantController {
     @PreAuthorize("@ss.hasPermission('product:merchant:query')")
     public CommonResult<PageResult<ProductMerchantRespVO>> getMerchantPage(@Valid ProductMerchantPageReqVO reqVO) {
         return success(ProductMerchantConvert.INSTANCE.convertPage(merchantService.getMerchantPage(reqVO)));
-    }
-
-    @PostMapping("/submit-review")
-    @Operation(summary = "提交商家审核")
-    @PreAuthorize("@ss.hasPermission('product:merchant:update')")
-    public CommonResult<Boolean> submitReview(@RequestParam("id") Long id) {
-        merchantService.submitReview(id);
-        return success(true);
-    }
-
-    @PostMapping("/approve")
-    @Operation(summary = "审核通过商家")
-    @PreAuthorize("@ss.hasPermission('product:merchant:review')")
-    public CommonResult<Boolean> approve(@RequestParam("id") Long id) {
-        merchantService.approveMerchant(id, getLoginUserId());
-        return success(true);
-    }
-
-    @PostMapping("/reject")
-    @Operation(summary = "驳回商家")
-    @PreAuthorize("@ss.hasPermission('product:merchant:review')")
-    public CommonResult<Boolean> reject(@Valid @RequestBody ProductMerchantReviewReqVO reqVO) {
-        merchantService.rejectMerchant(reqVO, getLoginUserId());
-        return success(true);
     }
 
     @PostMapping("/freeze")

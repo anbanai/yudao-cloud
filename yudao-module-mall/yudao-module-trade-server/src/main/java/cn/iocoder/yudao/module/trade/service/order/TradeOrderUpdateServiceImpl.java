@@ -486,7 +486,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             }
             Long deliveredSubOrderId = subOrder.getId();
             boolean allDelivered = subOrders.stream().allMatch(item -> Objects.equals(item.getId(), deliveredSubOrderId)
-                    || TradeOrderStatusEnum.haveDelivered(item.getStatus()));
+                    || TradeOrderStatusEnum.haveDelivered(item.getStatus())
+                    || TradeOrderStatusEnum.isCanceled(item.getStatus()));
             if (allDelivered) {
                 parentDelivered = true;
                 if (subOrders.size() == 1) {

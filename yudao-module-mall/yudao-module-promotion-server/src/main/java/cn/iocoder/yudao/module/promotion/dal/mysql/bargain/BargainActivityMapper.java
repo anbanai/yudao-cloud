@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.promotion.dal.mysql.bargain;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.promotion.controller.admin.bargain.vo.activity.BargainActivityPageReqVO;
@@ -61,11 +62,22 @@ public interface BargainActivityMapper extends BaseMapperX<BargainActivityDO> {
      * @param now       当前日期时间
      * @return 活动分页
      */
-    default PageResult<BargainActivityDO> selectPage(PageParam pageReqVO, Integer status, LocalDateTime now) {
-        return selectPage(pageReqVO, new LambdaQueryWrapperX<BargainActivityDO>()
+    default PageResult<BargainActivityDO> selectPage(PageParam pageReqVO, Integer status, LocalDateTime now, List<Long> availableSpuIds) {
+        return selectPage(pageReqVO, appQuery(status, now)
+                .in(BargainActivityDO::getSpuId, availableSpuIds)
+                .orderByDesc(BargainActivityDO::getId));
+    }
+
+    default List<Long> selectAppSpuIds(Integer status, LocalDateTime now) {
+        return selectList(appQuery(status, now).select(BargainActivityDO::getSpuId)).stream()
+                .map(BargainActivityDO::getSpuId).distinct().toList();
+    }
+
+    default LambdaQueryWrapper<BargainActivityDO> appQuery(Integer status, LocalDateTime now) {
+        return new LambdaQueryWrapperX<BargainActivityDO>()
                 .eq(BargainActivityDO::getStatus, status)
                 .le(BargainActivityDO::getStartTime, now)
-                .ge(BargainActivityDO::getEndTime, now));
+                .ge(BargainActivityDO::getEndTime, now);
     }
 
     /**

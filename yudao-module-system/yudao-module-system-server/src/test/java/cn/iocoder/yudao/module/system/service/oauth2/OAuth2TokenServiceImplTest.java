@@ -12,10 +12,12 @@ import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2ClientDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2RefreshTokenDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.MerchantUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2AccessTokenMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2RefreshTokenMapper;
 import cn.iocoder.yudao.module.system.dal.redis.oauth2.OAuth2AccessTokenRedisDAO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.merchant.MerchantUserService;
 import jakarta.annotation.Resource;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,8 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
     private OAuth2ClientService oauth2ClientService;
     @MockitoBean
     private AdminUserService adminUserService;
+    @MockitoBean
+    private MerchantUserService merchantUserService;
 
     @Test
     public void testCreateAccessToken() {
@@ -95,6 +99,76 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
         OAuth2RefreshTokenDO refreshTokenDO = oauth2RefreshTokenMapper.selectList().get(0);
         assertPojoEquals(accessTokenDO, refreshTokenDO, "id", "expiresTime", "createTime", "updateTime", "deleted");
         assertFalse(DateUtils.isExpired(refreshTokenDO.getExpiresTime()));
+    }
+
+    @Test
+    public void testCreateAccessToken_merchantIncludesMerchantIdInUserInfo() {
+        TenantContextHolder.setTenantId(0L);
+        Long userId = randomLongId();
+        Long merchantId = randomLongId();
+        String clientId = randomString();
+        OAuth2ClientDO clientDO = randomPojo(OAuth2ClientDO.class).setClientId(clientId)
+                .setAccessTokenValiditySeconds(30).setRefreshTokenValiditySeconds(60);
+        when(oauth2ClientService.validOAuthClientFromCache(eq(clientId))).thenReturn(clientDO);
+        when(merchantUserService.getUser(userId)).thenReturn(new MerchantUserDO().setId(userId)
+                .setNickname("Tea Seller").setMerchantId(merchantId).setStatus(0));
+
+        OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.createAccessToken(userId,
+                UserTypeEnum.MERCHANT.getValue(), clientId, null);
+
+        assertEquals("Tea Seller", accessTokenDO.getUserInfo().get("nickname"));
+        assertEquals(merchantId.toString(), accessTokenDO.getUserInfo().get("merchantId"));
+    }
+
+    @Test
+    public void testCheckAccessToken_refreshesMerchantIdAfterAccountBinding() {
+        Long userId = randomLongId();
+        Long merchantId = randomLongId();
+        OAuth2AccessTokenDO token = randomPojo(OAuth2AccessTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.MERCHANT.getValue())
+                .setExpiresTime(LocalDateTime.now().plusDays(1)));
+        oauth2AccessTokenMapper.insert(token);
+        when(merchantUserService.getUser(userId)).thenReturn(new MerchantUserDO().setId(userId)
+                .setNickname("Tea Seller").setMerchantId(merchantId).setStatus(0));
+
+        OAuth2AccessTokenDO checked = oauth2TokenService.checkAccessToken(token.getAccessToken());
+
+        assertEquals(merchantId.toString(), checked.getUserInfo().get("merchantId"));
+    }
+
+    @Test
+    public void testCheckAccessToken_rejectsDisabledMerchant() {
+        Long userId = randomLongId();
+        OAuth2AccessTokenDO token = randomPojo(OAuth2AccessTokenDO.class, o -> o
+                .setUserId(userId).setUserType(UserTypeEnum.MERCHANT.getValue())
+                .setExpiresTime(LocalDateTime.now().plusDays(1)));
+        oauth2AccessTokenMapper.insert(token);
+        oauth2AccessTokenRedisDAO.set(token);
+        when(merchantUserService.getUser(userId)).thenReturn(new MerchantUserDO().setId(userId)
+                .setStatus(cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.DISABLE.getStatus()));
+
+        assertServiceException(() -> oauth2TokenService.checkAccessToken(token.getAccessToken()),
+                new ErrorCode(1_002_000_001, "登录失败，账号被禁用"));
+    }
+
+    @Test
+    public void testRefreshAccessToken_rejectsRefreshTokenForDifferentUserType() {
+        TenantContextHolder.setTenantId(0L);
+        String refreshToken = randomString();
+        String clientId = randomString();
+        OAuth2ClientDO clientDO = randomPojo(OAuth2ClientDO.class).setClientId(clientId);
+        when(oauth2ClientService.validOAuthClientFromCache(eq(clientId))).thenReturn(clientDO);
+        OAuth2RefreshTokenDO refreshTokenDO = randomPojo(OAuth2RefreshTokenDO.class, o -> o
+                .setRefreshToken(refreshToken).setClientId(clientId).setUserType(UserTypeEnum.ADMIN.getValue())
+                .setExpiresTime(LocalDateTime.now().plusDays(1)));
+        oauth2RefreshTokenMapper.insert(refreshTokenDO);
+        OAuth2AccessTokenDO oldAccessToken = randomPojo(OAuth2AccessTokenDO.class, o -> o
+                .setRefreshToken(refreshToken).setUserType(UserTypeEnum.ADMIN.getValue()));
+        oauth2AccessTokenMapper.insert(oldAccessToken);
+
+        assertServiceException(() -> oauth2TokenService.refreshAccessToken(refreshToken, clientId,
+                        UserTypeEnum.MERCHANT.getValue()), new ErrorCode(401, "刷新令牌的用户类型不正确"));
+        assertNotNull(oauth2AccessTokenMapper.selectById(oldAccessToken.getId()));
     }
 
     @Test

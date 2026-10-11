@@ -110,7 +110,7 @@ public class ProductMerchantPayOnboardingService {
         String type = file == null ? null : file.getContentType();
         if (file == null || file.isEmpty() || file.getSize() > 10 * 1024 * 1024
                 || !Set.of("image/jpeg", "image/png", "application/pdf").contains(type == null ? "" : type)
-                || !Boolean.TRUE.equals(fileApi.isPrivateMasterSupported().getCheckedData())) {
+                || !isSuccessful(fileApi.isPrivateMasterSupported())) {
             throw exception(MERCHANT_PAY_MATERIALS_INVALID);
         }
         String extension = "image/jpeg".equals(type) ? ".jpg" : "image/png".equals(type) ? ".png" : ".pdf";
@@ -146,7 +146,7 @@ public class ProductMerchantPayOnboardingService {
             for (Map.Entry<String, Long> reference : references.entrySet()) {
                 validateFileReferencePath(reference.getKey(), materials);
                 if (reference.getValue() == null || reference.getValue() <= 0
-                        || !Boolean.TRUE.equals(fileApi.isFileCreatedByCurrentUser(reference.getValue()).getCheckedData())) {
+                    || !isSuccessful(fileApi.isFileCreatedByCurrentUser(reference.getValue()))) {
                     throw exception(MERCHANT_PAY_MATERIALS_INVALID);
                 }
             }
@@ -227,7 +227,11 @@ public class ProductMerchantPayOnboardingService {
         try {
             PayFundMerchantAccountRespDTO response;
             if (poll) {
-                response = payFundApi.getMerchant(task.getAppKey(), task.getMerchantId()).getCheckedData();
+                var result = payFundApi.getMerchant(task.getAppKey(), task.getMerchantId());
+                if (result == null || !result.isSuccess() || result.getData() == null) {
+                    throw new IllegalStateException("Payment query failed");
+                }
+                response = result.getData();
             } else {
                 Map<String, Object> materials = parse(task.getMaterialsJson());
                 if (!missingMaterials(materials).isEmpty()) {
@@ -238,10 +242,14 @@ public class ProductMerchantPayOnboardingService {
                 materials.put("materialsRef", "product-merchant-pay-onboarding:" + task.getId()
                         + ":m" + task.getMaterialsVersion());
                 materials.put("materialsVersion", task.getMaterialsVersion());
-                response = payFundApi.registerMerchant(new PayFundMerchantRegisterReqDTO().setAppKey(task.getAppKey())
+                var result = payFundApi.registerMerchant(new PayFundMerchantRegisterReqDTO().setAppKey(task.getAppKey())
                         .setMerchantId(task.getMerchantId()).setMerchantName(merchant.getName())
                         .setRequestNo(task.getRequestNo()).setBusinessRole(task.getBusinessRole())
-                        .setMaterials(materials)).getCheckedData();
+                        .setMaterials(materials));
+                if (result == null || !result.isSuccess() || result.getData() == null) {
+                    throw new IllegalStateException("Payment registration failed");
+                }
+                response = result.getData();
             }
             applyResponse(task, response);
         } catch (RuntimeException ex) {
@@ -368,7 +376,8 @@ public class ProductMerchantPayOnboardingService {
             String path = String.valueOf(reference.getKey());
             validateFileReferencePath(path, materials);
             Long fileId = Long.valueOf(String.valueOf(reference.getValue()));
-            String url = fileApi.presignGetUrl(fileId, 900).getCheckedData();
+            var result = fileApi.presignGetUrl(fileId, 900);
+            String url = result == null || !result.isSuccess() ? null : result.getData();
             if (safeUrl(url) == null) {
                 throw exception(MERCHANT_PAY_MATERIALS_INVALID);
             }
@@ -423,5 +432,9 @@ public class ProductMerchantPayOnboardingService {
         } catch (IllegalArgumentException ex) {
             return null;
         }
+    }
+
+    private boolean isSuccessful(cn.iocoder.yudao.framework.common.pojo.CommonResult<Boolean> result) {
+        return result != null && result.isSuccess() && Boolean.TRUE.equals(result.getData());
     }
 }

@@ -19,6 +19,7 @@ import cn.iocoder.yudao.module.promotion.dal.dataobject.combination.CombinationA
 import cn.iocoder.yudao.module.promotion.dal.dataobject.combination.CombinationProductDO;
 import cn.iocoder.yudao.module.promotion.dal.mysql.combination.CombinationActivityMapper;
 import cn.iocoder.yudao.module.promotion.dal.mysql.combination.CombinationProductMapper;
+import cn.iocoder.yudao.module.promotion.service.merchant.PromotionProductVisibilityService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,9 @@ import static java.util.Collections.singletonList;
 @Service
 @Validated
 public class CombinationActivityServiceImpl implements CombinationActivityService {
+
+    @Resource
+    private PromotionProductVisibilityService visibilityService;
 
     @Resource
     private CombinationActivityMapper combinationActivityMapper;
@@ -225,7 +229,9 @@ public class CombinationActivityServiceImpl implements CombinationActivityServic
 
     @Override
     public PageResult<CombinationActivityDO> getCombinationActivityPage(PageParam pageParam) {
-        return combinationActivityMapper.selectPage(pageParam, CommonStatusEnum.ENABLE.getStatus());
+        List<Long> available = visibilityService.getAvailableSpuIds(combinationActivityMapper.selectAppSpuIds(CommonStatusEnum.ENABLE.getStatus()));
+        return available.isEmpty() ? PageResult.empty()
+                : combinationActivityMapper.selectPage(pageParam, CommonStatusEnum.ENABLE.getStatus(), available);
     }
 
     @Override

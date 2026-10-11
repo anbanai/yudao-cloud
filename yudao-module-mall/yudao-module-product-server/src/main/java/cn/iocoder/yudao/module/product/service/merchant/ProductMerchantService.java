@@ -2,20 +2,19 @@ package cn.iocoder.yudao.module.product.service.merchant;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantPageReqVO;
-import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantReviewReqVO;
-import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantSaveReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
-import jakarta.validation.Valid;
 
 public interface ProductMerchantService {
-    Long createMerchant(@Valid ProductMerchantSaveReqVO reqVO);
-    void updateMerchant(@Valid ProductMerchantSaveReqVO reqVO);
     ProductMerchantDO getMerchant(Long id);
     PageResult<ProductMerchantDO> getMerchantPage(ProductMerchantPageReqVO reqVO);
-    void submitReview(Long id);
-    void approveMerchant(Long id, Long reviewerId);
-    void rejectMerchant(@Valid ProductMerchantReviewReqVO reqVO, Long reviewerId);
+    /**
+     * Approves an application after checking the merchant is still in the expected review state.
+     * The expected state is part of the transition contract so a stale review cannot approve a
+     * different application type after another operation changed the merchant status.
+     */
+    void approveByApplication(Long id, Long reviewerId, Integer expectedStatus);
     void freezeMerchant(Long id, Long reviewerId);
     void unfreezeMerchant(Long id, Long reviewerId);
+    void updateStoreProfile(Long merchantId, String storeName, String logoUrl, String description);
     void validateMerchantAvailable(Long id);
 }

@@ -175,6 +175,9 @@ yudao:
     ignore-visit-urls:
       - /admin-api/system/user/profile/**
       - /admin-api/system/auth/**
+      - /merchant-api/system/auth/register
+      - /merchant-api/system/auth/login
+      - /merchant-api/system/auth/refresh-token
     ignore-tables:
     ignore-caches:
       - user_role_ids

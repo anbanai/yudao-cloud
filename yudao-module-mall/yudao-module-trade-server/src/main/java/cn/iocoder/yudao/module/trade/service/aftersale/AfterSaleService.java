@@ -24,6 +24,9 @@ public interface AfterSaleService {
      */
     PageResult<AfterSaleDO> getAfterSalePage(AfterSalePageReqVO pageReqVO);
 
+    /** 【商家】获得仅包含当前商家订单项的售后分页。 */
+    PageResult<AfterSaleDO> getAfterSalePageForMerchant(Long merchantId, AfterSalePageReqVO pageReqVO);
+
     /**
      * 【会员】获得售后订单分页
      *
@@ -66,6 +69,7 @@ public interface AfterSaleService {
      * @param id     售后编号
      */
     void agreeAfterSale(Long userId, Long id);
+    void agreeAfterSale(Long userId, Long id, Long merchantId);
 
     /**
      * 【管理员】拒绝售后订单
@@ -74,6 +78,7 @@ public interface AfterSaleService {
      * @param auditReqVO 审批 Request 信息
      */
     void disagreeAfterSale(Long userId, AfterSaleDisagreeReqVO auditReqVO);
+    void disagreeAfterSale(Long userId, AfterSaleDisagreeReqVO auditReqVO, Long merchantId);
 
     /**
      * 【会员】退回货物
@@ -90,6 +95,7 @@ public interface AfterSaleService {
      * @param id     售后编号
      */
     void receiveAfterSale(Long userId, Long id);
+    void receiveAfterSale(Long userId, Long id, Long merchantId);
 
     /**
      * 【管理员】拒绝收货
@@ -98,6 +104,7 @@ public interface AfterSaleService {
      * @param refuseReqVO 拒绝收货 Request 信息
      */
     void refuseAfterSale(Long userId, AfterSaleRefuseReqVO refuseReqVO);
+    void refuseAfterSale(Long userId, AfterSaleRefuseReqVO refuseReqVO, Long merchantId);
 
     /**
      * 【管理员】确认退款

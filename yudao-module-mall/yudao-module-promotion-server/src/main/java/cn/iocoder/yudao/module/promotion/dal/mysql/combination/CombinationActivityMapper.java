@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.promotion.dal.mysql.combination;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.promotion.controller.admin.combination.vo.activity.CombinationActivityPageReqVO;
@@ -30,9 +31,20 @@ public interface CombinationActivityMapper extends BaseMapperX<CombinationActivi
         return selectList(CombinationActivityDO::getStatus, status);
     }
 
-    default PageResult<CombinationActivityDO> selectPage(PageParam pageParam, Integer status) {
-        return selectPage(pageParam, new LambdaQueryWrapperX<CombinationActivityDO>()
-                .eq(CombinationActivityDO::getStatus, status));
+    default PageResult<CombinationActivityDO> selectPage(PageParam pageParam, Integer status, List<Long> availableSpuIds) {
+        return selectPage(pageParam, appQuery(status)
+                .in(CombinationActivityDO::getSpuId, availableSpuIds)
+                .orderByDesc(CombinationActivityDO::getId));
+    }
+
+    default List<Long> selectAppSpuIds(Integer status) {
+        return selectList(appQuery(status).select(CombinationActivityDO::getSpuId)).stream()
+                .map(CombinationActivityDO::getSpuId).distinct().toList();
+    }
+
+    default LambdaQueryWrapper<CombinationActivityDO> appQuery(Integer status) {
+        return new LambdaQueryWrapperX<CombinationActivityDO>()
+                .eq(CombinationActivityDO::getStatus, status);
     }
 
     default CombinationActivityDO selectBySpuIdAndStatusAndNow(Long spuId, Integer status) {

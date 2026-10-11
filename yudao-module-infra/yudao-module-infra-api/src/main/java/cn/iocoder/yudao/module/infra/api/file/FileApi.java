@@ -98,6 +98,15 @@ public interface FileApi {
     @Operation(summary = "校验文件是否由当前用户上传")
     CommonResult<Boolean> isFileCreatedByCurrentUser(@RequestParam("id") Long fileId);
 
+    @GetMapping(PREFIX + "/merchant-qualification-owned-by-current-user")
+    @Operation(summary = "校验商家入驻资质文件是否由当前商家上传")
+    CommonResult<Boolean> isMerchantQualificationFileOwnedByCurrentUser(@RequestParam("id") Long fileId);
+
+    @GetMapping(PREFIX + "/merchant-qualification-owned-by")
+    @Operation(summary = "按商家账号校验入驻资质文件归属")
+    CommonResult<Boolean> isMerchantQualificationFileOwnedBy(@RequestParam("id") Long fileId,
+                                                              @RequestParam("ownerAccountId") Long ownerAccountId);
+
     @GetMapping(PREFIX + "/validate-image-url")
     @Operation(summary = "校验图片 URL 的上传限制")
     CommonResult<Boolean> validateImageUrl(@RequestParam("url") String url,

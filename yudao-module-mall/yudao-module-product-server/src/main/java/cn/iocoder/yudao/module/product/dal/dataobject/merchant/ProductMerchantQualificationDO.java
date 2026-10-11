@@ -26,6 +26,7 @@ public class ProductMerchantQualificationDO extends BaseDO {
     private Long id;
     private Long merchantId;
     private String type;
+    private Long fileId;
     @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
     @ToString.Exclude
     private String certificateNo;

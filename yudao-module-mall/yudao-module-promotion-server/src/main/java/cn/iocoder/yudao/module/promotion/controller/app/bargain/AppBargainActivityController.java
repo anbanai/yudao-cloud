@@ -29,6 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.cache.CacheUtils.buildAsyncReloadingCache;
@@ -67,7 +69,11 @@ public class AppBargainActivityController {
     @PermitAll
     public CommonResult<List<AppBargainActivityRespVO>> getBargainActivityList(
             @RequestParam(name = "count", defaultValue = "6") Integer count) {
-        return success(bargainActivityListCache.getUnchecked(count));
+        List<AppBargainActivityRespVO> cached = bargainActivityListCache.getUnchecked(count);
+        if (cached.isEmpty()) return success(cached);
+        Set<Long> availableIds = spuApi.getAvailableSpuList(convertList(cached, AppBargainActivityRespVO::getSpuId))
+                .getCheckedData().stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        return success(cached.stream().filter(item -> availableIds.contains(item.getSpuId())).toList());
     }
 
     private List<AppBargainActivityRespVO>getBargainActivityList0(Integer count) {
@@ -76,7 +82,9 @@ public class AppBargainActivityController {
             return Collections.emptyList();
         }
         // 拼接数据
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(list, BargainActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(list, BargainActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        list = list.stream().filter(item -> availableIds.contains(item.getSpuId())).toList();
         return BargainActivityConvert.INSTANCE.convertAppList(list, spuList);
     }
 
@@ -89,7 +97,9 @@ public class AppBargainActivityController {
             return success(PageResult.empty(result.getTotal()));
         }
         // 拼接数据
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(result.getList(), BargainActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(result.getList(), BargainActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        result.setList(result.getList().stream().filter(item -> availableIds.contains(item.getSpuId())).toList());
         return success(BargainActivityConvert.INSTANCE.convertAppPage(result, spuList));
     }
 
@@ -104,7 +114,9 @@ public class AppBargainActivityController {
         }
         // 拼接数据
         Integer successUserCount = bargainRecordService.getBargainRecordUserCount(id, BargainRecordStatusEnum.SUCCESS.getStatus());
-        ProductSpuRespDTO spu = spuApi.getSpu(activity.getSpuId()).getCheckedData();
+        List<ProductSpuRespDTO> available = spuApi.getAvailableSpuList(List.of(activity.getSpuId())).getCheckedData();
+        if (available.isEmpty()) return success(null);
+        ProductSpuRespDTO spu = available.get(0);
         return success(BargainActivityConvert.INSTANCE.convert(activity, successUserCount, spu));
     }
 

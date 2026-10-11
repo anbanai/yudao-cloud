@@ -123,6 +123,7 @@ public interface ProductGroupSpuMapper extends BaseMapperX<ProductGroupSpuDO> {
                 .eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus())
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getKeyword());
         query.apply("t1.tenant_id = {0}", TenantContextHolder.getRequiredTenantId());
+        query.apply("t1.merchant_id IN (SELECT id FROM product_merchant WHERE status = 20 AND deleted = FALSE)");
         boolean multi = reqVO.getGroupIds().stream().distinct().count() > 1;
         if (multi) {
             query.distinct();

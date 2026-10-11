@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.promotion.dal.dataobject.seckill.SeckillConfigDO;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.seckill.SeckillProductDO;
 import cn.iocoder.yudao.module.promotion.dal.mysql.seckill.seckillactivity.SeckillActivityMapper;
 import cn.iocoder.yudao.module.promotion.dal.mysql.seckill.seckillactivity.SeckillProductMapper;
+import cn.iocoder.yudao.module.promotion.service.merchant.PromotionProductVisibilityService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,9 @@ import static java.util.Collections.singletonList;
 @Service
 @Validated
 public class SeckillActivityServiceImpl implements SeckillActivityService {
+
+    @Resource
+    private PromotionProductVisibilityService visibilityService;
 
     @Resource
     private SeckillActivityMapper seckillActivityMapper;
@@ -288,7 +292,10 @@ public class SeckillActivityServiceImpl implements SeckillActivityService {
 
     @Override
     public PageResult<SeckillActivityDO> getSeckillActivityAppPageByConfigId(AppSeckillActivityPageReqVO pageReqVO) {
-        return seckillActivityMapper.selectPage(pageReqVO, CommonStatusEnum.ENABLE.getStatus(), LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        List<Long> available = visibilityService.getAvailableSpuIds(seckillActivityMapper.selectAppSpuIds(pageReqVO, CommonStatusEnum.ENABLE.getStatus(), now));
+        return available.isEmpty() ? PageResult.empty()
+                : seckillActivityMapper.selectPage(pageReqVO, CommonStatusEnum.ENABLE.getStatus(), now, available);
     }
 
     @Override

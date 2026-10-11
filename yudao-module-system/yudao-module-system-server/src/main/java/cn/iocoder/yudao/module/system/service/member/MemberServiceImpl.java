@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.system.service.member;
 
 import cn.hutool.core.util.ClassUtil;
 import cn.hutool.core.util.ReflectUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.spring.SpringUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,19 @@ public class MemberServiceImpl implements MemberService {
         return ReflectUtil.invoke(user, "getEmail");
     }
 
+    @Override
+    public boolean isMemberMobileExists(String mobile) {
+        if (StrUtil.isBlank(mobile)) {
+            return false;
+        }
+        Object api = getMemberUserApiIfPresent();
+        if (api == null) {
+            return false;
+        }
+        Object response = ReflectUtil.invoke(api, "getUserByMobile", mobile);
+        return ReflectUtil.invoke(response, "getData") != null;
+    }
+
     private Object getMemberUser(Long id) {
         if (id == null) {
             return null;
@@ -48,6 +62,21 @@ public class MemberServiceImpl implements MemberService {
         if (memberUserApi == null) {
             memberUserApi = SpringUtil.getBean(ClassUtil.loadClass(String.format("%s.module.member.api.user.MemberUserApi", basePackage)));
         }
+        return memberUserApi;
+    }
+
+    private Object getMemberUserApiIfPresent() {
+        if (memberUserApi != null) {
+            return memberUserApi;
+        }
+        String apiClassName = String.format("%s.module.member.api.user.MemberUserApi", basePackage);
+        Class<?> apiClass;
+        try {
+            apiClass = Class.forName(apiClassName);
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+        memberUserApi = SpringUtil.getBean(apiClass);
         return memberUserApi;
     }
 

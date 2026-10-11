@@ -12,6 +12,8 @@ public class ProductMerchantQualificationRespVO {
     private String type;
     private String certificateNo;
     private String fileUrl;
+    private Long fileId;
+    private String previewUrl;
     private LocalDate validStart;
     private LocalDate validEnd;
     private Integer status;

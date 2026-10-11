@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.promotion.dal.mysql.seckill.seckillactivity;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.ObjectUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils;
@@ -66,12 +67,23 @@ public interface SeckillActivityMapper extends BaseMapperX<SeckillActivityDO> {
                 .setSql("stock = stock + " + count));
     }
 
-    default PageResult<SeckillActivityDO> selectPage(AppSeckillActivityPageReqVO pageReqVO, Integer status, LocalDateTime dateTime) {
-        return selectPage(pageReqVO, new LambdaQueryWrapperX<SeckillActivityDO>()
+    default PageResult<SeckillActivityDO> selectPage(AppSeckillActivityPageReqVO pageReqVO, Integer status, LocalDateTime dateTime, List<Long> availableSpuIds) {
+        return selectPage(pageReqVO, appQuery(pageReqVO, status, dateTime)
+                .in(SeckillActivityDO::getSpuId, availableSpuIds)
+                .orderByDesc(SeckillActivityDO::getId));
+    }
+
+    default List<Long> selectAppSpuIds(AppSeckillActivityPageReqVO pageReqVO, Integer status, LocalDateTime dateTime) {
+        return selectList(appQuery(pageReqVO, status, dateTime).select(SeckillActivityDO::getSpuId)).stream()
+                .map(SeckillActivityDO::getSpuId).distinct().toList();
+    }
+
+    default LambdaQueryWrapper<SeckillActivityDO> appQuery(AppSeckillActivityPageReqVO pageReqVO, Integer status, LocalDateTime dateTime) {
+        return new LambdaQueryWrapperX<SeckillActivityDO>()
                 .eqIfPresent(SeckillActivityDO::getStatus, status)
                 .lt(SeckillActivityDO::getStartTime, dateTime)
-                .gt(SeckillActivityDO::getEndTime, dateTime)// 开始时间 < 指定时间 < 结束时间，也就是说获取指定时间段的活动
-                .apply(ObjectUtil.isNotNull(pageReqVO.getConfigId()), MyBatisUtils.findInSet("config_ids"), pageReqVO.getConfigId()));
+                .gt(SeckillActivityDO::getEndTime, dateTime)
+                .apply(ObjectUtil.isNotNull(pageReqVO.getConfigId()), MyBatisUtils.findInSet("config_ids"), pageReqVO.getConfigId());
     }
 
     default SeckillActivityDO selectBySpuIdAndStatusAndNow(Long spuId, Integer status) {

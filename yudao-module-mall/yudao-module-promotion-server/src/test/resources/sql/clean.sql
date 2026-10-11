@@ -11,3 +11,5 @@ DELETE FROM "promotion_article_category";
 DELETE FROM "promotion_article";
 DELETE FROM "promotion_diy_template";
 DELETE FROM "promotion_diy_page";
+DELETE FROM "promotion_bargain_activity";
+DELETE FROM "promotion_seckill_activity";

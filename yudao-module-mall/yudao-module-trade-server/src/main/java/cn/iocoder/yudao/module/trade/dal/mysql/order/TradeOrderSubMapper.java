@@ -1,6 +1,9 @@
 package cn.iocoder.yudao.module.trade.dal.mysql.order;
 
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.trade.controller.merchant.order.vo.MerchantOrderPageReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import org.apache.ibatis.annotations.Mapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -9,6 +12,23 @@ import java.util.List;
 
 @Mapper
 public interface TradeOrderSubMapper extends BaseMapperX<TradeOrderSubDO> {
+    default PageResult<TradeOrderSubDO> selectPageByMerchantId(MerchantOrderPageReqVO reqVO, Long merchantId) {
+        return selectPage(reqVO, new LambdaQueryWrapperX<TradeOrderSubDO>()
+                .eq(TradeOrderSubDO::getMerchantId, merchantId)
+                .likeIfPresent(TradeOrderSubDO::getNo, reqVO.getNo())
+                .eqIfPresent(TradeOrderSubDO::getStatus, reqVO.getStatus())
+                .betweenIfPresent(TradeOrderSubDO::getCreateTime, reqVO.getCreateTime())
+                .orderByDesc(TradeOrderSubDO::getId));
+    }
+
+    default TradeOrderSubDO selectByIdAndMerchantId(Long id, Long merchantId) {
+        return selectOne(TradeOrderSubDO::getId, id, TradeOrderSubDO::getMerchantId, merchantId);
+    }
+
+    default TradeOrderSubDO selectByOrderIdAndMerchantId(Long orderId, Long merchantId) {
+        return selectOne(TradeOrderSubDO::getOrderId, orderId, TradeOrderSubDO::getMerchantId, merchantId);
+    }
+
     default List<TradeOrderSubDO> selectListByOrderId(Long orderId) {
         return selectList(TradeOrderSubDO::getOrderId, orderId);
     }

@@ -98,6 +98,11 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     }
 
     @Override
+    public PageResult<AfterSaleDO> getAfterSalePageForMerchant(Long merchantId, AfterSalePageReqVO pageReqVO) {
+        return tradeAfterSaleMapper.selectPageByMerchantId(pageReqVO, merchantId);
+    }
+
+    @Override
     public PageResult<AfterSaleDO> getAfterSalePage(Long userId, AppAfterSalePageReqVO pageReqVO) {
         return tradeAfterSaleMapper.selectPage(userId, pageReqVO);
     }
@@ -202,15 +207,26 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @Transactional(rollbackFor = Exception.class)
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_AGREE_APPLY)
     public void agreeAfterSale(Long userId, Long id) {
+        agreeAfterSaleInternal(userId, id, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_AGREE_APPLY)
+    public void agreeAfterSale(Long userId, Long id, Long merchantId) {
+        agreeAfterSaleInternal(userId, id, merchantId);
+    }
+
+    private void agreeAfterSaleInternal(Long userId, Long id, Long merchantId) {
         // 校验售后单存在，并状态未审批
-        AfterSaleDO afterSale = validateAfterSaleAuditable(id);
+        AfterSaleDO afterSale = validateAfterSaleAuditable(id, merchantId);
 
         // 更新售后单的状态
         // 情况一：退款：标记为 WAIT_REFUND 状态。后续等退款发起成功后，在标记为 COMPLETE 状态
         // 情况二：退货退款：需要等用户退货后，才能发起退款
         Integer newStatus = afterSale.getWay().equals(AfterSaleWayEnum.REFUND.getWay()) ?
                 AfterSaleStatusEnum.WAIT_REFUND.getStatus() : AfterSaleStatusEnum.SELLER_AGREE.getStatus();
-        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.APPLY.getStatus(), new AfterSaleDO()
+        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.APPLY.getStatus(), merchantId, new AfterSaleDO()
                 .setStatus(newStatus).setAuditUserId(userId).setAuditTime(LocalDateTime.now()));
 
         // 记录售后日志
@@ -221,12 +237,23 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @Transactional(rollbackFor = Exception.class)
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_DISAGREE_APPLY)
     public void disagreeAfterSale(Long userId, AfterSaleDisagreeReqVO auditReqVO) {
+        disagreeAfterSaleInternal(userId, auditReqVO, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_DISAGREE_APPLY)
+    public void disagreeAfterSale(Long userId, AfterSaleDisagreeReqVO auditReqVO, Long merchantId) {
+        disagreeAfterSaleInternal(userId, auditReqVO, merchantId);
+    }
+
+    private void disagreeAfterSaleInternal(Long userId, AfterSaleDisagreeReqVO auditReqVO, Long merchantId) {
         // 校验售后单存在，并状态未审批
-        AfterSaleDO afterSale = validateAfterSaleAuditable(auditReqVO.getId());
+        AfterSaleDO afterSale = validateAfterSaleAuditable(auditReqVO.getId(), merchantId);
 
         // 更新售后单的状态
         Integer newStatus = AfterSaleStatusEnum.SELLER_DISAGREE.getStatus();
-        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.APPLY.getStatus(), new AfterSaleDO()
+        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.APPLY.getStatus(), merchantId, new AfterSaleDO()
                 .setStatus(newStatus).setAuditUserId(userId).setAuditTime(LocalDateTime.now())
                 .setAuditReason(auditReqVO.getAuditReason()));
 
@@ -244,6 +271,10 @@ public class AfterSaleServiceImpl implements AfterSaleService {
      * @return 售后单
      */
     private AfterSaleDO validateAfterSaleAuditable(Long id) {
+        return validateAfterSaleAuditable(id, null);
+    }
+
+    private AfterSaleDO validateAfterSaleAuditable(Long id, Long merchantId) {
         AfterSaleDO afterSale = tradeAfterSaleMapper.selectById(id);
         if (afterSale == null) {
             throw exception(AFTER_SALE_NOT_FOUND);
@@ -251,11 +282,20 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (ObjectUtil.notEqual(afterSale.getStatus(), AfterSaleStatusEnum.APPLY.getStatus())) {
             throw exception(AFTER_SALE_AUDIT_FAIL_STATUS_NOT_APPLY);
         }
+        if (merchantId != null && tradeAfterSaleMapper.selectByIdAndMerchantId(id, merchantId) == null) {
+            throw exception(AFTER_SALE_NOT_FOUND);
+        }
         return afterSale;
     }
 
     private void updateAfterSaleStatus(Long id, Integer status, AfterSaleDO updateObj) {
-        int updateCount = tradeAfterSaleMapper.updateByIdAndStatus(id, status, updateObj);
+        updateAfterSaleStatus(id, status, null, updateObj);
+    }
+
+    private void updateAfterSaleStatus(Long id, Integer status, Long merchantId, AfterSaleDO updateObj) {
+        int updateCount = merchantId == null
+                ? tradeAfterSaleMapper.updateByIdAndStatus(id, status, updateObj)
+                : tradeAfterSaleMapper.updateByIdAndStatusAndMerchantId(id, status, merchantId, updateObj);
         if (updateCount == 0) {
             throw exception(AFTER_SALE_UPDATE_STATUS_FAIL);
         }
@@ -302,11 +342,22 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @Transactional(rollbackFor = Exception.class)
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_AGREE_RECEIVE)
     public void receiveAfterSale(Long userId, Long id) {
+        receiveAfterSaleInternal(userId, id, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_AGREE_RECEIVE)
+    public void receiveAfterSale(Long userId, Long id, Long merchantId) {
+        receiveAfterSaleInternal(userId, id, merchantId);
+    }
+
+    private void receiveAfterSaleInternal(Long userId, Long id, Long merchantId) {
         // 校验售后单存在，并状态为已退货
-        AfterSaleDO afterSale = validateAfterSaleReceivable(id);
+        AfterSaleDO afterSale = validateAfterSaleReceivable(id, merchantId);
 
         // 更新售后单的状态
-        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.BUYER_DELIVERY.getStatus(), new AfterSaleDO()
+        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.BUYER_DELIVERY.getStatus(), merchantId, new AfterSaleDO()
                 .setStatus(AfterSaleStatusEnum.WAIT_REFUND.getStatus()).setReceiveTime(LocalDateTime.now()));
 
         // 记录售后日志
@@ -318,6 +369,17 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @Transactional(rollbackFor = Exception.class)
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_DISAGREE_RECEIVE)
     public void refuseAfterSale(Long userId, AfterSaleRefuseReqVO refuseReqVO) {
+        refuseAfterSaleInternal(userId, refuseReqVO, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_DISAGREE_RECEIVE)
+    public void refuseAfterSale(Long userId, AfterSaleRefuseReqVO refuseReqVO, Long merchantId) {
+        refuseAfterSaleInternal(userId, refuseReqVO, merchantId);
+    }
+
+    private void refuseAfterSaleInternal(Long userId, AfterSaleRefuseReqVO refuseReqVO, Long merchantId) {
         // 校验售后单存在，并状态为已退货
         AfterSaleDO afterSale = tradeAfterSaleMapper.selectById(refuseReqVO.getId());
         if (afterSale == null) {
@@ -328,7 +390,7 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         }
 
         // 更新售后单的状态
-        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.BUYER_DELIVERY.getStatus(), new AfterSaleDO()
+        updateAfterSaleStatus(afterSale.getId(), AfterSaleStatusEnum.BUYER_DELIVERY.getStatus(), merchantId, new AfterSaleDO()
                 .setStatus(AfterSaleStatusEnum.SELLER_REFUSE.getStatus()).setReceiveTime(LocalDateTime.now())
                 .setReceiveReason(refuseReqVO.getRefuseMemo()));
 
@@ -348,7 +410,12 @@ public class AfterSaleServiceImpl implements AfterSaleService {
      * @return 售后单
      */
     private AfterSaleDO validateAfterSaleReceivable(Long id) {
-        AfterSaleDO afterSale = tradeAfterSaleMapper.selectById(id);
+        return validateAfterSaleReceivable(id, null);
+    }
+
+    private AfterSaleDO validateAfterSaleReceivable(Long id, Long merchantId) {
+        AfterSaleDO afterSale = merchantId == null ? tradeAfterSaleMapper.selectById(id)
+                : tradeAfterSaleMapper.selectByIdAndMerchantId(id, merchantId);
         if (afterSale == null) {
             throw exception(AFTER_SALE_NOT_FOUND);
         }

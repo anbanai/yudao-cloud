@@ -38,6 +38,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.cache.CacheUtils.buildAsyncReloadingCache;
@@ -77,7 +79,12 @@ public class AppSeckillActivityController {
     @Operation(summary = "获得当前秒杀活动", description = "获取当前正在进行的活动，提供给首页使用")
     @PermitAll
     public CommonResult<AppSeckillActivityNowRespVO> getNowSeckillActivity() {
-        return success(nowSeckillActivityCache.getUnchecked("")); // 缓存
+        AppSeckillActivityNowRespVO cached = nowSeckillActivityCache.getUnchecked("");
+        if (CollUtil.isEmpty(cached.getActivities())) return success(cached);
+        Set<Long> availableIds = spuApi.getAvailableSpuList(convertList(cached.getActivities(), AppSeckillActivityRespVO::getSpuId))
+                .getCheckedData().stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        return success(new AppSeckillActivityNowRespVO().setConfig(cached.getConfig())
+                .setActivities(cached.getActivities().stream().filter(item -> availableIds.contains(item.getSpuId())).toList()));
     }
 
     private AppSeckillActivityNowRespVO getNowSeckillActivity0() {
@@ -92,7 +99,9 @@ public class AppSeckillActivityController {
         List<SeckillProductDO> productList = activityService.getSeckillProductListByActivityIds(
                 convertList(activityList, SeckillActivityDO::getId));
         // 2.2 获取 spu 信息
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        activityList = activityList.stream().filter(item -> availableIds.contains(item.getSpuId())).toList();
         return SeckillActivityConvert.INSTANCE.convert(config, activityList, productList, spuList);
     }
 
@@ -109,7 +118,9 @@ public class AppSeckillActivityController {
                 convertList(pageResult.getList(), SeckillActivityDO::getId));
 
         // 2. 拼接数据
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(pageResult.getList(), SeckillActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(pageResult.getList(), SeckillActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        pageResult.setList(pageResult.getList().stream().filter(item -> availableIds.contains(item.getSpuId())).toList());
         return success(SeckillActivityConvert.INSTANCE.convertPage02(pageResult, productList, spuList));
     }
 
@@ -122,6 +133,10 @@ public class AppSeckillActivityController {
         SeckillActivityDO activity = activityService.getSeckillActivity(id);
         if (activity == null
                 || ObjectUtil.equal(activity.getStatus(), CommonStatusEnum.DISABLE.getStatus())) {
+            return success(null);
+        }
+
+        if (spuApi.getAvailableSpuList(List.of(activity.getSpuId())).getCheckedData().isEmpty()) {
             return success(null);
         }
 
@@ -168,7 +183,9 @@ public class AppSeckillActivityController {
         // 2. 拼接返回
         List<SeckillProductDO> productList = activityService.getSeckillProductListByActivityIds(
                 convertList(activityList, SeckillActivityDO::getId));
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        activityList = activityList.stream().filter(item -> availableIds.contains(item.getSpuId())).toList();
         return success(SeckillActivityConvert.INSTANCE.convertAppList(activityList, productList, spuList));
     }
 

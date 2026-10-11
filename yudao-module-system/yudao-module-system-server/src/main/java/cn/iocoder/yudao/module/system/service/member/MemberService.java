@@ -23,4 +23,12 @@ public interface MemberService {
      */
     String getMemberUserEmail(Long id);
 
+    /**
+     * Checks whether a member account already uses the mobile number.
+     *
+     * @param mobile mobile number
+     * @return whether the mobile is registered
+     */
+    boolean isMemberMobileExists(String mobile);
+
 }

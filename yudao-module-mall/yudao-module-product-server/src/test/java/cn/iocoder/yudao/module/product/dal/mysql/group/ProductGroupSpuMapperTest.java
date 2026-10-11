@@ -29,6 +29,8 @@ class ProductGroupSpuMapperTest extends BaseDbUnitTest {
     @BeforeEach
     void setTenant() {
         TenantContextHolder.setTenantId(1L);
+        jdbc().update("INSERT INTO product_merchant (id, name, status, tenant_id, deleted) "
+                + "VALUES (1, 'platform-merchant', 20, 1, FALSE)");
     }
 
     @AfterEach
@@ -138,17 +140,41 @@ class ProductGroupSpuMapperTest extends BaseDbUnitTest {
                 .map(spu -> spu.getId()).toList());
     }
 
+    @Test
+    void testAppQueryExcludesProductsFromMerchantUnderReview() {
+        insertMerchant(2L, 50);
+        insertGroup(10L, 0, 1L);
+        insertSpu(100L, 1, 1);
+        insertSpu(101L, 1, 2, 2L);
+        insertRelation(1L, 10L, 100L, 0, 1L);
+        insertRelation(2L, 10L, 101L, 0, 1L);
+
+        var request = new AppProductGroupSpuPageReqVO().setGroupIds(List.of(10L));
+
+        assertEquals(List.of(100L), groupSpuMapper.selectAppSpuPage(request).getList().stream()
+                .map(spu -> spu.getId()).toList());
+    }
+
+    private void insertMerchant(Long id, int status) {
+        jdbc().update("INSERT INTO product_merchant (id, name, status, tenant_id, deleted) VALUES (?, ?, ?, 1, FALSE)",
+                id, "merchant-" + id, status);
+    }
+
     private void insertGroup(Long id, int status, Long tenantId) {
         jdbc().update("INSERT INTO product_group (id, name, sort, status, deleted, tenant_id) VALUES (?, ?, 0, ?, FALSE, ?)",
                 id, "group-" + id, status, tenantId);
     }
 
     private void insertSpu(Long id, int status, int sort) {
+        insertSpu(id, status, sort, 1L);
+    }
+
+    private void insertSpu(Long id, int status, int sort, Long merchantId) {
         jdbc().update("INSERT INTO product_spu (id, name, keyword, introduction, description, bar_code, category_id, "
-                        + "pic_url, unit, sort, status, spec_type, price, market_price, cost_price, stock, delivery_template_id, "
+                        + "merchant_id, pic_url, unit, sort, status, spec_type, price, market_price, cost_price, stock, delivery_template_id, "
                         + "recommend_hot, recommend_benefit, recommend_best, recommend_new, recommend_good, give_integral, "
-                        + "sub_commission_type, tenant_id) VALUES (?, ?, '', '', '', '', 1, '', 0, ?, ?, FALSE, 100, 100, 100, "
-                        + "1, 1, FALSE, FALSE, FALSE, FALSE, FALSE, 0, FALSE, 1)", id, "spu-" + id, sort, status);
+                        + "sub_commission_type, tenant_id) VALUES (?, ?, '', '', '', '', 1, ?, '', 0, ?, ?, FALSE, 100, 100, 100, "
+                        + "1, 1, FALSE, FALSE, FALSE, FALSE, FALSE, 0, FALSE, 1)", id, "spu-" + id, merchantId, sort, status);
     }
 
     private void insertRelation(Long id, Long groupId, Long spuId, int sort, Long tenantId) {

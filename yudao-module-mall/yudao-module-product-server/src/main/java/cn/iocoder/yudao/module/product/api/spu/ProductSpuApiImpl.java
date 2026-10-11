@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.product.api.spu;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
-import cn.iocoder.yudao.module.product.convert.spu.ProductSpuConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
@@ -35,6 +34,12 @@ public class ProductSpuApiImpl implements ProductSpuApi {
     @Override
     public CommonResult<List<ProductSpuRespDTO>> getSpuList(Collection<Long> ids) {
         List<ProductSpuDO> spus = spuService.getSpuList(ids);
+        return success(convertWithMerchant(spus));
+    }
+
+    @Override
+    public CommonResult<List<ProductSpuRespDTO>> getAvailableSpuList(Collection<Long> ids) {
+        List<ProductSpuDO> spus = spuService.getAvailableSpuList(ids);
         return success(convertWithMerchant(spus));
     }
 

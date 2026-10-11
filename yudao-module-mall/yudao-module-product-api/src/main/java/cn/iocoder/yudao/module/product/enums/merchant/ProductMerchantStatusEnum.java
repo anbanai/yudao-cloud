@@ -12,7 +12,9 @@ public enum ProductMerchantStatusEnum {
     PENDING(10, "待审核"),
     APPROVED(20, "已通过"),
     REJECTED(30, "已驳回"),
-    FROZEN(40, "已冻结");
+    FROZEN(40, "已冻结"),
+    CHANGE_PENDING(50, "变更待审核"),
+    CHANGE_REJECTED(60, "变更已驳回");
 
     private final Integer status;
     private final String name;

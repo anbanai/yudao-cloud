@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.infra.api.file;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateReqDTO;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
@@ -56,6 +57,31 @@ public class FileApiImpl implements FileApi {
         try {
             FileDO file = fileService.getFile(fileId);
             return success(userId.toString().equals(file.getCreator()));
+        } catch (ServiceException ignored) {
+            return success(false);
+        }
+    }
+
+    @Override
+    public CommonResult<Boolean> isMerchantQualificationFileOwnedByCurrentUser(Long fileId) {
+        var loginUser = SecurityFrameworkUtils.getLoginUser();
+        if (loginUser == null || !UserTypeEnum.MERCHANT.getValue().equals(loginUser.getUserType())
+                || loginUser.getId() == null || fileId == null) {
+            return success(false);
+        }
+        return isMerchantQualificationFileOwnedBy(fileId, loginUser.getId());
+    }
+
+    @Override
+    public CommonResult<Boolean> isMerchantQualificationFileOwnedBy(Long fileId, Long ownerAccountId) {
+        if (fileId == null || ownerAccountId == null || ownerAccountId <= 0) {
+            return success(false);
+        }
+        try {
+            FileDO file = fileService.getFile(fileId);
+            String ownerDirectory = "merchant-qualifications/" + ownerAccountId + "/";
+            return success(ownerAccountId.toString().equals(file.getCreator())
+                    && file.getPath() != null && file.getPath().startsWith(ownerDirectory));
         } catch (ServiceException ignored) {
             return success(false);
         }

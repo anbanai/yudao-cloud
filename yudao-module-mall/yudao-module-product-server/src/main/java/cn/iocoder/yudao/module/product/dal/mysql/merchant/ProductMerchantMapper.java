@@ -21,4 +21,20 @@ public interface ProductMerchantMapper extends BaseMapperX<ProductMerchantDO> {
     default ProductMerchantDO selectByName(String name) {
         return selectOne(ProductMerchantDO::getName, name);
     }
+
+    default ProductMerchantDO selectByOwnerAccountId(Long ownerAccountId) {
+        return selectOne(ProductMerchantDO::getOwnerAccountId, ownerAccountId);
+    }
+
+    default ProductMerchantDO selectByOwnerAccountIdForUpdate(Long ownerAccountId) {
+        return selectOne(new LambdaQueryWrapperX<ProductMerchantDO>()
+                .eq(ProductMerchantDO::getOwnerAccountId, ownerAccountId)
+                .last("FOR UPDATE"));
+    }
+
+    default ProductMerchantDO selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<ProductMerchantDO>()
+                .eq(ProductMerchantDO::getId, id)
+                .last("FOR UPDATE"));
+    }
 }

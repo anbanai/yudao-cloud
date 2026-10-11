@@ -53,7 +53,7 @@ public class AppProductSpuController {
     @Parameter(name = "ids", description = "编号列表", required = true)
     @PermitAll
     public CommonResult<List<AppProductSpuRespVO>> getSpuList(@RequestParam("ids") Set<Long> ids) {
-        List<ProductSpuDO> list = productSpuService.getSpuList(ids);
+        List<ProductSpuDO> list = productSpuService.getAvailableSpuList(ids);
         if (CollUtil.isEmpty(list)) {
             return success(Collections.emptyList());
         }
@@ -92,6 +92,7 @@ public class AppProductSpuController {
         if (!ProductSpuStatusEnum.isEnable(spu.getStatus())) {
             throw exception(SPU_NOT_ENABLE, spu.getName());
         }
+        productSpuService.validateSpuList(Set.of(id));
         // 获得商品 SKU
         List<ProductSkuDO> skus = productSkuService.getSkuListBySpuId(spu.getId());
 

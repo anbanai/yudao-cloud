@@ -22,6 +22,9 @@ public class WebProperties {
     @NotNull(message = "Admin API 不能为空")
     @Valid
     private Api adminApi = new Api("/admin-api", "**.controller.admin.**");
+    @NotNull(message = "Merchant API 不能为空")
+    @Valid
+    private Api merchantApi = new Api("/merchant-api", "**.controller.merchant.**");
 
     @NotNull(message = "Admin UI 不能为空")
     @Valid

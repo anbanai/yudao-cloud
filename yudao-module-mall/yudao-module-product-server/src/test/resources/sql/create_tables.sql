@@ -178,12 +178,17 @@ CREATE TABLE IF NOT EXISTS `product_merchant` (
     `name` varchar(128) NOT NULL COMMENT '商家名称',
     `store_name` varchar(128) DEFAULT NULL COMMENT '店铺名称',
     `logo_url` varchar(512) DEFAULT NULL COMMENT '店铺 logo',
+    `description` varchar(512) DEFAULT NULL COMMENT '店铺简介',
     `company_name` varchar(255) DEFAULT NULL COMMENT '企业主体名称',
-    `credit_code` varchar(2048) DEFAULT NULL COMMENT '统一社会信用代码',
-    `legal_person` varchar(2048) DEFAULT NULL COMMENT '法人',
-    `contact_name` varchar(2048) DEFAULT NULL COMMENT '联系人',
-    `contact_mobile` varchar(2048) DEFAULT NULL COMMENT '联系手机',
+    `credit_code` varchar(2048) DEFAULT NULL COMMENT '统一社会信用代码（加密）',
+    `legal_person` varchar(2048) DEFAULT NULL COMMENT '法人（加密）',
+    `contact_name` varchar(2048) DEFAULT NULL COMMENT '联系人（加密）',
+    `contact_mobile` varchar(2048) DEFAULT NULL COMMENT '联系手机（加密）',
+    `owner_account_id` bigint DEFAULT NULL COMMENT '商家账号编号',
+    `business_type` varchar(64) DEFAULT NULL COMMENT '经营类型',
+    `business_types` varchar(2048) DEFAULT NULL COMMENT '经营类型快照(JSON)',
     `status` tinyint NOT NULL DEFAULT 0 COMMENT '入驻状态',
+    `approved_revision` int DEFAULT NULL COMMENT '当前生效申请版本号',
     `reviewer_id` bigint DEFAULT NULL COMMENT '审核人',
     `review_time` datetime DEFAULT NULL COMMENT '审核时间',
     `reject_reason` varchar(512) DEFAULT NULL COMMENT '驳回原因',
@@ -193,15 +198,16 @@ CREATE TABLE IF NOT EXISTS `product_merchant` (
     `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `deleted` bit NOT NULL DEFAULT FALSE,
     `tenant_id` bigint NOT NULL DEFAULT 0,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`), UNIQUE (`owner_account_id`)
 ) COMMENT '平台商家';
 
 CREATE TABLE IF NOT EXISTS `product_merchant_qualification` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '资质编号',
     `merchant_id` bigint NOT NULL COMMENT '商家编号',
     `type` varchar(64) NOT NULL COMMENT '资质类型',
-    `certificate_no` varchar(2048) DEFAULT NULL COMMENT '证件编号',
-    `file_url` text NOT NULL COMMENT '证件文件',
+    `certificate_no` varchar(2048) DEFAULT NULL COMMENT '证件编号（加密）',
+    `file_url` text NOT NULL COMMENT '证件文件地址（加密）',
+    `file_id` bigint DEFAULT NULL COMMENT '私有资质文件编号',
     `valid_start` date DEFAULT NULL COMMENT '有效期开始',
     `valid_end` date DEFAULT NULL COMMENT '有效期结束',
     `status` tinyint NOT NULL DEFAULT 10 COMMENT '审核状态',
@@ -215,6 +221,106 @@ CREATE TABLE IF NOT EXISTS `product_merchant_qualification` (
     `tenant_id` bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`)
 ) COMMENT '商家资质';
+
+CREATE TABLE IF NOT EXISTS `product_merchant_business_type` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `code` varchar(64) NOT NULL,
+    `name` varchar(128) NOT NULL,
+    `enabled` boolean NOT NULL DEFAULT TRUE,
+    `sort` int NOT NULL DEFAULT 0,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `product_merchant_qualification_requirement` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `business_type` varchar(64) NOT NULL,
+    `code` varchar(64) NOT NULL,
+    `name` varchar(128) NOT NULL,
+    `required` boolean NOT NULL DEFAULT TRUE,
+    `certificate_no_required` boolean NOT NULL DEFAULT FALSE,
+    `certificate_no_pattern` varchar(2048) DEFAULT NULL,
+    `validity_required` boolean NOT NULL DEFAULT FALSE,
+    `enabled` boolean NOT NULL DEFAULT TRUE,
+    `sort` int NOT NULL DEFAULT 0,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `product_merchant_application` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `merchant_id` bigint NOT NULL,
+    `owner_account_id` bigint DEFAULT NULL,
+    `version_no` int NOT NULL,
+    `type` varchar(32) NOT NULL,
+    `status` tinyint NOT NULL DEFAULT 0,
+    `business_type` varchar(64) DEFAULT NULL,
+    `business_types` varchar(2048) DEFAULT NULL,
+    `merchant_name` varchar(128) DEFAULT NULL,
+    `store_name` varchar(128) DEFAULT NULL,
+    `logo_url` varchar(512) DEFAULT NULL,
+    `company_name` varchar(255) DEFAULT NULL,
+    `credit_code` varchar(2048) DEFAULT NULL,
+    `legal_person` varchar(2048) DEFAULT NULL,
+    `contact_name` varchar(2048) DEFAULT NULL,
+    `contact_mobile` varchar(2048) DEFAULT NULL,
+    `submitted_time` timestamp DEFAULT NULL,
+    `agreement_version` varchar(64) DEFAULT NULL,
+    `privacy_policy_version` varchar(64) DEFAULT NULL,
+    `consent_accepted` boolean DEFAULT NULL,
+    `consent_time` timestamp DEFAULT NULL,
+    `consent_ip` varchar(64) DEFAULT NULL,
+    `reviewer_id` bigint DEFAULT NULL,
+    `review_time` timestamp DEFAULT NULL,
+    `reject_reason` varchar(512) DEFAULT NULL,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`), UNIQUE (`merchant_id`, `version_no`)
+);
+
+CREATE TABLE IF NOT EXISTS `product_merchant_application_qualification` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `application_id` bigint NOT NULL,
+    `code` varchar(64) NOT NULL,
+    `name` varchar(128) DEFAULT NULL,
+    `required` boolean DEFAULT NULL,
+    `certificate_no_required` boolean NOT NULL DEFAULT FALSE,
+    `certificate_no_pattern` varchar(2048) DEFAULT NULL,
+    `validity_required` boolean NOT NULL DEFAULT FALSE,
+    `certificate_no` varchar(2048) DEFAULT NULL,
+    `file_id` bigint DEFAULT NULL,
+    `legacy_file_url` text DEFAULT NULL,
+    `valid_start` date DEFAULT NULL,
+    `valid_end` date DEFAULT NULL,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `product_merchant_review_record` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `merchant_id` bigint NOT NULL,
+    `application_id` bigint DEFAULT NULL,
+    `version_no` int DEFAULT NULL,
+    `action` varchar(16) NOT NULL,
+    `reason` varchar(512) DEFAULT NULL,
+    `operator_id` bigint DEFAULT NULL,
+    `operator_type` tinyint DEFAULT NULL,
+    `status_from` tinyint DEFAULT NULL,
+    `status_to` tinyint DEFAULT NULL,
+    `reviewer_id` bigint DEFAULT NULL,
+    `review_time` timestamp NOT NULL,
+    `creator` varchar(64) DEFAULT '', `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '', `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT FALSE, `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+);
 
 CREATE TABLE IF NOT EXISTS `product_property` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',

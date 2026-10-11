@@ -329,6 +329,11 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     }
 
     @Override
+    public List<ProductSpuDO> getSpuListByStatusAndMerchantId(Integer status, Long merchantId) {
+        return productSpuMapper.selectListByStatusAndMerchantId(status, merchantId);
+    }
+
+    @Override
     public PageResult<ProductSpuDO> getSpuPage(ProductSpuPageReqVO pageReqVO) {
         return productSpuMapper.selectPage(pageReqVO, getCategoryIdsWithChildren(pageReqVO));
     }
@@ -363,11 +368,13 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     @Transactional(rollbackFor = Exception.class)
     public void updateSpuStatus(ProductSpuUpdateStatusReqVO updateReqVO) {
         // 校验存在
-        validateSpuExists(updateReqVO.getId());
+        ProductSpuDO spu = validateSpuExists(updateReqVO.getId());
+        // 状态更新同样属于经营操作，避免管理员在商家冻结或资料复审期间重新上架商品。
+        merchantService.validateMerchantAvailable(spu.getMerchantId());
         // TODO 芋艿：【可选】参与活动中的商品，不允许下架？？？
 
         // 更新状态
-        ProductSpuDO productSpuDO = productSpuMapper.selectById(updateReqVO.getId()).setStatus(updateReqVO.getStatus());
+        ProductSpuDO productSpuDO = spu.setStatus(updateReqVO.getStatus());
         productSpuMapper.updateById(productSpuDO);
     }
 

@@ -27,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
@@ -54,7 +56,9 @@ public class AppCombinationActivityController {
         // 拼接返回
         List<CombinationProductDO> productList = activityService.getCombinationProductListByActivityIds(
                 convertList(pageResult.getList(), CombinationActivityDO::getId));
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(pageResult.getList(), CombinationActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(pageResult.getList(), CombinationActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        pageResult.setList(pageResult.getList().stream().filter(item -> availableIds.contains(item.getSpuId())).toList());
         return success(CombinationActivityConvert.INSTANCE.convertAppPage(pageResult, productList, spuList));
     }
 
@@ -72,7 +76,9 @@ public class AppCombinationActivityController {
         // 2. 拼接返回
         List<CombinationProductDO> productList = activityService.getCombinationProductListByActivityIds(
                 convertList(activityList, CombinationActivityDO::getId));
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(activityList, CombinationActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = spuApi.getAvailableSpuList(convertList(activityList, CombinationActivityDO::getSpuId)).getCheckedData();
+        Set<Long> availableIds = spuList.stream().map(ProductSpuRespDTO::getId).collect(Collectors.toSet());
+        activityList = activityList.stream().filter(item -> availableIds.contains(item.getSpuId())).toList();
         return success(CombinationActivityConvert.INSTANCE.convertAppList(activityList, productList, spuList));
     }
 
@@ -85,6 +91,10 @@ public class AppCombinationActivityController {
         CombinationActivityDO activity = activityService.getCombinationActivity(id);
         if (activity == null
                 || ObjectUtil.equal(activity.getStatus(), CommonStatusEnum.DISABLE.getStatus())) {
+            return success(null);
+        }
+
+        if (spuApi.getAvailableSpuList(List.of(activity.getSpuId())).getCheckedData().isEmpty()) {
             return success(null);
         }
 

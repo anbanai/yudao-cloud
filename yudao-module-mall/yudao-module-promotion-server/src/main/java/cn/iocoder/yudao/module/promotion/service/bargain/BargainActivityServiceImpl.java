@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.promotion.controller.admin.bargain.vo.activity.Ba
 import cn.iocoder.yudao.module.promotion.convert.bargain.BargainActivityConvert;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.bargain.BargainActivityDO;
 import cn.iocoder.yudao.module.promotion.dal.mysql.bargain.BargainActivityMapper;
+import cn.iocoder.yudao.module.promotion.service.merchant.PromotionProductVisibilityService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,9 @@ import static cn.iocoder.yudao.module.promotion.enums.ErrorCodeConstants.*;
 @Service
 @Validated
 public class BargainActivityServiceImpl implements BargainActivityService {
+
+    @Resource
+    private PromotionProductVisibilityService visibilityService;
 
     @Resource
     private BargainActivityMapper bargainActivityMapper;
@@ -183,7 +187,10 @@ public class BargainActivityServiceImpl implements BargainActivityService {
     @Override
     public PageResult<BargainActivityDO> getBargainActivityPage(PageParam pageReqVO) {
         // 只查询进行中，且在时间范围内的
-        return bargainActivityMapper.selectPage(pageReqVO, CommonStatusEnum.ENABLE.getStatus(), LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        List<Long> available = visibilityService.getAvailableSpuIds(bargainActivityMapper.selectAppSpuIds(CommonStatusEnum.ENABLE.getStatus(), now));
+        return available.isEmpty() ? PageResult.empty()
+                : bargainActivityMapper.selectPage(pageReqVO, CommonStatusEnum.ENABLE.getStatus(), now, available);
     }
 
     @Override

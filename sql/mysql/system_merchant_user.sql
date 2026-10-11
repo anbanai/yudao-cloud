@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `system_merchant_user` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商家账号ID',
+  `merchant_id` bigint DEFAULT NULL COMMENT '商品服务商家编号',
+  `username` varchar(30) NOT NULL COMMENT '账号',
+  `password` varchar(100) NOT NULL COMMENT '密码',
+  `nickname` varchar(30) NOT NULL COMMENT '昵称',
+  `email` varchar(50) DEFAULT '' COMMENT '邮箱',
+  `mobile` varchar(30) DEFAULT '' COMMENT '手机号',
+  `sex` tinyint DEFAULT 0 COMMENT '性别',
+  `avatar` varchar(512) DEFAULT '' COMMENT '头像',
+  `status` tinyint NOT NULL DEFAULT 0 COMMENT '帐号状态（0正常 1停用）',
+  `login_ip` varchar(50) DEFAULT '' COMMENT '最后登录IP',
+  `login_date` datetime DEFAULT NULL COMMENT '最后登录时间',
+  `creator` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_system_merchant_user_username` (`username`),
+  KEY `idx_system_merchant_user_merchant_id` (`merchant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家工作台账号信息表';

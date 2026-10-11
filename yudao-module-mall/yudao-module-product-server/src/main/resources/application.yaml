@@ -111,6 +111,12 @@ yudao:
   product:
     stock:
       hotspot-enabled: false # Nacos 可动态切换的 PolarDB 热点行库存更新开关
+    merchant:
+      application:
+        agreement-version: ${MERCHANT_AGREEMENT_VERSION:}
+        agreement-url: ${MERCHANT_AGREEMENT_URL:}
+        privacy-policy-version: ${MERCHANT_PRIVACY_POLICY_VERSION:}
+        privacy-policy-url: ${MERCHANT_PRIVACY_POLICY_URL:}
   web:
     admin-ui:
       url: http://dashboard.yudao.iocoder.cn # Admin 管理后台 UI 的地址

@@ -42,6 +42,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         Integer tabType = reqVO.getTabType();
         LambdaQueryWrapperX<ProductSpuDO> queryWrapper = new LambdaQueryWrapperX<ProductSpuDO>()
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getName())
+                .eqIfPresent(ProductSpuDO::getMerchantId, reqVO.getMerchantId())
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
         appendTabQuery(tabType, queryWrapper);
@@ -74,9 +75,29 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
         // 上架状态 且有库存
         query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
+        // 商家未通过审核、冻结或处于资料复审时，不向商城用户展示其商品。
+        query.inSql(ProductSpuDO::getMerchantId,
+                "SELECT id FROM product_merchant WHERE status = 20 AND deleted = FALSE");
 
         appendSortQuery(query, pageReqVO.getSortField(), pageReqVO.getSortAsc());
         return selectPage(pageReqVO, query);
+    }
+
+    default java.util.List<ProductSpuDO> selectAvailableByIds(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
+                .in(ProductSpuDO::getId, ids)
+                .apply("merchant_id IN (SELECT id FROM product_merchant WHERE status = {0} AND deleted = {1})",
+                        ProductMerchantStatusEnum.APPROVED.getStatus(), false));
+    }
+
+    default java.util.List<ProductSpuDO> selectListByStatusAndMerchantId(Integer status, Long merchantId) {
+        return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
+                .eq(ProductSpuDO::getStatus, status)
+                .eq(ProductSpuDO::getMerchantId, merchantId)
+                .orderByDesc(ProductSpuDO::getSort).orderByDesc(ProductSpuDO::getId));
     }
 
     static void appendSortQuery(LambdaQueryWrapperX<ProductSpuDO> query, String sortField, Boolean sortAsc) {
@@ -185,6 +206,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     default Long selectCountByTab(ProductSpuPageReqVO reqVO, Integer tabType, Set<Long> categoryIds) {
         LambdaQueryWrapperX<ProductSpuDO> queryWrapper = new LambdaQueryWrapperX<ProductSpuDO>()
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getName())
+                .eqIfPresent(ProductSpuDO::getMerchantId, reqVO.getMerchantId())
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
         appendTabQuery(tabType, queryWrapper);
@@ -204,14 +226,4 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         update(null, updateWrapper);
     }
 
-
-    default java.util.List<ProductSpuDO> selectAvailableByIds(java.util.Collection<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return java.util.Collections.emptyList();
-        }
-        return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
-                .in(ProductSpuDO::getId, ids)
-                .apply("merchant_id IN (SELECT id FROM product_merchant WHERE status = {0} AND deleted = {1})",
-                        ProductMerchantStatusEnum.APPROVED.getStatus(), false));
-    }
 }

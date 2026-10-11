@@ -7,9 +7,11 @@ import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 平台商家 DO。 */
 @TableName(value = "product_merchant", autoResultMap = true)
@@ -27,6 +29,7 @@ public class ProductMerchantDO extends BaseDO {
     private String name;
     private String storeName;
     private String logoUrl;
+    private String description;
     private String companyName;
     @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
     @ToString.Exclude
@@ -40,7 +43,12 @@ public class ProductMerchantDO extends BaseDO {
     @TableField(typeHandler = MerchantSensitiveTypeHandler.class)
     @ToString.Exclude
     private String contactMobile;
+    private Long ownerAccountId;
+    private String businessType;
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<String> businessTypes;
     private Integer status;
+    private Integer approvedRevision;
     private Long reviewerId;
     private LocalDateTime reviewTime;
     private String rejectReason;

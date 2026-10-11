@@ -41,6 +41,16 @@ public interface OAuth2TokenService {
     OAuth2AccessTokenDO refreshAccessToken(String refreshToken, String clientId);
 
     /**
+     * Refresh an access token while requiring a specific user type.
+     *
+     * @param refreshToken refresh token
+     * @param clientId client identifier
+     * @param userType expected user type
+     * @return access token information
+     */
+    OAuth2AccessTokenDO refreshAccessToken(String refreshToken, String clientId, Integer userType);
+
+    /**
      * 获得访问令牌
      *
      * 参考 DefaultTokenServices 的 getAccessToken 方法
@@ -79,6 +89,14 @@ public interface OAuth2TokenService {
      * @param userType 用户类型
      */
     void removeAccessToken(Long userId, Integer userType);
+
+    /**
+     * Rebuild active token user info after a merchant account is bound to its merchant record.
+     *
+     * @param userId merchant user ID
+     * @param userType user type
+     */
+    void refreshAccessTokenUserInfo(Long userId, Integer userType);
 
     /**
      * 获得访问令牌分页

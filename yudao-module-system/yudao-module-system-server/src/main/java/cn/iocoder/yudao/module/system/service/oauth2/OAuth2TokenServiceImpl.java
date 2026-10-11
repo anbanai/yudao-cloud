@@ -5,6 +5,7 @@ import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
@@ -19,10 +20,12 @@ import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2ClientDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2RefreshTokenDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.MerchantUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2AccessTokenMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2RefreshTokenMapper;
 import cn.iocoder.yudao.module.system.dal.redis.oauth2.OAuth2AccessTokenRedisDAO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.merchant.MerchantUserService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -30,11 +33,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.AUTH_LOGIN_USER_DISABLED;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 
 /**
  * OAuth2.0 Token Service 实现类
@@ -57,6 +64,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Resource
     @Lazy // 懒加载，避免循环依赖
     private AdminUserService adminUserService;
+    @Resource
+    @Lazy
+    private MerchantUserService merchantUserService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -71,6 +81,12 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Override
     @Transactional(noRollbackFor = ServiceException.class)
     public OAuth2AccessTokenDO refreshAccessToken(String refreshToken, String clientId) {
+        return refreshAccessToken(refreshToken, clientId, null);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = ServiceException.class)
+    public OAuth2AccessTokenDO refreshAccessToken(String refreshToken, String clientId, Integer userType) {
         // 查询访问令牌
         OAuth2RefreshTokenDO refreshTokenDO = oauth2RefreshTokenMapper.selectByRefreshToken(refreshToken);
         if (refreshTokenDO == null) {
@@ -81,6 +97,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         OAuth2ClientDO clientDO = oauth2ClientService.validOAuthClientFromCache(clientId);
         if (ObjectUtil.notEqual(clientId, refreshTokenDO.getClientId())) {
             throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "刷新令牌的客户端编号不正确");
+        }
+        if (userType != null && ObjectUtil.notEqual(userType, refreshTokenDO.getUserType())) {
+            throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "刷新令牌的用户类型不正确");
         }
 
         // 移除相关的访问令牌
@@ -136,6 +155,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         if (DateUtils.isExpired(accessTokenDO.getExpiresTime())) {
             throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "访问令牌已过期");
         }
+        if (UserTypeEnum.MERCHANT.getValue().equals(accessTokenDO.getUserType())) {
+            accessTokenDO.setUserInfo(buildUserInfo(accessTokenDO.getUserId(), accessTokenDO.getUserType()));
+        }
         return accessTokenDO;
     }
 
@@ -169,6 +191,19 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
             oauth2RefreshTokenMapper.deleteByRefreshToken(accessToken.getRefreshToken());
             oauth2AccessTokenRedisDAO.delete(accessToken.getRefreshToken());
         });
+    }
+
+    @Override
+    public void refreshAccessTokenUserInfo(Long userId, Integer userType) {
+        if (!UserTypeEnum.MERCHANT.getValue().equals(userType)) {
+            return;
+        }
+        List<OAuth2AccessTokenDO> accessTokens = oauth2AccessTokenMapper.selectListByUserIdAndUserType(userId, userType);
+        for (OAuth2AccessTokenDO accessToken : accessTokens) {
+            accessToken.setUserInfo(buildUserInfo(userId, userType));
+            oauth2AccessTokenMapper.updateById(accessToken);
+            oauth2AccessTokenRedisDAO.set(accessToken);
+        }
     }
 
     @Override
@@ -231,6 +266,22 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         } else if (userType.equals(UserTypeEnum.MEMBER.getValue())) {
             // 注意：目前 Member 暂时不读取，可以按需实现
             return Collections.emptyMap();
+        } else if (userType.equals(UserTypeEnum.MERCHANT.getValue())) {
+            MerchantUserDO user = merchantUserService.getUser(userId);
+            if (user == null) {
+                throw exception(USER_NOT_EXISTS);
+            }
+            if (CommonStatusEnum.isDisable(user.getStatus())) {
+                throw exception(AUTH_LOGIN_USER_DISABLED);
+            }
+            Map<String, String> userInfo = new HashMap<>();
+            if (user.getNickname() != null) {
+                userInfo.put(LoginUser.INFO_KEY_NICKNAME, user.getNickname());
+            }
+            if (user.getMerchantId() != null) {
+                userInfo.put("merchantId", user.getMerchantId().toString());
+            }
+            return userInfo;
         }
         throw new IllegalArgumentException("未知用户类型：" + userType);
     }
