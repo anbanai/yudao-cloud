@@ -1,4 +1,6 @@
-FROM m.daocloud.io/docker.io/library/eclipse-temurin:17-jre
+# Use the DaoCloud mirror path that resolves the official library image directly.
+# Pin the multi-arch digest so builds do not depend on the mirror's mutable tag HEAD.
+FROM docker.m.daocloud.io/library/eclipse-temurin@sha256:207ecae0b2b104dfc6dfa763d1e9cd2041cb344800a180e24cb1a28ed533ff90
 
 ## 创建目录，并使用它作为工作目录
 RUN mkdir -p /app
