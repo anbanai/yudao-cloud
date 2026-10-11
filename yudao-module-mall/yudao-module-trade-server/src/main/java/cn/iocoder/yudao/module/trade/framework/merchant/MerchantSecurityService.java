@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 
-@Service
+@Service("tradeMerchantSecurityService")
 public class MerchantSecurityService {
 
     @Resource

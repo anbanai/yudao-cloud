@@ -15,7 +15,7 @@ import jakarta.annotation.Resource;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MERCHANT_NOT_EXISTS;
 
-@Service
+@Service("productMerchantSecurityService")
 public class MerchantSecurityService {
 
     @Resource
