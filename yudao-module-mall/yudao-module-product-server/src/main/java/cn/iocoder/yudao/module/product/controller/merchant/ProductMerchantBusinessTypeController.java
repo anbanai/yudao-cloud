@@ -17,7 +17,7 @@ import java.util.List;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "商家端 - 经营类型")
-@RestController
+@RestController("merchantProductMerchantBusinessTypeController")
 @RequestMapping("/product/merchant/business-type")
 @Validated
 public class ProductMerchantBusinessTypeController {

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 商家经营类型")
-@RestController
+@RestController("adminProductMerchantBusinessTypeController")
 @RequestMapping("/product/merchant/business-type")
 @Validated
 public class ProductMerchantBusinessTypeController {

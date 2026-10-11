@@ -27,7 +27,7 @@ import java.util.List;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 商家申请审核")
-@RestController
+@RestController("adminProductMerchantApplicationController")
 @RequestMapping("/product/merchant/application")
 @Validated
 public class ProductMerchantApplicationController {
