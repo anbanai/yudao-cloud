@@ -41,6 +41,7 @@ public class ProductMerchantApplicationController {
     @GetMapping("/terms")
     @Operation(summary = "获取当前商家入驻协议")
     public CommonResult<ProductMerchantApplicationTermsRespVO> getTerms() {
+        merchantSecurityService.requireMerchantAccountId();
         return success(new ProductMerchantApplicationTermsRespVO()
                 .setAvailable(applicationProperties.isConfigured())
                 .setAgreementVersion(applicationProperties.getAgreementVersion())

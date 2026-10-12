@@ -25,6 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +44,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Tag(name = "商家端 - 商品")
 @RestController
 @RequestMapping("/product/merchant/spu")
+@PreAuthorize("denyAll()")
 @Validated
 public class ProductMerchantSpuController {
 

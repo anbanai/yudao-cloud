@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.service.spu;
 
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -27,10 +28,12 @@ public class ProductSpuHotspotUpdateService {
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public int updateStock(Long id, Integer incrCount) {
         if (incrCount > 0) {
-            return productSpuMapper.updateStockIncrHotspot(id, incrCount);
+            return productSpuMapper.updateStockIncrHotspot(id, incrCount,
+                    TenantContextHolder.getRequiredTenantId());
         }
         if (incrCount < 0) {
-            return productSpuMapper.updateStockDecrHotspot(id, -incrCount);
+            return productSpuMapper.updateStockDecrHotspot(id, -incrCount,
+                    TenantContextHolder.getRequiredTenantId());
         }
         return 0;
     }

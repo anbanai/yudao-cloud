@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.annotation.security.PermitAll;
+import org.springframework.security.access.prepost.PreAuthorize;
 import jakarta.validation.Valid;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -79,12 +80,14 @@ public class MerchantAuthController {
 
     @GetMapping("/profile")
     @Operation(summary = "获取商家账号资料")
+    @PreAuthorize("denyAll()")
     public CommonResult<MerchantUserProfileRespVO> getProfile() {
         return success(merchantAuthService.getProfile(getCurrentMerchantUserId()));
     }
 
     @PutMapping("/profile")
     @Operation(summary = "更新商家账号资料")
+    @PreAuthorize("denyAll()")
     public CommonResult<Boolean> updateProfile(@RequestBody @Valid MerchantUserProfileUpdateReqVO reqVO) {
         merchantAuthService.updateProfile(getCurrentMerchantUserId(), reqVO);
         return success(true);

@@ -86,6 +86,14 @@ public class ProductSkuServiceImpl implements ProductSkuService {
     }
 
     @Override
+    public List<ProductSkuDO> getAvailableSkuList(Collection<Long> ids) {
+        if (CollUtil.isEmpty(ids)) {
+            return ListUtil.empty();
+        }
+        return productSkuMapper.selectAvailableByIds(ids);
+    }
+
+    @Override
     public void validateSkuList(List<ProductSkuSaveReqVO> skus, Boolean specType) {
         // 0、校验skus是否为空
         if (CollUtil.isEmpty(skus)) {
@@ -157,6 +165,11 @@ public class ProductSkuServiceImpl implements ProductSkuService {
     @Override
     public List<ProductSkuDO> getAvailableSkuListBySpuId(Long spuId) {
         return productSkuMapper.selectAvailableListBySpuId(spuId);
+    }
+
+    @Override
+    public List<ProductSkuDO> getAvailableSkuListBySpuId(Collection<Long> spuIds) {
+        return productSkuMapper.selectAvailableListBySpuId(spuIds);
     }
 
     @Override

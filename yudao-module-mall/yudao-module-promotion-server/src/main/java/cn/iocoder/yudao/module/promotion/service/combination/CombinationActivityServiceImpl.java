@@ -104,13 +104,14 @@ public class CombinationActivityServiceImpl implements CombinationActivityServic
      */
     private void validateProductExists(Long spuId, List<CombinationProductBaseVO> products) {
         // 1. 校验商品 spu 是否存在
-        ProductSpuRespDTO spu = productSpuApi.getSpu(spuId).getCheckedData();
+        ProductSpuRespDTO spu = productSpuApi.getAvailableSpuList(singletonList(spuId)).getCheckedData()
+                .stream().findFirst().orElse(null);
         if (spu == null) {
             throw exception(SPU_NOT_EXISTS);
         }
 
         // 2. 校验商品 sku 都存在
-        List<ProductSkuRespDTO> skus = productSkuApi.getSkuListBySpuId(singletonList(spuId)).getCheckedData();
+        List<ProductSkuRespDTO> skus = productSkuApi.getAvailableSkuListBySpuId(singletonList(spuId)).getCheckedData();
         Map<Long, ProductSkuRespDTO> skuMap = convertMap(skus, ProductSkuRespDTO::getId);
         products.forEach(product -> {
             if (!skuMap.containsKey(product.getSkuId())) {
@@ -243,6 +244,9 @@ public class CombinationActivityServiceImpl implements CombinationActivityServic
 
     @Override
     public CombinationActivityDO getMatchCombinationActivityBySpuId(Long spuId) {
+        if (productSpuApi.getAvailableSpuList(singletonList(spuId)).getCheckedData().isEmpty()) {
+            return null;
+        }
         return combinationActivityMapper.selectBySpuIdAndStatusAndNow(spuId, CommonStatusEnum.ENABLE.getStatus());
     }
 

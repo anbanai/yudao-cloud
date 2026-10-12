@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
@@ -20,6 +21,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MerchantTradeOrderControllerTest {
+
+    @Test
+    void merchantOrderEndpointsAreDisabledUntilMerchantOperationsAreReleased() {
+        org.junit.jupiter.api.Assertions.assertEquals("denyAll()",
+                MerchantTradeOrderController.class.getAnnotation(PreAuthorize.class).value());
+    }
 
     @Mock
     private TradeOrderSubMapper orderSubMapper;

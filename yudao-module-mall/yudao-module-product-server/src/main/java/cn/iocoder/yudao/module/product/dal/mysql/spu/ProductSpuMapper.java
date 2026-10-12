@@ -109,6 +109,19 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     }
 
     /**
+     * 查询交易校验使用的 SPU，保留状态和商家状态校验的错误语义，
+     * 但显式限定平台全局租户与当前租户范围。
+     */
+    default java.util.List<ProductSpuDO> selectByIdsInTenantScope(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return TenantUtils.executeIgnore(() -> selectList(new LambdaQueryWrapperX<ProductSpuDO>()
+                .in(ProductSpuDO::getId, ids)
+                .apply("product_spu.tenant_id IN (0, {0})", TenantContextHolder.getRequiredTenantId())));
+    }
+
+    /**
      * 查询商城详情使用的商品，显式允许平台全局租户和当前租户。
      */
     default ProductSpuDO selectAvailableById(Long id) {
@@ -156,11 +169,14 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         } else {
             sql = " stock = stock - " + Math.abs(incrCount) + ", sales_count = sales_count + " + Math.abs(incrCount);
         }
-        // 执行更新
-        LambdaUpdateWrapper<ProductSpuDO> updateWrapper = new LambdaUpdateWrapper<ProductSpuDO>()
-                .setSql(sql)
-                .eq(ProductSpuDO::getId, id);
-        update(null, updateWrapper);
+        // 执行更新，交易可能处理平台全局商品，因此显式允许平台全局与当前租户。
+        TenantUtils.executeIgnore(() -> {
+            LambdaUpdateWrapper<ProductSpuDO> updateWrapper = new LambdaUpdateWrapper<ProductSpuDO>()
+                    .setSql(sql)
+                    .eq(ProductSpuDO::getId, id)
+                    .apply("product_spu.tenant_id IN (0, {0})", TenantContextHolder.getRequiredTenantId());
+            update(null, updateWrapper);
+        });
     }
 
     /**
@@ -172,8 +188,9 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
      */
     @Update("UPDATE /*+ COMMIT_ON_SUCCESS ROLLBACK_ON_FAIL */ product_spu "
             + "SET stock = stock + #{incrCount}, sales_count = sales_count - #{incrCount} "
-            + "WHERE id = #{id}")
-    int updateStockIncrHotspot(@Param("id") Long id, @Param("incrCount") Integer incrCount);
+            + "WHERE id = #{id} AND tenant_id IN (0, #{tenantId})")
+    int updateStockIncrHotspot(@Param("id") Long id, @Param("incrCount") Integer incrCount,
+                               @Param("tenantId") Long tenantId);
 
     /**
      * PolarDB 热点行优化：更新 SPU 库存（减少）。
@@ -184,8 +201,9 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
      */
     @Update("UPDATE /*+ COMMIT_ON_SUCCESS ROLLBACK_ON_FAIL */ product_spu "
             + "SET stock = stock - #{count}, sales_count = sales_count + #{count} "
-            + "WHERE id = #{id}")
-    int updateStockDecrHotspot(@Param("id") Long id, @Param("count") Integer count);
+            + "WHERE id = #{id} AND tenant_id IN (0, #{tenantId})")
+    int updateStockDecrHotspot(@Param("id") Long id, @Param("count") Integer count,
+                               @Param("tenantId") Long tenantId);
 
     /**
      * 添加后台 Tab 选项的查询条件

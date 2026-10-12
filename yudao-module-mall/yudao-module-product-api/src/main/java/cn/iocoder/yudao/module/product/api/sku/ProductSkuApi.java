@@ -36,6 +36,11 @@ public interface ProductSkuApi {
     @Parameter(name = "ids", description = "SKU 编号列表", required = true, example = "1024,2048")
     CommonResult<List<ProductSkuRespDTO>> getSkuList(@RequestParam("ids") Collection<Long> ids);
 
+    @GetMapping(PREFIX + "/available-list")
+    @Operation(summary = "批量查询交易链路可用 SKU")
+    @Parameter(name = "ids", description = "SKU 编号列表", required = true, example = "1024,2048")
+    CommonResult<List<ProductSkuRespDTO>> getAvailableSkuList(@RequestParam("ids") Collection<Long> ids);
+
     /**
      * 批量查询 SKU MAP
      *
@@ -50,6 +55,11 @@ public interface ProductSkuApi {
     @Operation(summary = "批量查询 SKU 信息")
     @Parameter(name = "spuIds", description = "SPU 编号列表", required = true, example = "1024,2048")
     CommonResult<List<ProductSkuRespDTO>> getSkuListBySpuId(@RequestParam("spuIds") Collection<Long> spuIds);
+
+    @GetMapping(PREFIX + "/available-list-by-spu-id")
+    @Operation(summary = "批量查询交易链路可用 SKU")
+    @Parameter(name = "spuIds", description = "SPU 编号列表", required = true, example = "1024,2048")
+    CommonResult<List<ProductSkuRespDTO>> getAvailableSkuListBySpuId(@RequestParam("spuIds") Collection<Long> spuIds);
 
     @PostMapping(PREFIX + "/update-stock")
     @Operation(summary = "更新 SKU 库存（增加 or 减少）")

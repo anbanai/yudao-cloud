@@ -82,12 +82,16 @@ public class TradePriceServiceImpl implements TradePriceService {
         // 获得商品 SKU 数组
         Map<Long, Integer> skuIdCountMap = convertMap(reqBO.getItems(),
                 TradePriceCalculateReqBO.Item::getSkuId, TradePriceCalculateReqBO.Item::getCount);
-        List<ProductSkuRespDTO> skus = productSkuApi.getSkuList(skuIdCountMap.keySet()).getCheckedData();
+        List<ProductSkuRespDTO> skus = productSkuApi.getAvailableSkuList(skuIdCountMap.keySet()).getCheckedData();
 
         // 校验商品 SKU
-        skus.forEach(sku -> {
-            Integer count = skuIdCountMap.get(sku.getId());
-            if (count == null) {
+        Map<Long, ProductSkuRespDTO> skuMap = convertMap(skus, ProductSkuRespDTO::getId);
+        if (skuMap.size() != skuIdCountMap.size()) {
+            throw exception(SKU_NOT_EXISTS);
+        }
+        skuIdCountMap.forEach((skuId, count) -> {
+            ProductSkuRespDTO sku = skuMap.get(skuId);
+            if (sku == null) {
                 throw exception(SKU_NOT_EXISTS);
             }
             if (count > sku.getStock()) {
@@ -104,7 +108,8 @@ public class TradePriceServiceImpl implements TradePriceService {
     @Override
     public List<AppTradeProductSettlementRespVO> calculateProductPrice(Long userId, List<Long> spuIds) {
         // 1.1 获得 SPU 与 SKU 的映射
-        List<ProductSkuRespDTO> allSkuList = productSkuApi.getSkuListBySpuId(spuIds).getCheckedData();
+        productSpuApi.validateSpuList(spuIds).getCheckedData();
+        List<ProductSkuRespDTO> allSkuList = productSkuApi.getAvailableSkuListBySpuId(spuIds).getCheckedData();
         Map<Long, List<ProductSkuRespDTO>> spuIdAndSkuListMap = convertMultiMap(allSkuList, ProductSkuRespDTO::getSpuId);
         // 1.2 获得会员等级
         MemberLevelRespDTO level = discountActivityPriceCalculator.getMemberLevel(userId);

@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.product.dal.dataobject.merchant;
 
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import cn.iocoder.yudao.module.product.framework.merchant.core.MerchantSensitiveTypeHandler;
 import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
@@ -22,7 +22,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductMerchantDO extends BaseDO {
+public class ProductMerchantDO extends TenantBaseDO {
 
     @TableId
     private Long id;

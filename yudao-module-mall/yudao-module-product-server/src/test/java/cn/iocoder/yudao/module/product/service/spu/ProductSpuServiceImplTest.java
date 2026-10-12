@@ -144,7 +144,7 @@ class ProductSpuServiceImplTest {
     void testValidateSpuListChecksMerchantAvailability() {
         ProductSpuDO spu = new ProductSpuDO().setId(100L).setName("茶叶")
                 .setStatus(ProductSpuStatusEnum.ENABLE.getStatus()).setMerchantId(9L);
-        when(productSpuMapper.selectByIds(Set.of(100L))).thenReturn(List.of(spu));
+        when(productSpuMapper.selectByIdsInTenantScope(Set.of(100L))).thenReturn(List.of(spu));
 
         productSpuService.validateSpuList(Set.of(100L));
 

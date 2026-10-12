@@ -44,7 +44,7 @@ public class ProductBrandServiceImpl implements ProductBrandService {
     public Long createBrand(ProductBrandCreateReqVO createReqVO) {
         // 校验
         validateBrandNameUnique(null, createReqVO.getName());
-        merchantService.validateMerchantAvailable(createReqVO.getMerchantId());
+        merchantService.validateMerchantForManagement(createReqVO.getMerchantId());
         validateProductImage(createReqVO.getPicUrl());
 
         // 插入
@@ -59,7 +59,7 @@ public class ProductBrandServiceImpl implements ProductBrandService {
         // 校验存在
         validateBrandExists(updateReqVO.getId());
         validateBrandNameUnique(updateReqVO.getId(), updateReqVO.getName());
-        merchantService.validateMerchantAvailable(updateReqVO.getMerchantId());
+        merchantService.validateMerchantForManagement(updateReqVO.getMerchantId());
         validateProductImage(updateReqVO.getPicUrl());
         // 更新
         ProductBrandDO updateObj = ProductBrandConvert.INSTANCE.convert(updateReqVO);

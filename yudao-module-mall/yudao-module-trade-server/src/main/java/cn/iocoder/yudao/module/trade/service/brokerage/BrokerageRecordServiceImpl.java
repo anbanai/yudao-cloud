@@ -333,13 +333,14 @@ public class BrokerageRecordServiceImpl implements BrokerageRecordService {
             return respVO;
         }
         // 2.3 校验商品是否存在
-        ProductSpuRespDTO spu = productSpuApi.getSpu(spuId).getCheckedData();
+        ProductSpuRespDTO spu = productSpuApi.getAvailableSpuList(ListUtil.of(spuId)).getCheckedData()
+                .stream().findFirst().orElse(null);
         if (spu == null) {
             return respVO;
         }
 
         // 3.1 获取商品 SKU 列表
-        List<ProductSkuRespDTO> skuList = productSkuApi.getSkuListBySpuId(ListUtil.of(spuId)).getCheckedData();
+        List<ProductSkuRespDTO> skuList = productSkuApi.getAvailableSkuListBySpuId(ListUtil.of(spuId)).getCheckedData();
         if (BooleanUtil.isTrue(spu.getSubCommissionType())) {
             // 3.2.1 商品独立分销模式：直接取 SKU 固定佣金
             // 注意：固定佣金允许为 0，表示商家主动设为零佣金；为空时，也按 0 处理

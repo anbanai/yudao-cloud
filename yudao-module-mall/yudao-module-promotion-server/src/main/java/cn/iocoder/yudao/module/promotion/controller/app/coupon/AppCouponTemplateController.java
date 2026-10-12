@@ -136,11 +136,16 @@ public class AppCouponTemplateController {
         }
         // 品类券：查询商品的品类编号
         if (Objects.equals(productScope, PromotionProductScopeEnum.CATEGORY.getScope()) && spuId != null) {
-            ProductSpuRespDTO spu = productSpuApi.getSpu(spuId).getCheckedData();
-            return spu != null ? spu.getCategoryId() : null;
+            ProductSpuRespDTO spu = productSpuApi.getAvailableSpuList(singletonList(spuId)).getCheckedData()
+                    .stream().findFirst().orElse(null);
+            return spu != null ? spu.getCategoryId() : -1L;
         }
-        // 商品劵：直接返回
-        return spuId;
+        // 商品劵：仅对当前可售商品匹配
+        if (Objects.equals(productScope, PromotionProductScopeEnum.SPU.getScope()) && spuId != null
+                && !productSpuApi.getAvailableSpuList(singletonList(spuId)).getCheckedData().isEmpty()) {
+            return spuId;
+        }
+        return -1L;
     }
 
 }

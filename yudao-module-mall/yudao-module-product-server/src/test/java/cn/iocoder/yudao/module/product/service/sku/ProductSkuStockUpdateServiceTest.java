@@ -40,14 +40,14 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
     void testUpdateLegacy_updatesSkuAndSpu() {
         ProductSkuUpdateStockReqDTO request = request(1L, -2);
         when(productSkuMapper.updateStockDecr(1L, -2)).thenReturn(1);
-        when(productSkuMapper.selectByIds(anyCollection()))
+        when(productSkuMapper.selectByIdsInTenantScope(anyCollection()))
                 .thenReturn(List.of(new ProductSkuDO().setId(1L).setSpuId(10L)));
 
         stockUpdateService.updateLegacy(request);
 
         verify(productSkuMapper).updateStockDecr(1L, -2);
         verify(productSkuHotspotUpdateService, never()).updateStock(any(), any());
-        verify(productSkuMapper, never()).updateStockDecrHotspot(any(), any());
+        verify(productSkuMapper, never()).updateStockDecrHotspot(any(), any(), any());
         verify(productSpuService).updateSpuStock(any());
         verify(productSpuHotspotUpdateService, never()).updateStock(any(), any());
     }
@@ -56,7 +56,7 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
     void testUpdateHotspot_usesHotspotSqlAndUpdatesSpu() {
         ProductSkuUpdateStockReqDTO request = request(1L, -2);
         when(productSkuHotspotUpdateService.updateStock(1L, -2)).thenReturn(1);
-        when(productSkuMapper.selectByIds(anyCollection()))
+        when(productSkuMapper.selectByIdsInTenantScope(anyCollection()))
                 .thenReturn(List.of(new ProductSkuDO().setId(1L).setSpuId(10L)));
 
         stockUpdateService.updateHotspot(request);
@@ -64,7 +64,7 @@ class ProductSkuStockUpdateServiceTest extends BaseMockitoUnitTest {
         InOrder order = inOrder(productSkuHotspotUpdateService, productSkuMapper,
                 productSpuHotspotUpdateService);
         order.verify(productSkuHotspotUpdateService).updateStock(1L, -2);
-        order.verify(productSkuMapper).selectByIds(anyCollection());
+        order.verify(productSkuMapper).selectByIdsInTenantScope(anyCollection());
         order.verify(productSpuHotspotUpdateService).updateStock(10L, -2);
         verify(productSkuMapper, never()).updateStockDecr(any(), any());
         verify(productSpuService, never()).updateSpuStock(any());

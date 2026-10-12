@@ -4,12 +4,14 @@ import cn.iocoder.yudao.framework.web.config.WebProperties;
 import cn.iocoder.yudao.framework.web.config.YudaoWebAutoConfiguration;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.ProductMerchantApplicationController;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.ProductMerchantBusinessTypeController;
+import cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantSpuController;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.Set;
@@ -62,6 +64,19 @@ class ProductMerchantControllerMappingTest {
                     "/admin-api/product/merchant/business-type/page",
                     "/merchant-api/product/merchant/business-type/list");
         }
+    }
+
+    @Test
+    void merchantBusinessControllersAreExplicitlyDisabledWhileApplicationEndpointsRemainAvailable() {
+        assertThat(ProductMerchantSpuController.class.getAnnotation(PreAuthorize.class).value())
+                .isEqualTo("denyAll()");
+        assertThat(cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantBrandController.class
+                .getAnnotation(PreAuthorize.class).value()).isEqualTo("denyAll()");
+        assertThat(cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantProfileController.class
+                .getAnnotation(PreAuthorize.class).value()).isEqualTo("denyAll()");
+        assertThat(ProductMerchantApplicationController.class.getAnnotation(PreAuthorize.class)).isNull();
+        assertThat(cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantApplicationController.class
+                .getAnnotation(PreAuthorize.class)).isNull();
     }
 
 }

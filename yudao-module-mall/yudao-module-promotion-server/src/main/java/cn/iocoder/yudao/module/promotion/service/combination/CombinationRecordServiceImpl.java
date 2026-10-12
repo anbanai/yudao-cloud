@@ -171,7 +171,11 @@ public class CombinationRecordServiceImpl implements CombinationRecordService {
 
         // 2. 组合数据创建拼团记录
         MemberUserRespDTO user = memberUserApi.getUser(reqDTO.getUserId()).getCheckedData();
-        ProductSpuRespDTO spu = productSpuApi.getSpu(reqDTO.getSpuId()).getCheckedData();
+        ProductSpuRespDTO spu = productSpuApi.getAvailableSpuList(List.of(reqDTO.getSpuId())).getCheckedData()
+                .stream().findFirst().orElse(null);
+        if (spu == null) {
+            throw exception(COMBINATION_JOIN_ACTIVITY_PRODUCT_NOT_EXISTS);
+        }
         ProductSkuRespDTO sku = productSkuApi.getSku(reqDTO.getSkuId()).getCheckedData();
         CombinationRecordDO record = CombinationActivityConvert.INSTANCE.convert(reqDTO, keyValue.getKey(), user, spu, sku);
         // 2.1. 如果是团长需要设置 headId 为 CombinationRecordDO#HEAD_ID_GROUP

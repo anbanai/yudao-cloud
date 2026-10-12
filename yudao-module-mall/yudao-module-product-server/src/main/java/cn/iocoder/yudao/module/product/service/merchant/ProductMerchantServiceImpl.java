@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.product.service.merchant;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantReviewRecordDO;
@@ -108,7 +109,24 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
 
     @Override
     public void validateMerchantAvailable(Long id) {
-        ProductMerchantDO merchant = validateExists(id);
+        ProductMerchantDO merchant = merchantMapper.selectAvailableById(id);
+        if (merchant == null) {
+            throw exception(MERCHANT_NOT_EXISTS);
+        }
+        if (!ProductMerchantStatusEnum.isAvailable(merchant.getStatus())) {
+            throw exception(MERCHANT_NOT_AVAILABLE);
+        }
+    }
+
+    @Override
+    public void validateMerchantForManagement(Long id) {
+        ProductMerchantDO merchant = merchantMapper.selectById(id);
+        if (merchant == null) {
+            throw exception(MERCHANT_NOT_EXISTS);
+        }
+        if (!java.util.Objects.equals(merchant.getTenantId(), TenantContextHolder.getRequiredTenantId())) {
+            throw exception(MERCHANT_TENANT_MISMATCH);
+        }
         if (!ProductMerchantStatusEnum.isAvailable(merchant.getStatus())) {
             throw exception(MERCHANT_NOT_AVAILABLE);
         }

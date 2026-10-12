@@ -81,5 +81,6 @@ public interface ErrorCodeConstants {
     ErrorCode MERCHANT_APPLICATION_REJECT_REASON_REQUIRED = new ErrorCode(1_008_010_017, "驳回商家申请时必须填写原因");
     ErrorCode MERCHANT_PAY_MATERIALS_INVALID = new ErrorCode(1_008_010_018, "支付入网资料不完整或格式无效");
     ErrorCode MERCHANT_PAY_ONBOARDING_NOT_EXISTS = new ErrorCode(1_008_010_019, "商家支付入网任务不存在");
+    ErrorCode MERCHANT_TENANT_MISMATCH = new ErrorCode(1_008_010_020, "商家与当前租户不一致");
 
 }

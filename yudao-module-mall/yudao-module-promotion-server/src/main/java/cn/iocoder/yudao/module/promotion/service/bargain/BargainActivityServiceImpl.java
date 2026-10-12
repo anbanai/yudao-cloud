@@ -7,6 +7,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
+import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.promotion.controller.admin.bargain.vo.activity.BargainActivityCreateReqVO;
 import cn.iocoder.yudao.module.promotion.controller.admin.bargain.vo.activity.BargainActivityPageReqVO;
 import cn.iocoder.yudao.module.promotion.controller.admin.bargain.vo.activity.BargainActivityUpdateReqVO;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static java.util.Collections.singletonList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.anyMatch;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_NOT_EXISTS;
 import static cn.iocoder.yudao.module.promotion.enums.ErrorCodeConstants.*;
@@ -45,6 +47,8 @@ public class BargainActivityServiceImpl implements BargainActivityService {
 
     @Resource
     private ProductSkuApi productSkuApi;
+    @Resource
+    private ProductSpuApi productSpuApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -200,6 +204,9 @@ public class BargainActivityServiceImpl implements BargainActivityService {
 
     @Override
     public BargainActivityDO getMatchBargainActivityBySpuId(Long spuId) {
+        if (productSpuApi.getAvailableSpuList(singletonList(spuId)).getCheckedData().isEmpty()) {
+            return null;
+        }
         return bargainActivityMapper.selectBySpuIdAndStatusAndNow(spuId, CommonStatusEnum.ENABLE.getStatus());
     }
 

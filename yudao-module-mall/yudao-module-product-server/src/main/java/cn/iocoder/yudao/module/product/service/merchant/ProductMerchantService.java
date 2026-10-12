@@ -17,4 +17,6 @@ public interface ProductMerchantService {
     void unfreezeMerchant(Long id, Long reviewerId);
     void updateStoreProfile(Long merchantId, String storeName, String logoUrl, String description);
     void validateMerchantAvailable(Long id);
+    /** 校验后台经营数据使用的商家属于当前租户且处于可经营状态。 */
+    void validateMerchantForManagement(Long id);
 }

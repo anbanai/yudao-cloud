@@ -105,7 +105,7 @@ public class ProductSkuStockUpdateService {
     }
 
     private Map<Long, Integer> getSpuStockIncrCounts(ProductSkuUpdateStockReqDTO updateStockReqDTO) {
-        List<ProductSkuDO> skus = productSkuMapper.selectByIds(
+        List<ProductSkuDO> skus = productSkuMapper.selectByIdsInTenantScope(
                 convertSet(updateStockReqDTO.getItems(), ProductSkuUpdateStockReqDTO.Item::getId));
         if (CollUtil.isEmpty(skus)) {
             return Map.of();

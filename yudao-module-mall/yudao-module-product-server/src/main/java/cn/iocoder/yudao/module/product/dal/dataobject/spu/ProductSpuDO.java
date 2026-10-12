@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.product.dal.dataobject.spu;
 
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import cn.iocoder.yudao.framework.mybatis.core.type.IntegerListTypeHandler;
 import cn.iocoder.yudao.module.product.dal.dataobject.brand.ProductBrandDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
@@ -28,7 +28,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductSpuDO extends BaseDO {
+public class ProductSpuDO extends TenantBaseDO {
 
     /**
      * 商品 SPU 编号，自增

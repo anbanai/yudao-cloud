@@ -218,14 +218,15 @@ public class PointActivityServiceImpl implements PointActivityService {
      */
     private void validateProductExists(Long spuId, List<PointProductSaveReqVO> products) {
         // 1. 校验商品 spu 是否存在
-        ProductSpuRespDTO spu = productSpuApi.getSpu(spuId).getCheckedData();
+        ProductSpuRespDTO spu = productSpuApi.getAvailableSpuList(singletonList(spuId)).getCheckedData()
+                .stream().findFirst().orElse(null);
         if (spu == null) {
             throw exception(SPU_NOT_EXISTS);
         }
         products.forEach(product -> product.setSpuId(spuId));
 
         // 2. 校验商品 sku 都存在
-        List<ProductSkuRespDTO> skus = productSkuApi.getSkuListBySpuId(singletonList(spuId)).getCheckedData();
+        List<ProductSkuRespDTO> skus = productSkuApi.getAvailableSkuListBySpuId(singletonList(spuId)).getCheckedData();
         Map<Long, ProductSkuRespDTO> skuMap = convertMap(skus, ProductSkuRespDTO::getId);
         products.forEach(product -> {
             if (!skuMap.containsKey(product.getSkuId())) {

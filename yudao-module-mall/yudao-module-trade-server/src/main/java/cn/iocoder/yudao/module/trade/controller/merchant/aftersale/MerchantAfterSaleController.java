@@ -25,6 +25,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,6 +38,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Tag(name = "商家端 - 售后")
 @RestController
 @RequestMapping("/trade/merchant/after-sale")
+@PreAuthorize("denyAll()")
 @Validated
 public class MerchantAfterSaleController {
 

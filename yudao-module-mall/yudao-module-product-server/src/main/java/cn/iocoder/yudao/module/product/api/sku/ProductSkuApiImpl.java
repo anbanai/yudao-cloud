@@ -31,7 +31,11 @@ public class ProductSkuApiImpl implements ProductSkuApi {
 
     @Override
     public CommonResult<ProductSkuRespDTO> getSku(Long id) {
-        ProductSkuDO sku = productSkuService.getSku(id);
+        if (id == null) {
+            return success(null);
+        }
+        ProductSkuDO sku = productSkuService.getAvailableSkuList(java.util.List.of(id)).stream()
+                .findFirst().orElse(null);
         return success(BeanUtils.toBean(sku, ProductSkuRespDTO.class));
     }
 
@@ -42,8 +46,20 @@ public class ProductSkuApiImpl implements ProductSkuApi {
     }
 
     @Override
+    public CommonResult<List<ProductSkuRespDTO>> getAvailableSkuList(Collection<Long> ids) {
+        List<ProductSkuDO> skus = productSkuService.getAvailableSkuList(ids);
+        return success(BeanUtils.toBean(skus, ProductSkuRespDTO.class));
+    }
+
+    @Override
     public CommonResult<List<ProductSkuRespDTO>> getSkuListBySpuId(Collection<Long> spuIds) {
         List<ProductSkuDO> skus = productSkuService.getSkuListBySpuId(spuIds);
+        return success(BeanUtils.toBean(skus, ProductSkuRespDTO.class));
+    }
+
+    @Override
+    public CommonResult<List<ProductSkuRespDTO>> getAvailableSkuListBySpuId(Collection<Long> spuIds) {
+        List<ProductSkuDO> skus = productSkuService.getAvailableSkuListBySpuId(spuIds);
         return success(BeanUtils.toBean(skus, ProductSkuRespDTO.class));
     }
 

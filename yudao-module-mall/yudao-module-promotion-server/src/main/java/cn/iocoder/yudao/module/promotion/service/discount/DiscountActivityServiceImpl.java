@@ -155,7 +155,7 @@ public class DiscountActivityServiceImpl implements DiscountActivityService {
      */
     private void validateProductExists(List<DiscountActivityBaseVO.Product> products) {
         // 1.获得商品所有的 sku
-        List<ProductSkuRespDTO> skus = productSkuApi.getSkuListBySpuId(
+        List<ProductSkuRespDTO> skus = productSkuApi.getAvailableSkuListBySpuId(
                 convertList(products, DiscountActivityBaseVO.Product::getSpuId)).getCheckedData();
         Map<Long, ProductSkuRespDTO> skuMap = convertMap(skus, ProductSkuRespDTO::getId);
         // 2. 校验商品 sku 都存在
@@ -231,7 +231,14 @@ public class DiscountActivityServiceImpl implements DiscountActivityService {
         if (CollUtil.isEmpty(skuIds)) {
             return CollUtil.newArrayList();
         }
-        return discountProductMapper.selectListBySkuIdsAndStatusAndNow(skuIds, CommonStatusEnum.ENABLE.getStatus());
+        // 活动表只保存 SKU 编号，交易链路必须先确认 SKU 当前仍属于可售商品。
+        List<ProductSkuRespDTO> availableSkus = productSkuApi.getAvailableSkuList(skuIds).getCheckedData();
+        if (CollUtil.isEmpty(availableSkus)) {
+            return CollUtil.newArrayList();
+        }
+        java.util.Set<Long> availableSkuIds = convertSet(availableSkus, ProductSkuRespDTO::getId);
+        return discountProductMapper.selectListBySkuIdsAndStatusAndNow(availableSkuIds,
+                CommonStatusEnum.ENABLE.getStatus());
     }
 
 }

@@ -165,6 +165,58 @@ CREATE TABLE IF NOT EXISTS `trade_order_sub` (
     UNIQUE KEY `uk_trade_order_sub_order_merchant` (`order_id`, `merchant_id`)
 ) COMMENT='商家履约订单';
 
+CREATE TABLE IF NOT EXISTS `product_merchant_data_quality_issue` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `issue_key` varchar(191) NOT NULL,
+    `issue_type` varchar(64) NOT NULL,
+    `table_name` varchar(64) NOT NULL,
+    `record_id` bigint DEFAULT NULL,
+    `detail` varchar(1000) NOT NULL,
+    `status` tinyint NOT NULL DEFAULT 0 COMMENT '0待处理 1已修复 2已忽略',
+    `first_seen` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `last_seen` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `creator` varchar(64) DEFAULT '',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted` bit NOT NULL DEFAULT b'0',
+    `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_product_merchant_data_quality_issue_key` (`issue_key`),
+    KEY `idx_product_merchant_data_quality_issue_status` (`status`, `issue_type`)
+) COMMENT='多商家数据治理问题台账';
+
+-- 先处理历史重复子单，再建立唯一约束，避免脏数据阻断升级。
+DROP TEMPORARY TABLE IF EXISTS `tmp_trade_order_sub_duplicate`;
+CREATE TEMPORARY TABLE `tmp_trade_order_sub_duplicate` (
+    `order_id` bigint NOT NULL,
+    `merchant_id` bigint NOT NULL,
+    `keep_id` bigint NOT NULL,
+    PRIMARY KEY (`order_id`, `merchant_id`)
+);
+INSERT INTO `tmp_trade_order_sub_duplicate` (`order_id`, `merchant_id`, `keep_id`)
+SELECT `order_id`, `merchant_id`, MIN(`id`)
+FROM `trade_order_sub`
+GROUP BY `order_id`, `merchant_id`
+HAVING COUNT(*) > 1;
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('trade_order_sub:duplicate:', `order_id`, ':', `merchant_id`),
+       'DUPLICATE_SUB_ORDER', 'trade_order_sub', `keep_id`,
+       CONCAT('订单 ', `order_id`, ' 商家 ', `merchant_id`, ' 存在重复子单，保留最早记录'), 0
+FROM `tmp_trade_order_sub_duplicate`;
+UPDATE `trade_order_item` i
+JOIN `trade_order_sub` s ON s.`id` = i.`sub_order_id`
+JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
+                                      AND d.`merchant_id` = s.`merchant_id`
+SET i.`sub_order_id` = d.`keep_id`
+WHERE s.`id` <> d.`keep_id`;
+DELETE s FROM `trade_order_sub` s
+JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
+                                      AND d.`merchant_id` = s.`merchant_id`
+WHERE s.`id` <> d.`keep_id`;
+DROP TEMPORARY TABLE `tmp_trade_order_sub_duplicate`;
+
 SET @add_trade_sub_unique_index = (
     SELECT IF(COUNT(*) = 0,
               'ALTER TABLE `trade_order_sub` ADD UNIQUE KEY `uk_trade_order_sub_order_merchant` (`order_id`, `merchant_id`)',
@@ -521,3 +573,183 @@ WHERE m.`deleted` = b'0' AND m.`owner_account_id` IS NULL AND m.`status` IN (0, 
   AND NOT EXISTS (
       SELECT 1 FROM `product_merchant_review_record` r
       WHERE r.`application_id` = a.`id` AND r.`action` = 'LEGACY');
+
+-- 数据治理：先记录异常，再修复可确定的商品、品牌、订单归属；脚本可重复执行。
+SET @platform_merchant_id := (
+    SELECT MIN(`id`) FROM `product_merchant`
+    WHERE `name` = '平台自营商家' AND `deleted` = b'0'
+);
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('product_spu:merchant:', s.`id`), 'PRODUCT_WITHOUT_MERCHANT', 'product_spu', s.`id`,
+       '商品缺少商家、商家不存在/已删除或商家租户不一致', s.`tenant_id`
+FROM `product_spu` s
+LEFT JOIN `product_merchant` m ON m.`id` = s.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = s.`tenant_id`)
+WHERE s.`merchant_id` IS NULL OR m.`id` IS NULL;
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('product_brand:merchant:', b.`id`), 'BRAND_WITHOUT_MERCHANT', 'product_brand', b.`id`,
+       '品牌缺少商家、商家不存在/已删除或商家租户不一致', b.`tenant_id`
+FROM `product_brand` b
+LEFT JOIN `product_merchant` m ON m.`id` = b.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = b.`tenant_id`)
+WHERE b.`merchant_id` IS NULL OR m.`id` IS NULL;
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('trade_order_item:merchant:', i.`id`), 'ORDER_ITEM_MERCHANT_SNAPSHOT', 'trade_order_item', i.`id`,
+       '订单项缺少有效商家或商家名称快照', i.`tenant_id`
+FROM `trade_order_item` i
+LEFT JOIN `product_spu` s ON s.`id` = i.`spu_id`
+LEFT JOIN `product_merchant` m ON m.`id` = s.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = i.`tenant_id`)
+LEFT JOIN `product_merchant` im ON im.`id` = i.`merchant_id` AND im.`deleted` = b'0'
+    AND (im.`tenant_id` = 0 OR im.`tenant_id` = i.`tenant_id`)
+WHERE i.`merchant_id` IS NULL OR i.`merchant_name` IS NULL OR m.`id` IS NULL OR im.`id` IS NULL;
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('trade_order_item:sub_order:', i.`id`), 'MISSING_SUB_ORDER', 'trade_order_item', i.`id`,
+       '订单项缺少商家子订单关联', i.`tenant_id`
+FROM `trade_order_item` i
+LEFT JOIN `trade_order_sub` s ON s.`id` = i.`sub_order_id`
+WHERE i.`sub_order_id` IS NULL OR s.`id` IS NULL;
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('trade_order_sub:amount:', s.`id`), 'SUB_ORDER_AMOUNT_MISMATCH', 'trade_order_sub', s.`id`,
+       '商家子订单数量或金额与订单项汇总不一致', s.`tenant_id`
+FROM `trade_order_sub` s
+JOIN (
+    SELECT `sub_order_id`, COUNT(*) AS `item_count`, SUM(`count`) AS `product_count`,
+           SUM(`price` * `count`) AS `total_price`, SUM(COALESCE(`pay_price`, 0)) AS `pay_price`
+    FROM `trade_order_item`
+    WHERE `sub_order_id` IS NOT NULL
+    GROUP BY `sub_order_id`
+) a ON a.`sub_order_id` = s.`id`
+WHERE s.`product_count` <> a.`product_count`
+   OR s.`total_price` <> a.`total_price`
+   OR s.`pay_price` <> a.`pay_price`;
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('promotion_combination_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT',
+       'promotion_combination_product', p.`id`, '促销商品引用不存在、删除或归属不一致的 SPU/SKU', p.`tenant_id`
+FROM `promotion_combination_product` p
+LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
+LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('promotion_discount_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT',
+       'promotion_discount_product', p.`id`, '促销商品引用不存在、删除或归属不一致的 SPU/SKU', p.`tenant_id`
+FROM `promotion_discount_product` p
+LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
+LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('promotion_point_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT',
+       'promotion_point_product', p.`id`, '促销商品引用不存在、删除或归属不一致的 SPU/SKU', p.`tenant_id`
+FROM `promotion_point_product` p
+LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
+LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('promotion_seckill_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT',
+       'promotion_seckill_product', p.`id`, '促销商品引用不存在、删除或归属不一致的 SPU/SKU', p.`tenant_id`
+FROM `promotion_seckill_product` p
+LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
+LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('system_merchant_user:binding:', u.`id`), 'MERCHANT_ACCOUNT_BINDING',
+       'system_merchant_user', u.`id`, '商家账号绑定了不存在/删除商家或与商家主体账号不一致', u.`tenant_id`
+FROM `system_merchant_user` u
+LEFT JOIN `product_merchant` m ON m.`id` = u.`merchant_id` AND m.`deleted` = b'0'
+WHERE u.`merchant_id` IS NOT NULL AND (m.`id` IS NULL OR m.`owner_account_id` IS NULL
+    OR m.`owner_account_id` <> u.`id`);
+
+-- 可确定的历史归属统一修复为平台自营商家；订单快照只在缺失或无效时补齐。
+UPDATE `product_spu` s
+LEFT JOIN `product_merchant` m ON m.`id` = s.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = s.`tenant_id`)
+SET s.`merchant_id` = @platform_merchant_id
+WHERE s.`merchant_id` IS NULL OR m.`id` IS NULL;
+
+UPDATE `product_brand` b
+LEFT JOIN `product_merchant` m ON m.`id` = b.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = b.`tenant_id`)
+SET b.`merchant_id` = @platform_merchant_id
+WHERE b.`merchant_id` IS NULL OR m.`id` IS NULL;
+
+UPDATE `trade_order_item` i
+LEFT JOIN `product_spu` s ON s.`id` = i.`spu_id`
+LEFT JOIN `product_merchant` m ON m.`id` = s.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = i.`tenant_id`)
+LEFT JOIN `product_merchant` im ON im.`id` = i.`merchant_id` AND im.`deleted` = b'0'
+    AND (im.`tenant_id` = 0 OR im.`tenant_id` = i.`tenant_id`)
+SET i.`merchant_id` = COALESCE(im.`id`, m.`id`, @platform_merchant_id),
+    i.`merchant_name` = COALESCE(NULLIF(i.`merchant_name`, ''), im.`store_name`, im.`name`,
+        m.`store_name`, m.`name`, '平台自营商家')
+WHERE i.`merchant_id` IS NULL OR i.`merchant_name` IS NULL OR m.`id` IS NULL OR im.`id` IS NULL;
+
+UPDATE `trade_order_item` i
+JOIN `trade_order_sub` s ON s.`order_id` = i.`order_id` AND s.`merchant_id` = i.`merchant_id`
+SET i.`sub_order_id` = s.`id`
+WHERE i.`sub_order_id` IS NULL;
+
+UPDATE `trade_order_sub` s
+JOIN `product_merchant` m ON m.`id` = s.`merchant_id`
+SET s.`merchant_name` = COALESCE(NULLIF(s.`merchant_name`, ''), m.`store_name`, m.`name`)
+WHERE s.`merchant_name` IS NULL OR s.`merchant_name` = '';
+
+ALTER TABLE `product_spu` MODIFY COLUMN `merchant_id` bigint NOT NULL COMMENT '商品销售商家编号';
+ALTER TABLE `product_brand` MODIFY COLUMN `merchant_id` bigint NOT NULL COMMENT '品牌默认归属商家编号';
+ALTER TABLE `trade_order_item`
+    MODIFY COLUMN `merchant_id` bigint NOT NULL COMMENT '商家编号快照',
+    MODIFY COLUMN `merchant_name` varchar(128) NOT NULL DEFAULT '平台自营商家' COMMENT '商家名称快照';
+
+UPDATE `product_merchant_data_quality_issue`
+SET `status` = 1, `last_seen` = NOW()
+WHERE `status` = 0 AND `issue_type` IN ('PRODUCT_WITHOUT_MERCHANT', 'BRAND_WITHOUT_MERCHANT',
+    'ORDER_ITEM_MERCHANT_SNAPSHOT', 'MISSING_SUB_ORDER', 'DUPLICATE_SUB_ORDER');
+
+-- 支付表按可选模块安装；若存在，则只登记缺失快照，不篡改历史资金记录。
+DROP PROCEDURE IF EXISTS `tmp_audit_merchant_payment_snapshot`;
+DELIMITER $$
+CREATE PROCEDURE `tmp_audit_merchant_payment_snapshot`()
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables
+               WHERE table_schema = DATABASE() AND table_name = 'pay_fund_order')
+       AND (SELECT COUNT(DISTINCT column_name) FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'pay_fund_order'
+              AND column_name IN ('id', 'tenant_id', 'trade_order_sub_id', 'divide_plan_data')) = 4 THEN
+        SET @merchant_payment_sql = 'INSERT IGNORE INTO product_merchant_data_quality_issue (issue_key, issue_type, table_name, record_id, detail, tenant_id) SELECT CONCAT(\'pay_fund_order:divide_snapshot:\', id), \'PAYMENT_SNAPSHOT\', \'pay_fund_order\', id, \'已拆分订单缺少支付分账计划快照\', tenant_id FROM pay_fund_order WHERE trade_order_sub_id IS NOT NULL AND (divide_plan_data IS NULL OR divide_plan_data = \'\')';
+        PREPARE merchant_payment_stmt FROM @merchant_payment_sql;
+        EXECUTE merchant_payment_stmt;
+        DEALLOCATE PREPARE merchant_payment_stmt;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables
+               WHERE table_schema = DATABASE() AND table_name = 'pay_fund_detail')
+       AND (SELECT COUNT(DISTINCT column_name) FROM information_schema.columns
+            WHERE table_schema = DATABASE() AND table_name = 'pay_fund_detail'
+              AND column_name IN ('id', 'tenant_id', 'trade_order_sub_id', 'merchant_id')) = 4 THEN
+        SET @merchant_payment_sql = 'INSERT IGNORE INTO product_merchant_data_quality_issue (issue_key, issue_type, table_name, record_id, detail, tenant_id) SELECT CONCAT(\'pay_fund_detail:merchant_snapshot:\', id), \'PAYMENT_SNAPSHOT\', \'pay_fund_detail\', id, \'资金明细缺少商家快照\', tenant_id FROM pay_fund_detail WHERE trade_order_sub_id IS NOT NULL AND merchant_id IS NULL';
+        PREPARE merchant_payment_stmt FROM @merchant_payment_sql;
+        EXECUTE merchant_payment_stmt;
+        DEALLOCATE PREPARE merchant_payment_stmt;
+    END IF;
+END$$
+DELIMITER ;
+CALL `tmp_audit_merchant_payment_snapshot`();
+DROP PROCEDURE `tmp_audit_merchant_payment_snapshot`;

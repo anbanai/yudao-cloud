@@ -129,10 +129,25 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
     @Test
     void testSelectAvailableSkuListBySpuId_includesGlobalSkuForDetail() {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        insertMerchant(jdbc, 900L, 20, false, 0L);
+        insertSpu(jdbc, 9000L, 900L, 0L, 1);
         insertSku(jdbc, 9100L, 9000L, 0L);
 
         assertThat(skuMapper.selectAvailableListBySpuId(9000L))
                 .extracting(row -> row.getId()).containsExactly(9100L);
+    }
+
+    @Test
+    void testSelectAvailableByIds_includesGlobalAndCurrentTenantSkuOnly() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        insertMerchant(jdbc, 900L, 20, false, 0L);
+        insertSpu(jdbc, 9000L, 900L, 0L, 1);
+        insertSku(jdbc, 9300L, 9000L, 0L);
+        insertSku(jdbc, 9301L, 9000L, 1L);
+        insertSku(jdbc, 9302L, 9000L, 2L);
+
+        assertThat(skuMapper.selectAvailableByIds(List.of(9300L, 9301L, 9302L)))
+                .extracting(row -> row.getId()).containsExactly(9300L, 9301L);
     }
 
     @Test

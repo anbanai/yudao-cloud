@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.service.sku;
 
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.dal.mysql.sku.ProductSkuMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -27,10 +28,12 @@ public class ProductSkuHotspotUpdateService {
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public int updateStock(Long id, Integer incrCount) {
         if (incrCount > 0) {
-            return productSkuMapper.updateStockIncrHotspot(id, incrCount);
+            return productSkuMapper.updateStockIncrHotspot(id, incrCount,
+                    TenantContextHolder.getRequiredTenantId());
         }
         if (incrCount < 0) {
-            return productSkuMapper.updateStockDecrHotspot(id, -incrCount);
+            return productSkuMapper.updateStockDecrHotspot(id, -incrCount,
+                    TenantContextHolder.getRequiredTenantId());
         }
         return 0;
     }

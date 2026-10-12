@@ -142,12 +142,11 @@ public class CartServiceImpl implements CartService {
         }
 
         // 查询 SPU、SKU 列表
-        List<ProductSpuRespDTO> spus = productSpuApi.getSpuList(convertSet(carts, CartDO::getSpuId)).getCheckedData();
-        List<ProductSkuRespDTO> skus = productSkuApi.getSkuList(convertSet(carts, CartDO::getSkuId)).getCheckedData();
+        List<ProductSpuRespDTO> spus = productSpuApi.getAvailableSpuList(convertSet(carts, CartDO::getSpuId)).getCheckedData();
+        List<ProductSkuRespDTO> skus = productSkuApi.getAvailableSkuList(convertSet(carts, CartDO::getSkuId)).getCheckedData();
 
-        // 如果 SPU 被删除，则删除购物车对应的商品。延迟删除
-        // 为什么不是 SKU 被删除呢？因为 SKU 被删除时，还可以通过 SPU 选择其它 SKU
-        deleteCartIfSpuDeleted(carts, spus);
+        // 商品下架、商家冻结、租户不可见或 SKU 删除时，延迟删除购物车项。
+        deleteCartIfUnavailable(carts, spus, skus);
 
         // 拼接数据
         return TradeCartConvert.INSTANCE.convertList(carts, spus, skus);
@@ -161,10 +160,12 @@ public class CartServiceImpl implements CartService {
         return cartMapper.selectListByUserId(userId, ids);
     }
 
-    private void deleteCartIfSpuDeleted(List<CartDO> carts, List<ProductSpuRespDTO> spus) {
-        // 如果 SPU 被删除，则删除购物车对应的商品。延迟删除
+    private void deleteCartIfUnavailable(List<CartDO> carts, List<ProductSpuRespDTO> spus,
+                                        List<ProductSkuRespDTO> skus) {
         carts.removeIf(cart -> {
-            if (spus.stream().noneMatch(spu -> spu.getId().equals(cart.getSpuId()))) {
+            boolean spuMissing = spus.stream().noneMatch(spu -> spu.getId().equals(cart.getSpuId()));
+            boolean skuMissing = skus.stream().noneMatch(sku -> sku.getId().equals(cart.getSkuId()));
+            if (spuMissing || skuMissing) {
                 cartMapper.deleteById(cart.getId());
                 return true;
             }

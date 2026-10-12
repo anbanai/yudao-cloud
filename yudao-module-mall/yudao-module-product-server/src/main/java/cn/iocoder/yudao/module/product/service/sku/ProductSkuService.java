@@ -47,6 +47,11 @@ public interface ProductSkuService {
     List<ProductSkuDO> getSkuList(Collection<Long> ids);
 
     /**
+     * 获得交易链路可用的 SKU，只包含平台全局租户和当前租户数据。
+     */
+    List<ProductSkuDO> getAvailableSkuList(Collection<Long> ids);
+
+    /**
      * 对 sku 的组合的属性等进行合法性校验
      *
      * @param list sku组合的集合
@@ -87,6 +92,8 @@ public interface ProductSkuService {
     List<ProductSkuDO> getSkuListBySpuId(Long spuId);
 
     List<ProductSkuDO> getAvailableSkuListBySpuId(Long spuId);
+
+    List<ProductSkuDO> getAvailableSkuListBySpuId(Collection<Long> spuIds);
 
     /**
      * 获得 spu 对应的 SKU 集合

@@ -195,7 +195,7 @@ public class RewardActivityServiceImpl implements RewardActivityService {
     @Override
     public List<RewardActivityMatchRespDTO> getMatchRewardActivityListBySpuIds(Collection<Long> spuIds) {
         // 1. 查询商品分类
-        List<ProductSpuRespDTO> spuList = productSpuApi.getSpuList(spuIds).getCheckedData();
+        List<ProductSpuRespDTO> spuList = productSpuApi.getAvailableSpuList(spuIds).getCheckedData();
         if (CollUtil.isEmpty(spuList)) {
             return Collections.emptyList();
         }
