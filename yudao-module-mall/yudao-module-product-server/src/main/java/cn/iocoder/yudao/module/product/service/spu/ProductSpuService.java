@@ -74,6 +74,11 @@ public interface ProductSpuService {
     List<ProductSpuDO> getAvailableSpuList(Collection<Long> ids);
 
     /**
+     * 获得商城详情使用的可售商品。
+     */
+    ProductSpuDO getAvailableSpu(Long id);
+
+    /**
      * 获得商品 SPU Map
      *
      * @param ids 编号数组

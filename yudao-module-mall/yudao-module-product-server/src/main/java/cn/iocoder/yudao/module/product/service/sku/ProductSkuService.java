@@ -86,6 +86,8 @@ public interface ProductSkuService {
      */
     List<ProductSkuDO> getSkuListBySpuId(Long spuId);
 
+    List<ProductSkuDO> getAvailableSkuListBySpuId(Long spuId);
+
     /**
      * 获得 spu 对应的 SKU 集合
      *

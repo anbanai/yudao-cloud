@@ -324,6 +324,11 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     }
 
     @Override
+    public ProductSpuDO getAvailableSpu(Long id) {
+        return productSpuMapper.selectAvailableById(id);
+    }
+
+    @Override
     public List<ProductSpuDO> getSpuListByStatus(Integer status) {
         return productSpuMapper.selectList(ProductSpuDO::getStatus, status);
     }

@@ -10,7 +10,6 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageRe
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuRespVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
-import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
@@ -97,16 +96,12 @@ public class AppProductSpuController {
     @PermitAll
     public CommonResult<AppProductSpuDetailRespVO> getSpuDetail(@RequestParam("id") Long id) {
         // 获得商品 SPU
-        ProductSpuDO spu = productSpuService.getSpu(id);
+        ProductSpuDO spu = productSpuService.getAvailableSpu(id);
         if (spu == null) {
             throw exception(SPU_NOT_EXISTS);
         }
-        if (!ProductSpuStatusEnum.isEnable(spu.getStatus())) {
-            throw exception(SPU_NOT_ENABLE, spu.getName());
-        }
-        productSpuService.validateSpuList(Set.of(id));
         // 获得商品 SKU
-        List<ProductSkuDO> skus = productSkuService.getSkuListBySpuId(spu.getId());
+        List<ProductSkuDO> skus = productSkuService.getAvailableSkuListBySpuId(spu.getId());
 
         // 增加浏览量
         productSpuService.updateBrowseCount(id, 1);

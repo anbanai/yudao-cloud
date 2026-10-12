@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantDatabaseInterceptor;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
+import cn.iocoder.yudao.module.product.dal.mysql.sku.ProductSkuMapper;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import jakarta.annotation.Resource;
@@ -28,6 +29,8 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
 
     @Resource
     private ProductSpuMapper spuMapper;
+    @Resource
+    private ProductSkuMapper skuMapper;
     @Resource
     private DataSource dataSource;
 
@@ -114,6 +117,36 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
                 .extracting(row -> row.getId()).containsExactly(8001L, 8000L);
     }
 
+    @Test
+    void testSelectAvailableById_includesGlobalProductForDetail() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        insertMerchant(jdbc, 900L, 20, false, 0L);
+        insertSpu(jdbc, 9000L, 900L, 0L, 1);
+
+        assertThat(spuMapper.selectAvailableById(9000L)).extracting(row -> row.getId()).isEqualTo(9000L);
+    }
+
+    @Test
+    void testSelectAvailableSkuListBySpuId_includesGlobalSkuForDetail() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        insertSku(jdbc, 9100L, 9000L, 0L);
+
+        assertThat(skuMapper.selectAvailableListBySpuId(9000L))
+                .extracting(row -> row.getId()).containsExactly(9100L);
+    }
+
+    @Test
+    void testUpdateBrowseCount_updatesGlobalProduct() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        insertMerchant(jdbc, 920L, 20, false, 0L);
+        insertSpu(jdbc, 9200L, 920L, 0L, 1);
+
+        spuMapper.updateBrowseCount(9200L, 1);
+
+        assertThat(jdbc.queryForObject("SELECT browse_count FROM product_spu WHERE id = ?", Integer.class, 9200L))
+                .isEqualTo(1);
+    }
+
     private void insertMerchant(JdbcTemplate jdbc, Long id, Integer status, boolean deleted) {
         insertMerchant(jdbc, id, status, deleted, 1L);
     }
@@ -134,5 +167,13 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
                         + "recommend_good, give_integral, sub_commission_type, tenant_id) "
                         + "VALUES (?, ?, '', '', '', '', 1, ?, '', 0, 0, ?, FALSE, 100, 100, 100, 1, 1, FALSE, FALSE, "
                         + "FALSE, FALSE, FALSE, 0, FALSE, ?)", id, "spu-" + id, merchantId, status, tenantId);
+    }
+
+    private void insertSku(JdbcTemplate jdbc, Long id, Long spuId, Long tenantId) {
+        jdbc.update("INSERT INTO product_sku (id, spu_id, properties, price, market_price, cost_price, bar_code, "
+                        + "pic_url, stock, weight, volume, first_brokerage_price, "
+                        + "second_brokerage_price, sales_count, tenant_id) "
+                        + "VALUES (?, ?, '[]', 100, 120, 80, '', '', 10, 0, 0, 0, 0, 0, ?)",
+                id, spuId, tenantId);
     }
 }

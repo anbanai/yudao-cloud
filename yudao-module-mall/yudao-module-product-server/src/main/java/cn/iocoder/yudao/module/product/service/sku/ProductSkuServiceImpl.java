@@ -155,6 +155,11 @@ public class ProductSkuServiceImpl implements ProductSkuService {
     }
 
     @Override
+    public List<ProductSkuDO> getAvailableSkuListBySpuId(Long spuId) {
+        return productSkuMapper.selectAvailableListBySpuId(spuId);
+    }
+
+    @Override
     public List<ProductSkuDO> getSkuListBySpuId(Collection<Long> spuIds) {
         if (CollUtil.isEmpty(spuIds)) {
             return Collections.emptyList();

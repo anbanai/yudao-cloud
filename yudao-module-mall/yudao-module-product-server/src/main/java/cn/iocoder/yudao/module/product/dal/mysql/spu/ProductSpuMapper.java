@@ -108,6 +108,14 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         });
     }
 
+    /**
+     * 查询商城详情使用的商品，显式允许平台全局租户和当前租户。
+     */
+    default ProductSpuDO selectAvailableById(Long id) {
+        java.util.List<ProductSpuDO> list = selectAvailableByIds(java.util.Collections.singleton(id));
+        return list.isEmpty() ? null : list.get(0);
+    }
+
     default java.util.List<ProductSpuDO> selectListByStatusAndMerchantId(Integer status, Long merchantId) {
         return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
                 .eq(ProductSpuDO::getStatus, status)
@@ -235,10 +243,13 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
      * @param incrCount 增加的数量
      */
     default void updateBrowseCount(Long id, int incrCount) {
-        LambdaUpdateWrapper<ProductSpuDO> updateWrapper = new LambdaUpdateWrapper<ProductSpuDO>()
-                .setSql(" browse_count = browse_count +" + incrCount)
-                .eq(ProductSpuDO::getId, id);
-        update(null, updateWrapper);
+        TenantUtils.executeIgnore(() -> {
+            LambdaUpdateWrapper<ProductSpuDO> updateWrapper = new LambdaUpdateWrapper<ProductSpuDO>()
+                    .setSql(" browse_count = browse_count +" + incrCount)
+                    .eq(ProductSpuDO::getId, id)
+                    .apply("product_spu.tenant_id IN (0, {0})", TenantContextHolder.getRequiredTenantId());
+            update(null, updateWrapper);
+        });
     }
 
 }

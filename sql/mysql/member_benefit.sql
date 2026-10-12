@@ -13,12 +13,15 @@ PREPARE member_level_multiplier_stmt FROM @member_level_multiplier_sql;
 EXECUTE member_level_multiplier_stmt;
 DEALLOCATE PREPARE member_level_multiplier_stmt;
 
-SET @member_level_seed_sql := IF(@member_level_multiplier_exists = 0,
-    'UPDATE member_level SET point_trade_give_multiplier = CASE level WHEN 1 THEN 1000 WHEN 2 THEN 1200 WHEN 3 THEN 1500 WHEN 4 THEN 2000 WHEN 5 THEN 2000 END WHERE level BETWEEN 1 AND 5',
-    'SELECT 1');
-PREPARE member_level_seed_stmt FROM @member_level_seed_sql;
-EXECUTE member_level_seed_stmt;
-DEALLOCATE PREPARE member_level_seed_stmt;
+-- Seed missing/default values on every run. This also recovers if the ALTER succeeded
+-- but a later statement failed before the first run completed, while preserving
+-- operator-customized non-default multipliers.
+UPDATE member_level
+SET point_trade_give_multiplier = CASE level
+    WHEN 1 THEN 1000 WHEN 2 THEN 1200 WHEN 3 THEN 1500 WHEN 4 THEN 2000 WHEN 5 THEN 2000 END
+WHERE level BETWEEN 1 AND 5
+  AND (point_trade_give_multiplier IS NULL
+    OR (point_trade_give_multiplier = 1000 AND level BETWEEN 2 AND 5));
 
 -- Existing installations may have their own experience thresholds. Preserve them;
 -- only add missing levels with ascending defaults that operators can adjust.
@@ -34,10 +37,6 @@ FROM (
 ) seed CROSS JOIN system_tenant tenant
 WHERE tenant.deleted = b'0'
   AND NOT EXISTS (SELECT 1 FROM member_level l WHERE l.tenant_id = tenant.id AND l.level = seed.level);
-
-UPDATE member_level SET point_trade_give_multiplier = CASE level
-    WHEN 1 THEN 1000 WHEN 2 THEN 1200 WHEN 3 THEN 1500 WHEN 4 THEN 2000 WHEN 5 THEN 2000 END
-WHERE level BETWEEN 1 AND 5 AND @member_level_multiplier_exists = 0;
 
 INSERT INTO system_menu (name, permission, type, sort, parent_id, path, icon, component,
                          component_name, status, visible, keep_alive, always_show)

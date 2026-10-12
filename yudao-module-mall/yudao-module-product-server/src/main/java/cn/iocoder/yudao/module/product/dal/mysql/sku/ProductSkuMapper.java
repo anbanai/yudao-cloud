@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.product.dal.mysql.sku;
 import cn.hutool.core.lang.Assert;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
@@ -26,6 +28,12 @@ public interface ProductSkuMapper extends BaseMapperX<ProductSkuDO> {
 
     default List<ProductSkuDO> selectListBySpuId(Long spuId) {
         return selectList(ProductSkuDO::getSpuId, spuId);
+    }
+
+    default List<ProductSkuDO> selectAvailableListBySpuId(Long spuId) {
+        return TenantUtils.executeIgnore(() -> selectList(new LambdaQueryWrapperX<ProductSkuDO>()
+                .eq(ProductSkuDO::getSpuId, spuId)
+                .apply("product_sku.tenant_id IN (0, {0})", TenantContextHolder.getRequiredTenantId())));
     }
 
     default List<ProductSkuDO> selectListBySpuId(Collection<Long> spuIds) {
