@@ -9799,6 +9799,76 @@ JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
                                       AND d.`merchant_id` = s.`merchant_id`
 SET i.`sub_order_id` = d.`keep_id`
 WHERE s.`id` <> d.`keep_id`;
+
+-- 重定向其它已知引用，避免清理重复子单时破坏物流和资金历史。
+SET @repoint_trade_logistics_waybill = IF(
+    (SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'trade_logistics_waybill') = 1
+    AND (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'trade_logistics_waybill'
+           AND column_name = 'sub_order_id') = 1,
+    'UPDATE `trade_logistics_waybill` w
+     JOIN `trade_order_sub` s ON s.`id` = w.`sub_order_id`
+     JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
+                                           AND d.`merchant_id` = s.`merchant_id`
+     SET w.`sub_order_id` = d.`keep_id`
+     WHERE s.`id` <> d.`keep_id`',
+    'SELECT 1');
+PREPARE repoint_trade_logistics_waybill_stmt FROM @repoint_trade_logistics_waybill;
+EXECUTE repoint_trade_logistics_waybill_stmt;
+DEALLOCATE PREPARE repoint_trade_logistics_waybill_stmt;
+
+SET @repoint_pay_fund_order = IF(
+    (SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'pay_fund_order') = 1
+    AND (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'pay_fund_order'
+           AND column_name = 'trade_order_sub_id') = 1,
+    'UPDATE `pay_fund_order` p
+     JOIN `trade_order_sub` s ON s.`id` = p.`trade_order_sub_id`
+     JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
+                                           AND d.`merchant_id` = s.`merchant_id`
+     SET p.`trade_order_sub_id` = d.`keep_id`
+     WHERE s.`id` <> d.`keep_id`',
+    'SELECT 1');
+PREPARE repoint_pay_fund_order_stmt FROM @repoint_pay_fund_order;
+EXECUTE repoint_pay_fund_order_stmt;
+DEALLOCATE PREPARE repoint_pay_fund_order_stmt;
+
+SET @repoint_pay_fund_detail = IF(
+    (SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'pay_fund_detail') = 1
+    AND (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'pay_fund_detail'
+           AND column_name = 'trade_order_sub_id') = 1,
+    'UPDATE `pay_fund_detail` p
+     JOIN `trade_order_sub` s ON s.`id` = p.`trade_order_sub_id`
+     JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
+                                           AND d.`merchant_id` = s.`merchant_id`
+     SET p.`trade_order_sub_id` = d.`keep_id`
+     WHERE s.`id` <> d.`keep_id`',
+    'SELECT 1');
+PREPARE repoint_pay_fund_detail_stmt FROM @repoint_pay_fund_detail;
+EXECUTE repoint_pay_fund_detail_stmt;
+DEALLOCATE PREPARE repoint_pay_fund_detail_stmt;
+
+SET @repoint_pay_divide_request = IF(
+    (SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'pay_divide_request') = 1
+    AND (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'pay_divide_request'
+           AND column_name = 'trade_order_sub_id') = 1,
+    'UPDATE `pay_divide_request` p
+     JOIN `trade_order_sub` s ON s.`id` = p.`trade_order_sub_id`
+     JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
+                                           AND d.`merchant_id` = s.`merchant_id`
+     SET p.`trade_order_sub_id` = d.`keep_id`
+     WHERE s.`id` <> d.`keep_id`',
+    'SELECT 1');
+PREPARE repoint_pay_divide_request_stmt FROM @repoint_pay_divide_request;
+EXECUTE repoint_pay_divide_request_stmt;
+DEALLOCATE PREPARE repoint_pay_divide_request_stmt;
+
 DELETE s FROM `trade_order_sub` s
 JOIN `tmp_trade_order_sub_duplicate` d ON d.`order_id` = s.`order_id`
                                       AND d.`merchant_id` = s.`merchant_id`
@@ -10310,7 +10380,14 @@ ALTER TABLE `trade_order_item`
 UPDATE `product_merchant_data_quality_issue`
 SET `status` = 1, `last_seen` = NOW()
 WHERE `status` = 0 AND `issue_type` IN ('PRODUCT_WITHOUT_MERCHANT', 'BRAND_WITHOUT_MERCHANT',
-    'ORDER_ITEM_MERCHANT_SNAPSHOT', 'MISSING_SUB_ORDER', 'DUPLICATE_SUB_ORDER');
+    'ORDER_ITEM_MERCHANT_SNAPSHOT', 'DUPLICATE_SUB_ORDER');
+
+UPDATE `product_merchant_data_quality_issue` q
+JOIN `trade_order_item` i ON i.`id` = q.`record_id`
+JOIN `trade_order_sub` s ON s.`id` = i.`sub_order_id`
+SET q.`status` = 1, q.`last_seen` = NOW()
+WHERE q.`status` = 0 AND q.`issue_type` = 'MISSING_SUB_ORDER'
+  AND q.`table_name` = 'trade_order_item';
 
 -- 支付表按可选模块安装；若存在，则只登记缺失快照，不篡改历史资金记录。
 DROP PROCEDURE IF EXISTS `tmp_audit_merchant_payment_snapshot`;
