@@ -73,6 +73,9 @@ public class AppPointActivityController {
                 || ObjUtil.equal(activity.getStatus(), CommonStatusEnum.DISABLE.getStatus())) {
             return success(null);
         }
+        if (productSpuApi.getAvailableSpuList(Collections.singletonList(activity.getSpuId())).getCheckedData().isEmpty()) {
+            return success(null);
+        }
 
         // 2. 拼接数据
         List<PointProductDO> products = pointActivityService.getPointProductListByActivityIds(Collections.singletonList(id));
@@ -104,9 +107,10 @@ public class AppPointActivityController {
         List<PointProductDO> products = pointActivityService.getPointProductListByActivityIds(
                 convertSet(activityList, PointActivityDO::getId));
         Map<Long, List<PointProductDO>> productsMap = convertMultiMap(products, PointProductDO::getActivityId);
-        Map<Long, ProductSpuRespDTO> spuMap = productSpuApi.getSpuMap(
-                convertSet(activityList, PointActivityDO::getSpuId));
+        Map<Long, ProductSpuRespDTO> spuMap = convertMap(productSpuApi.getAvailableSpuList(
+                convertSet(activityList, PointActivityDO::getSpuId)).getCheckedData(), ProductSpuRespDTO::getId);
         List<AppPointActivityRespVO> result = BeanUtils.toBean(activityList, AppPointActivityRespVO.class);
+        result.removeIf(activity -> !spuMap.containsKey(activity.getSpuId()));
         result.forEach(activity -> {
             // 设置 product 信息
             PointProductDO minProduct = getMinObject(productsMap.get(activity.getId()), PointProductDO::getPoint);

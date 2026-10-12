@@ -61,7 +61,7 @@ public interface BargainRecordConvert {
             MapUtils.findAndThen(activityMap, record.getActivityId(),
                     activity -> record.setActivityName(activity.getName()).setEndTime(activity.getEndTime()));
             MapUtils.findAndThen(spuMap, record.getSpuId(),
-                    spu -> record.setPicUrl(record.getPicUrl()));
+                    spu -> record.setPicUrl(spu.getPicUrl()));
             MapUtils.findAndThen(orderMap, record.getOrderId(),
                     order -> record.setPayStatus(order.getPayStatus()).setPayOrderId(order.getPayOrderId()));
         });

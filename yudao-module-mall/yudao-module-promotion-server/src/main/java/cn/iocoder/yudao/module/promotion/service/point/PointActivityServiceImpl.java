@@ -297,6 +297,13 @@ public class PointActivityServiceImpl implements PointActivityService {
         if (product == null) {
             throw exception(POINT_ACTIVITY_JOIN_ACTIVITY_PRODUCT_NOT_EXISTS);
         }
+        ProductSkuRespDTO sku = productSkuApi.getAvailableSkuList(singletonList(skuId)).getCheckedData().stream()
+                .filter(item -> ObjectUtil.equal(item.getId(), skuId)
+                        && ObjectUtil.equal(item.getSpuId(), activity.getSpuId()))
+                .findFirst().orElse(null);
+        if (sku == null) {
+            throw exception(POINT_ACTIVITY_JOIN_ACTIVITY_PRODUCT_NOT_EXISTS);
+        }
         // 2.2 超过单次购买限制
         if (count > product.getCount()) {
             throw exception(POINT_ACTIVITY_JOIN_ACTIVITY_SINGLE_LIMIT_COUNT_EXCEED);

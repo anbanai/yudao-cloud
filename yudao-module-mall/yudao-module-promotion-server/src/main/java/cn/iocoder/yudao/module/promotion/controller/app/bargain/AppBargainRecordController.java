@@ -146,7 +146,7 @@ public class AppBargainRecordController {
         // 拼接数据
         List<BargainActivityDO> activityList = bargainActivityService.getBargainActivityList(
                 convertSet(pageResult.getList(), BargainRecordDO::getActivityId));
-        List<ProductSpuRespDTO> spuList = productSpuApi.getSpuList(
+        List<ProductSpuRespDTO> spuList = productSpuApi.getAvailableSpuList(
                 convertSet(pageResult.getList(), BargainRecordDO::getSpuId)).getCheckedData();
         List<TradeOrderRespDTO> orderList = tradeOrderApi.getOrderList(
                 convertSet(pageResult.getList(), BargainRecordDO::getOrderId)).getCheckedData();

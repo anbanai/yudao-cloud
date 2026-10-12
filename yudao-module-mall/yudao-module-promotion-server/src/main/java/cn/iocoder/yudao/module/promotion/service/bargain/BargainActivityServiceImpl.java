@@ -180,6 +180,12 @@ public class BargainActivityServiceImpl implements BargainActivityService {
         if (!LocalDateTimeUtils.isBetween(activity.getStartTime(), activity.getEndTime())) {
             throw exception(BARGAIN_ACTIVITY_TIME_END);
         }
+        if (productSpuApi.getAvailableSpuList(singletonList(activity.getSpuId())).getCheckedData().isEmpty()
+                || productSkuApi.getAvailableSkuList(singletonList(activity.getSkuId())).getCheckedData().stream()
+                .noneMatch(sku -> ObjectUtil.equal(sku.getId(), activity.getSkuId())
+                        && ObjectUtil.equal(sku.getSpuId(), activity.getSpuId()))) {
+            throw exception(BARGAIN_ACTIVITY_PRODUCT_NOT_EXISTS);
+        }
         return activity;
     }
 

@@ -101,6 +101,7 @@ public interface ErrorCodeConstants {
     ErrorCode BARGAIN_ACTIVITY_STOCK_NOT_ENOUGH = new ErrorCode(1_013_012_004, "砍价活动库存不足");
     ErrorCode BARGAIN_ACTIVITY_STATUS_CLOSED = new ErrorCode(1_013_012_005, "砍价活动已关闭");
     ErrorCode BARGAIN_ACTIVITY_TIME_END = new ErrorCode(1_013_012_006, "砍价活动已经结束");
+    ErrorCode BARGAIN_ACTIVITY_PRODUCT_NOT_EXISTS = new ErrorCode(1_013_012_007, "砍价失败，原因：商品不存在");
 
     // ========== 砍价记录 1-013-013-000 ==========
     ErrorCode BARGAIN_RECORD_NOT_EXISTS = new ErrorCode(1_013_013_000, "砍价记录不存在");

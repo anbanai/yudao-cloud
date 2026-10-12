@@ -326,6 +326,14 @@ public class SeckillActivityServiceImpl implements SeckillActivityService {
         if (product == null) {
             throw exception(SECKILL_JOIN_ACTIVITY_PRODUCT_NOT_EXISTS);
         }
+        ProductSkuRespDTO sku = productSkuApi.getAvailableSkuList(singletonList(skuId)).getCheckedData().stream()
+                .filter(item -> ObjectUtil.equal(item.getId(), skuId)
+                        && ObjectUtil.equal(item.getSpuId(), activity.getSpuId())
+                        && ObjectUtil.equal(product.getSpuId(), activity.getSpuId()))
+                .findFirst().orElse(null);
+        if (sku == null) {
+            throw exception(SECKILL_JOIN_ACTIVITY_PRODUCT_NOT_EXISTS);
+        }
         // 2.2 校验库存是否充足
         if (count > product.getStock()) {
             throw exception(SECKILL_ACTIVITY_UPDATE_STOCK_FAIL);

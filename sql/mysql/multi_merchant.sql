@@ -682,6 +682,18 @@ WHERE i.`merchant_id` IS NULL OR i.`merchant_name` IS NULL OR m.`id` IS NULL OR 
 
 INSERT IGNORE INTO `product_merchant_data_quality_issue`
     (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
+SELECT CONCAT('trade_order_item:merchant-mismatch:', i.`id`), 'ORDER_ITEM_MERCHANT_MISMATCH',
+       'trade_order_item', i.`id`, '订单项商家历史快照与当前商品商家不一致，保留历史快照待人工核对', i.`tenant_id`
+FROM `trade_order_item` i
+JOIN `product_spu` s ON s.`id` = i.`spu_id`
+JOIN `product_merchant` m ON m.`id` = s.`merchant_id` AND m.`deleted` = b'0'
+    AND (m.`tenant_id` = 0 OR m.`tenant_id` = i.`tenant_id`)
+JOIN `product_merchant` im ON im.`id` = i.`merchant_id` AND im.`deleted` = b'0'
+    AND (im.`tenant_id` = 0 OR im.`tenant_id` = i.`tenant_id`)
+WHERE i.`merchant_id` <> s.`merchant_id`;
+
+INSERT IGNORE INTO `product_merchant_data_quality_issue`
+    (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
 SELECT CONCAT('trade_order_item:sub_order:', i.`id`), 'MISSING_SUB_ORDER', 'trade_order_item', i.`id`,
        '订单项缺少商家子订单关联', i.`tenant_id`
 FROM `trade_order_item` i
@@ -711,7 +723,8 @@ SELECT CONCAT('promotion_combination_product:', p.`id`), 'PROMOTION_INVALID_PROD
 FROM `promotion_combination_product` p
 LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
 LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
-WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`
+    OR s.`tenant_id` <> p.`tenant_id` OR k.`tenant_id` <> p.`tenant_id` OR s.`tenant_id` <> k.`tenant_id`);
 
 INSERT IGNORE INTO `product_merchant_data_quality_issue`
     (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
@@ -720,7 +733,8 @@ SELECT CONCAT('promotion_discount_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT
 FROM `promotion_discount_product` p
 LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
 LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
-WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`
+    OR s.`tenant_id` <> p.`tenant_id` OR k.`tenant_id` <> p.`tenant_id` OR s.`tenant_id` <> k.`tenant_id`);
 
 INSERT IGNORE INTO `product_merchant_data_quality_issue`
     (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
@@ -729,7 +743,8 @@ SELECT CONCAT('promotion_point_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT',
 FROM `promotion_point_product` p
 LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
 LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
-WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`
+    OR s.`tenant_id` <> p.`tenant_id` OR k.`tenant_id` <> p.`tenant_id` OR s.`tenant_id` <> k.`tenant_id`);
 
 INSERT IGNORE INTO `product_merchant_data_quality_issue`
     (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
@@ -738,7 +753,8 @@ SELECT CONCAT('promotion_seckill_product:', p.`id`), 'PROMOTION_INVALID_PRODUCT'
 FROM `promotion_seckill_product` p
 LEFT JOIN `product_spu` s ON s.`id` = p.`spu_id` AND s.`deleted` = b'0'
 LEFT JOIN `product_sku` k ON k.`id` = p.`sku_id` AND k.`deleted` = b'0'
-WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`);
+WHERE p.`deleted` = b'0' AND (s.`id` IS NULL OR k.`id` IS NULL OR k.`spu_id` <> p.`spu_id`
+    OR s.`tenant_id` <> p.`tenant_id` OR k.`tenant_id` <> p.`tenant_id` OR s.`tenant_id` <> k.`tenant_id`);
 
 INSERT IGNORE INTO `product_merchant_data_quality_issue`
     (`issue_key`, `issue_type`, `table_name`, `record_id`, `detail`, `tenant_id`)
@@ -768,15 +784,18 @@ LEFT JOIN `product_merchant` m ON m.`id` = s.`merchant_id` AND m.`deleted` = b'0
     AND (m.`tenant_id` = 0 OR m.`tenant_id` = i.`tenant_id`)
 LEFT JOIN `product_merchant` im ON im.`id` = i.`merchant_id` AND im.`deleted` = b'0'
     AND (im.`tenant_id` = 0 OR im.`tenant_id` = i.`tenant_id`)
-SET i.`merchant_id` = COALESCE(im.`id`, m.`id`, @platform_merchant_id),
-    i.`merchant_name` = COALESCE(NULLIF(i.`merchant_name`, ''), im.`store_name`, im.`name`,
-        m.`store_name`, m.`name`, '平台自营商家')
+SET i.`merchant_id` = COALESCE(m.`id`, im.`id`, @platform_merchant_id),
+    i.`merchant_name` = COALESCE(NULLIF(i.`merchant_name`, ''), m.`store_name`, m.`name`,
+        im.`store_name`, im.`name`, '平台自营商家')
 WHERE i.`merchant_id` IS NULL OR i.`merchant_name` IS NULL OR m.`id` IS NULL OR im.`id` IS NULL;
 
 UPDATE `trade_order_item` i
-JOIN `trade_order_sub` s ON s.`order_id` = i.`order_id` AND s.`merchant_id` = i.`merchant_id`
-SET i.`sub_order_id` = s.`id`
-WHERE i.`sub_order_id` IS NULL;
+LEFT JOIN `trade_order_sub` current_sub ON current_sub.`id` = i.`sub_order_id`
+LEFT JOIN `trade_order_sub` target_sub ON target_sub.`order_id` = i.`order_id`
+    AND target_sub.`merchant_id` = i.`merchant_id`
+SET i.`sub_order_id` = target_sub.`id`
+WHERE i.`sub_order_id` IS NULL OR current_sub.`id` IS NULL
+   OR current_sub.`merchant_id` <> i.`merchant_id`;
 
 UPDATE `trade_order_sub` s
 JOIN `product_merchant` m ON m.`id` = s.`merchant_id`
