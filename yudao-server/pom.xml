@@ -21,6 +21,12 @@
     <url>https://github.com/YunaiV/ruoyi-vue-pro</url>
 
     <dependencies>
+        <!-- 监控与 Kubernetes 健康探针 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>cn.iocoder.cloud</groupId>
             <artifactId>yudao-module-system-server</artifactId>

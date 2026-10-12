@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `product_merchant_pay_onboarding` (
     `materials_version` int NOT NULL DEFAULT 0,
     `attempt_count` int NOT NULL DEFAULT 0,
     `request_accepted` bit NOT NULL DEFAULT b'0',
-    `next_retry_time` timestamp DEFAULT NULL,
+    `next_retry_time` datetime DEFAULT NULL,
     `last_error` varchar(128) DEFAULT NULL,
     `onboarding_status` int DEFAULT NULL,
     `sign_url` mediumtext DEFAULT NULL,

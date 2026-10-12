@@ -5,9 +5,13 @@ import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantPayOnboar
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.sql.SQLException;
+import java.util.List;
 
 /** 自动恢复各租户的待发送/待轮询入网任务，不依赖审批后的内存回调。 */
 @Component
@@ -19,13 +23,12 @@ public class ProductMerchantPayOnboardingJob {
     private JdbcTemplate jdbcTemplate;
     @Resource
     private ProductMerchantPayOnboardingService onboardingService;
+    private volatile boolean schemaWarningLogged;
 
     @Scheduled(fixedDelayString = "${yudao.product.merchant-pay.scheduler-delay-millis:30000}")
     public void execute() {
         // 只从全局队列读取租户编号，实际任务和 RPC 均在对应租户上下文执行。
-        for (Long tenantId : jdbcTemplate.queryForList("SELECT DISTINCT tenant_id FROM product_merchant_pay_onboarding"
-                + " WHERE deleted = 0 AND state IN ('READY','RETRY','SUBMITTED','ACTION_REQUIRED')"
-                + " AND next_retry_time <= CURRENT_TIMESTAMP", Long.class)) {
+        for (Long tenantId : queryDueTenantIds()) {
             try {
                 TenantUtils.execute(tenantId, () -> onboardingService.processPending());
             } catch (RuntimeException ex) {
@@ -33,5 +36,34 @@ public class ProductMerchantPayOnboardingJob {
                 log.warn("[merchantPayOnboarding][tenant({}) 入网任务处理失败，等待下一轮恢复]", tenantId);
             }
         }
+    }
+
+    private List<Long> queryDueTenantIds() {
+        try {
+            List<Long> tenantIds = jdbcTemplate.queryForList("SELECT DISTINCT tenant_id FROM product_merchant_pay_onboarding"
+                    + " WHERE deleted = 0 AND state IN ('READY','RETRY','SUBMITTED','ACTION_REQUIRED')"
+                    + " AND next_retry_time <= CURRENT_TIMESTAMP", Long.class);
+            schemaWarningLogged = false;
+            return tenantIds;
+        } catch (BadSqlGrammarException ex) {
+            if (!isMissingOnboardingTable(ex)) {
+                throw ex;
+            }
+            if (!schemaWarningLogged) {
+                log.warn("[merchantPayOnboarding][缺少 product_merchant_pay_onboarding 表，已跳过本轮任务；请执行 sql/mysql/yeepay_merchant_onboarding.sql]");
+                schemaWarningLogged = true;
+            }
+            return List.of();
+        }
+    }
+
+    private boolean isMissingOnboardingTable(Throwable throwable) {
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sqlException
+                    && (sqlException.getErrorCode() == 1146 || "42S02".equals(sqlException.getSQLState()))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
