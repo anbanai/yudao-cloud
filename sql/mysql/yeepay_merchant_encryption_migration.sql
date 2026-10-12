@@ -24,27 +24,77 @@ ALTER TABLE product_merchant
 ALTER TABLE product_merchant_qualification
     MODIFY certificate_no varchar(2048) DEFAULT NULL,
     MODIFY file_url text NOT NULL;
--- 唯一版本记录保证重复执行不会给明文再次添加前缀或重新标记新密文。
-DROP PROCEDURE IF EXISTS migrate_merchant_plaintext_v0;
-DELIMITER $$
-CREATE PROCEDURE migrate_merchant_plaintext_v0()
-BEGIN
-    DECLARE inserted_rows int;
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
-    START TRANSACTION;
-    INSERT IGNORE INTO product_merchant_encryption_migration(migration_id, state)
-        VALUES ('merchant-plaintext-v0-to-aes-v1', 'MARKED');
-    SET inserted_rows = ROW_COUNT();
-    IF inserted_rows = 1 THEN
-        UPDATE product_merchant SET credit_code = CONCAT('PLAIN:v0:', credit_code) WHERE credit_code IS NOT NULL;
-        UPDATE product_merchant SET legal_person = CONCAT('PLAIN:v0:', legal_person) WHERE legal_person IS NOT NULL;
-        UPDATE product_merchant SET contact_name = CONCAT('PLAIN:v0:', contact_name) WHERE contact_name IS NOT NULL;
-        UPDATE product_merchant SET contact_mobile = CONCAT('PLAIN:v0:', contact_mobile) WHERE contact_mobile IS NOT NULL;
-        UPDATE product_merchant_qualification SET certificate_no = CONCAT('PLAIN:v0:', certificate_no) WHERE certificate_no IS NOT NULL;
-        UPDATE product_merchant_qualification SET file_url = CONCAT('PLAIN:v0:', file_url) WHERE file_url IS NOT NULL;
-    END IF;
-    COMMIT;
-END$$
-DELIMITER ;
-CALL migrate_merchant_plaintext_v0();
-DROP PROCEDURE migrate_merchant_plaintext_v0;
+-- 兼容不支持存储过程、客户端脚本分隔指令或一次提交多条语句的 MySQL 兼容执行器：
+-- 下面每个 UPDATE/INSERT 都是独立语句，请按文件顺序逐条执行，不要把整个文件作为一个请求发送。
+-- 迁移前必须停止商户写入并完成备份。账本 INSERT 放在最后，保证中断后可安全重跑未完成的步骤。
+-- 每个 UPDATE 同时排除已有 PLAIN:v0:/AES:v1: 前缀，并仅在账本不是 ENCRYPTED 时执行；
+-- 不会重复加前缀，旧脚本留下 MARKED 后也可以继续补齐未完成字段。
+-- 已存在无前缀 AES 密文或 AES:v1 密文的部署必须跳过本脚本，不得把密文当作旧明文迁移。
+
+UPDATE product_merchant
+SET credit_code = CONCAT('PLAIN:v0:', credit_code)
+WHERE credit_code IS NOT NULL
+  AND credit_code NOT LIKE 'PLAIN:v0:%'
+  AND credit_code NOT LIKE 'AES:v1:%'
+  AND NOT EXISTS (
+      SELECT 1 FROM product_merchant_encryption_migration
+      WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1' AND state = 'ENCRYPTED'
+  );
+
+UPDATE product_merchant
+SET legal_person = CONCAT('PLAIN:v0:', legal_person)
+WHERE legal_person IS NOT NULL
+  AND legal_person NOT LIKE 'PLAIN:v0:%'
+  AND legal_person NOT LIKE 'AES:v1:%'
+  AND NOT EXISTS (
+      SELECT 1 FROM product_merchant_encryption_migration
+      WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1' AND state = 'ENCRYPTED'
+  );
+
+UPDATE product_merchant
+SET contact_name = CONCAT('PLAIN:v0:', contact_name)
+WHERE contact_name IS NOT NULL
+  AND contact_name NOT LIKE 'PLAIN:v0:%'
+  AND contact_name NOT LIKE 'AES:v1:%'
+  AND NOT EXISTS (
+      SELECT 1 FROM product_merchant_encryption_migration
+      WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1' AND state = 'ENCRYPTED'
+  );
+
+UPDATE product_merchant
+SET contact_mobile = CONCAT('PLAIN:v0:', contact_mobile)
+WHERE contact_mobile IS NOT NULL
+  AND contact_mobile NOT LIKE 'PLAIN:v0:%'
+  AND contact_mobile NOT LIKE 'AES:v1:%'
+  AND NOT EXISTS (
+      SELECT 1 FROM product_merchant_encryption_migration
+      WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1' AND state = 'ENCRYPTED'
+  );
+
+UPDATE product_merchant_qualification
+SET certificate_no = CONCAT('PLAIN:v0:', certificate_no)
+WHERE certificate_no IS NOT NULL
+  AND certificate_no NOT LIKE 'PLAIN:v0:%'
+  AND certificate_no NOT LIKE 'AES:v1:%'
+  AND NOT EXISTS (
+      SELECT 1 FROM product_merchant_encryption_migration
+      WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1' AND state = 'ENCRYPTED'
+  );
+
+UPDATE product_merchant_qualification
+SET file_url = CONCAT('PLAIN:v0:', file_url)
+WHERE file_url IS NOT NULL
+  AND file_url NOT LIKE 'PLAIN:v0:%'
+  AND file_url NOT LIKE 'AES:v1:%'
+  AND NOT EXISTS (
+      SELECT 1 FROM product_merchant_encryption_migration
+      WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1' AND state = 'ENCRYPTED'
+  );
+
+-- 最后写入唯一迁移账本；重复执行时该 INSERT 不会新增记录，前面的 UPDATE 也会因账本存在而跳过。
+INSERT INTO product_merchant_encryption_migration (migration_id, state)
+SELECT 'merchant-plaintext-v0-to-aes-v1', 'MARKED'
+WHERE NOT EXISTS (
+    SELECT 1 FROM product_merchant_encryption_migration
+    WHERE migration_id = 'merchant-plaintext-v0-to-aes-v1'
+);
