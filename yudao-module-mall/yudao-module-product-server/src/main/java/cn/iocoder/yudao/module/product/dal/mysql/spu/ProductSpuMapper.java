@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.type.IntegerListTypeHandler;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
@@ -75,9 +76,14 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
         // 上架状态 且有库存
         query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        // 商品表不是 TenantBaseDO：历史/平台商品可能使用全局租户 0，兼容全局商品与当前租户商品。
+        query.apply("product_spu.tenant_id IN (0, {0})", tenantId);
         // 商家未通过审核、冻结或处于资料复审时，不向商城用户展示其商品。
-        query.inSql(ProductSpuDO::getMerchantId,
-                "SELECT id FROM product_merchant WHERE status = 20 AND deleted = FALSE");
+        // 平台自营商家也可能是全局记录（tenant_id = 0）。
+        query.apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
+                        + "AND status = {1} AND deleted = {2})",
+                tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false);
 
         appendSortQuery(query, pageReqVO.getSortField(), pageReqVO.getSortAsc());
         return selectPage(pageReqVO, query);
@@ -87,10 +93,14 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         if (ids == null || ids.isEmpty()) {
             return java.util.Collections.emptyList();
         }
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
         return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
                 .in(ProductSpuDO::getId, ids)
-                .apply("merchant_id IN (SELECT id FROM product_merchant WHERE status = {0} AND deleted = {1})",
-                        ProductMerchantStatusEnum.APPROVED.getStatus(), false));
+                .eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus())
+                .apply("product_spu.tenant_id IN (0, {0})", tenantId)
+                .apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
+                                + "AND status = {1} AND deleted = {2})",
+                        tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false));
     }
 
     default java.util.List<ProductSpuDO> selectListByStatusAndMerchantId(Integer status, Long merchantId) {

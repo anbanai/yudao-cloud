@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuDetailRespVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuRespVO;
@@ -19,6 +20,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.annotation.security.PermitAll;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -40,6 +44,8 @@ import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_NOT_E
 @RequestMapping("/product/spu")
 @Validated
 public class AppProductSpuController {
+
+    private static final Logger log = LoggerFactory.getLogger(AppProductSpuController.class);
 
     @Resource
     private ProductSpuService productSpuService;
@@ -54,6 +60,12 @@ public class AppProductSpuController {
     @PermitAll
     public CommonResult<List<AppProductSpuRespVO>> getSpuList(@RequestParam("ids") Set<Long> ids) {
         List<ProductSpuDO> list = productSpuService.getAvailableSpuList(ids);
+        if (CollUtil.isNotEmpty(ids) && list.size() < ids.size()) {
+            Set<Long> returnedIds = list.stream().map(ProductSpuDO::getId).collect(Collectors.toSet());
+            Set<Long> missingIds = ids.stream().filter(id -> !returnedIds.contains(id)).collect(Collectors.toSet());
+            log.warn("[getSpuList][商品未返回] tenantId={}, requestedCount={}, returnedCount={}, missingIds={}",
+                    TenantContextHolder.getRequiredTenantId(), ids.size(), list.size(), missingIds);
+        }
         if (CollUtil.isEmpty(list)) {
             return success(Collections.emptyList());
         }
