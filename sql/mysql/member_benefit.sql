@@ -88,6 +88,21 @@ SET @coupon_tenant_index_sql := IF((SELECT COUNT(*) FROM information_schema.STAT
     'ALTER TABLE promotion_coupon ADD UNIQUE KEY uk_coupon_source_biz_tenant (source_biz_id, tenant_id)', 'SELECT 1');
 PREPARE member_coupon_tenant_index_stmt FROM @coupon_tenant_index_sql; EXECUTE member_coupon_tenant_index_stmt; DEALLOCATE PREPARE member_coupon_tenant_index_stmt;
 
+-- Create the table before applying additive changes so a fresh database does not
+-- fail on ALTER TABLE member_level_benefit before reaching this DDL.
+CREATE TABLE IF NOT EXISTS member_level_benefit (
+    id bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+    level_id bigint NOT NULL COMMENT '会员等级', benefit_id bigint NOT NULL COMMENT '权益定义',
+    quantity int NOT NULL DEFAULT 1 COMMENT '额度', period_type tinyint NOT NULL DEFAULT 1 COMMENT '周期：1一次性，2季度，3年度，4生日',
+    claim_type tinyint NOT NULL DEFAULT 0 COMMENT '领取方式：0自动到账，1用户领取', validity_days int NOT NULL DEFAULT 365,
+    birthday_advance_days int NOT NULL DEFAULT 0 COMMENT '生日权益提前发放天数',
+    status tinyint NOT NULL DEFAULT 0, sort int NOT NULL DEFAULT 0,
+    creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (id), UNIQUE KEY uk_level_benefit_tenant (level_id, benefit_id, tenant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员等级权益绑定';
+
 SET @birthday_advance_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'member_level_benefit' AND COLUMN_NAME = 'birthday_advance_days') = 0,
     'ALTER TABLE member_level_benefit ADD COLUMN birthday_advance_days int NOT NULL DEFAULT 0 COMMENT ''生日权益提前发放天数'' AFTER validity_days', 'SELECT 1');
@@ -135,19 +150,6 @@ CREATE TABLE IF NOT EXISTS member_benefit_definition (
     deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (id), UNIQUE KEY uk_code_tenant (code, tenant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员权益定义';
-
-CREATE TABLE IF NOT EXISTS member_level_benefit (
-    id bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
-    level_id bigint NOT NULL COMMENT '会员等级', benefit_id bigint NOT NULL COMMENT '权益定义',
-    quantity int NOT NULL DEFAULT 1 COMMENT '额度', period_type tinyint NOT NULL DEFAULT 1 COMMENT '周期：1一次性，2季度，3年度，4生日',
-    claim_type tinyint NOT NULL DEFAULT 0 COMMENT '领取方式：0自动到账，1用户领取', validity_days int NOT NULL DEFAULT 365,
-    birthday_advance_days int NOT NULL DEFAULT 0 COMMENT '生日权益提前发放天数',
-    status tinyint NOT NULL DEFAULT 0, sort int NOT NULL DEFAULT 0,
-    creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
-    PRIMARY KEY (id), UNIQUE KEY uk_level_benefit_tenant (level_id, benefit_id, tenant_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员等级权益绑定';
 
 CREATE TABLE IF NOT EXISTS member_user_benefit (
     id bigint NOT NULL AUTO_INCREMENT COMMENT '编号', user_id bigint NOT NULL, level_id bigint NOT NULL, benefit_id bigint NOT NULL,
