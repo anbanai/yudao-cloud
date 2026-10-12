@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.type.IntegerListTypeHandler;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
@@ -69,38 +70,42 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
      * 获得商品 SPU 分页，提供给用户 App 使用
      */
     default PageResult<ProductSpuDO> selectPage(AppProductSpuPageReqVO pageReqVO, Set<Long> categoryIds) {
-        LambdaQueryWrapperX<ProductSpuDO> query = new LambdaQueryWrapperX<ProductSpuDO>()
-                // 关键字匹配，目前只匹配商品名
-                .likeIfPresent(ProductSpuDO::getName, pageReqVO.getKeyword())
-                // 分类
-                .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
-        // 上架状态 且有库存
-        query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
-        Long tenantId = TenantContextHolder.getRequiredTenantId();
-        // 商品表不是 TenantBaseDO：历史/平台商品可能使用全局租户 0，兼容全局商品与当前租户商品。
-        query.apply("product_spu.tenant_id IN (0, {0})", tenantId);
-        // 商家未通过审核、冻结或处于资料复审时，不向商城用户展示其商品。
-        // 平台自营商家也可能是全局记录（tenant_id = 0）。
-        query.apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
-                        + "AND status = {1} AND deleted = {2})",
-                tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false);
+        return TenantUtils.executeIgnore(() -> {
+            LambdaQueryWrapperX<ProductSpuDO> query = new LambdaQueryWrapperX<ProductSpuDO>()
+                    // 关键字匹配，目前只匹配商品名
+                    .likeIfPresent(ProductSpuDO::getName, pageReqVO.getKeyword())
+                    // 分类
+                    .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
+            // 上架状态 且有库存
+            query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
+            Long tenantId = TenantContextHolder.getRequiredTenantId();
+            // 此查询显式限定全局商品和当前租户商品，避免租户插件只保留当前租户。
+            query.apply("product_spu.tenant_id IN (0, {0})", tenantId);
+            // 商家未通过审核、冻结或处于资料复审时，不向商城用户展示其商品。
+            // 平台自营商家也可能是全局记录（tenant_id = 0）。
+            query.apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
+                            + "AND status = {1} AND deleted = {2})",
+                    tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false);
 
-        appendSortQuery(query, pageReqVO.getSortField(), pageReqVO.getSortAsc());
-        return selectPage(pageReqVO, query);
+            appendSortQuery(query, pageReqVO.getSortField(), pageReqVO.getSortAsc());
+            return selectPage(pageReqVO, query);
+        });
     }
 
     default java.util.List<ProductSpuDO> selectAvailableByIds(java.util.Collection<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return java.util.Collections.emptyList();
         }
-        Long tenantId = TenantContextHolder.getRequiredTenantId();
-        return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
-                .in(ProductSpuDO::getId, ids)
-                .eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus())
-                .apply("product_spu.tenant_id IN (0, {0})", tenantId)
-                .apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
-                                + "AND status = {1} AND deleted = {2})",
-                        tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false));
+        return TenantUtils.executeIgnore(() -> {
+            Long tenantId = TenantContextHolder.getRequiredTenantId();
+            return selectList(new LambdaQueryWrapperX<ProductSpuDO>()
+                    .in(ProductSpuDO::getId, ids)
+                    .eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus())
+                    .apply("product_spu.tenant_id IN (0, {0})", tenantId)
+                    .apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
+                                    + "AND status = {1} AND deleted = {2})",
+                            tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false));
+        });
     }
 
     default java.util.List<ProductSpuDO> selectListByStatusAndMerchantId(Integer status, Long merchantId) {

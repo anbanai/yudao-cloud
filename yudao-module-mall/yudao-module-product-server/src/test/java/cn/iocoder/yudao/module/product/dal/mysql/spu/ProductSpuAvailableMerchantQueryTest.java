@@ -1,18 +1,29 @@
 package cn.iocoder.yudao.module.product.dal.mysql.spu;
 
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils;
+import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantDatabaseInterceptor;
+import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(ProductSpuAvailableMerchantQueryTest.TenantQueryTestConfiguration.class)
 class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
 
     @Resource
@@ -28,6 +39,18 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
     @AfterEach
     void clearTenant() {
         TenantContextHolder.clear();
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class TenantQueryTestConfiguration {
+
+        @Bean
+        TenantLineInnerInterceptor tenantLineInnerInterceptor(MybatisPlusInterceptor interceptor) {
+            TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor(
+                    new TenantDatabaseInterceptor(new TenantProperties()));
+            MyBatisUtils.addInterceptor(interceptor, tenantInterceptor, 0);
+            return tenantInterceptor;
+        }
     }
 
     @Test
@@ -71,6 +94,24 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
 
         assertThat(spuMapper.selectAvailableByIds(List.of(5000L, 5001L, 5002L, 6000L, 6001L, 7000L)))
                 .extracting(row -> row.getId()).containsExactly(5000L, 5001L, 5002L);
+    }
+
+    @Test
+    void testSelectPage_includesGlobalAndCurrentTenantDataOnly() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        insertMerchant(jdbc, 800L, 20, false, 0L);
+        insertMerchant(jdbc, 801L, 20, false, 1L);
+        insertMerchant(jdbc, 802L, 20, false, 2L);
+        insertSpu(jdbc, 8000L, 800L, 0L, 1);
+        insertSpu(jdbc, 8001L, 801L, 1L, 1);
+        insertSpu(jdbc, 8002L, 802L, 2L, 1);
+
+        AppProductSpuPageReqVO pageReqVO = new AppProductSpuPageReqVO();
+        pageReqVO.setPageNo(1);
+        pageReqVO.setPageSize(20);
+
+        assertThat(spuMapper.selectPage(pageReqVO, Set.of()).getList())
+                .extracting(row -> row.getId()).containsExactly(8001L, 8000L);
     }
 
     private void insertMerchant(JdbcTemplate jdbc, Long id, Integer status, boolean deleted) {
