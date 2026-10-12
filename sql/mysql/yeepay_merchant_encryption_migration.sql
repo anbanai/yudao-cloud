@@ -1,7 +1,7 @@
 -- 商家旧明文 -> AES:v1 专用升级脚本（MySQL 8）。
 -- 仅适用于从旧 HEAD 54cead8d6 的纯明文商家表升级的部署。
 -- 已经部署 EncryptTypeHandler、存在无前缀 AES 或 AES:v1 密文的部署必须跳过本脚本。
--- 此脚本不判断解密失败、不推断数据格式。执行前备份，并停止商家写入。
+-- 此脚本不判断解密失败、不推断数据格式。执行前备份，并停止商家写入及正在运行的回填任务。
 -- 顺序：确保旧版商户/资质表存在，再执行本脚本，最后启动新版本。
 -- 启动时临时设置：
 -- yudao.product.merchant.encryption.allow-marked-plaintext=true
