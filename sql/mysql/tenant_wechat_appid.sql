@@ -10,4 +10,10 @@ SET websites = CASE
     update_time = NOW()
 WHERE id = 1
   AND deleted = 0
-  AND FIND_IN_SET('wx427975d783c9d126', COALESCE(websites, '')) = 0;
+  AND FIND_IN_SET('wx427975d783c9d126', COALESCE(websites, '')) = 0
+  AND NOT EXISTS (
+      SELECT 1
+      FROM system_tenant existing
+      WHERE existing.deleted = 0
+        AND FIND_IN_SET('wx427975d783c9d126', COALESCE(existing.websites, '')) <> 0
+  );
