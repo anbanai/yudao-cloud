@@ -9130,6 +9130,7 @@ CREATE TABLE `trade_config`  (
   `brokerage_withdraw_fee_percent` int NOT NULL DEFAULT 0 COMMENT '提现手续费百分比',
   `brokerage_frozen_days` int NOT NULL DEFAULT 7 COMMENT '佣金冻结时间(天)',
   `brokerage_withdraw_types` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '1,2,3,4' COMMENT '提现方式：1-钱包；2-银行卡；3-微信；4-支付宝',
+  `kefu_wechat_qr_code_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '企微客服二维码图片地址',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
@@ -9143,7 +9144,7 @@ CREATE TABLE `trade_config`  (
 -- Records of trade_config
 -- ----------------------------
 BEGIN;
-INSERT INTO `trade_config` (`id`, `after_sale_refund_reasons`, `after_sale_return_reasons`, `delivery_express_free_enabled`, `delivery_express_free_price`, `delivery_pick_up_enabled`, `brokerage_enabled`, `brokerage_enabled_condition`, `brokerage_bind_mode`, `brokerage_poster_urls`, `brokerage_first_percent`, `brokerage_second_percent`, `brokerage_withdraw_min_price`, `brokerage_withdraw_fee_percent`, `brokerage_frozen_days`, `brokerage_withdraw_types`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (2, '[\"不想要了\",\"商品质量问题\",\"商品描述不符\"]', '[\"不想要了\",\"商品质量问题\",\"商品描述不符\",\"商品错发漏发\",\"商品包装破损\"]', b'0', 200, b'1', b'1', 1, 1, '[\"http://test.yudao.iocoder.cn/20251009/blob_1752042302026_1759972614285.jpg\"]', 5, 10, 50, 1, 2, '2,3,4,1,5,6', '1', '2023-09-28 14:26:02', '1', '2025-10-09 09:17:05', b'0', 1);
+INSERT INTO `trade_config` (`id`, `after_sale_refund_reasons`, `after_sale_return_reasons`, `delivery_express_free_enabled`, `delivery_express_free_price`, `delivery_pick_up_enabled`, `brokerage_enabled`, `brokerage_enabled_condition`, `brokerage_bind_mode`, `brokerage_poster_urls`, `brokerage_first_percent`, `brokerage_second_percent`, `brokerage_withdraw_min_price`, `brokerage_withdraw_fee_percent`, `brokerage_frozen_days`, `brokerage_withdraw_types`, `kefu_wechat_qr_code_url`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`) VALUES (2, '[\"不想要了\",\"商品质量问题\",\"商品描述不符\"]', '[\"不想要了\",\"商品质量问题\",\"商品描述不符\",\"商品错发漏发\",\"商品包装破损\"]', b'0', 200, b'1', b'1', 1, 1, '[\"http://test.yudao.iocoder.cn/20251009/blob_1752042302026_1759972614285.jpg\"]', 5, 10, 50, 1, 2, '2,3,4,1,5,6', NULL, '1', '2023-09-28 14:26:02', '1', '2025-10-09 09:17:05', b'0', 1);
 COMMIT;
 
 -- ----------------------------

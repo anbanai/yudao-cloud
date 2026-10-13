@@ -115,4 +115,11 @@ public class TradeConfigDO extends BaseDO {
     @TableField(typeHandler = IntegerListTypeHandler.class)
     private List<Integer> brokerageWithdrawTypes;
 
+    // ========== 客服相关 ==========
+
+    /**
+     * 企微客服二维码图片地址
+     */
+    private String kefuWechatQrCodeUrl;
+
 }

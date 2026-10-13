@@ -41,4 +41,9 @@ public class AppTradeConfigRespVO {
     @Schema(description = "提现方式", requiredMode = Schema.RequiredMode.REQUIRED, example = "[1, 2]")
     private List<Integer> brokerageWithdrawTypes;
 
+    // ========== 客服相关 ==========
+
+    @Schema(description = "企微客服二维码图片地址", example = "https://www.iocoder.cn/yudao-kefu.jpg")
+    private String kefuWechatQrCodeUrl;
+
 }

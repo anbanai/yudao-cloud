@@ -97,4 +97,9 @@ public class TradeConfigBaseVO {
     @InEnum(value = BrokerageWithdrawTypeEnum.class, message = "提现方式必须是 {value}")
     private List<Integer> brokerageWithdrawTypes;
 
+    // ========== 客服相关 ==========
+
+    @Schema(description = "企微客服二维码图片地址", example = "https://www.iocoder.cn/yudao-kefu.jpg")
+    private String kefuWechatQrCodeUrl;
+
 }
