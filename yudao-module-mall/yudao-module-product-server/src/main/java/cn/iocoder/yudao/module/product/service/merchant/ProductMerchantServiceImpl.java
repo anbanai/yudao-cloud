@@ -38,6 +38,11 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
     }
 
     @Override
+    public ProductMerchantDO getMerchantForTrade(Long id) {
+        return merchantMapper.selectAvailableById(id);
+    }
+
+    @Override
     public PageResult<ProductMerchantDO> getMerchantPage(ProductMerchantPageReqVO reqVO) {
         return merchantMapper.selectPage(reqVO);
     }

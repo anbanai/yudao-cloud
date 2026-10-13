@@ -6,6 +6,10 @@ import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO
 
 public interface ProductMerchantService {
     ProductMerchantDO getMerchant(Long id);
+    /**
+     * 查询交易链路使用的商家，显式保留平台全局租户与当前租户数据。
+     */
+    ProductMerchantDO getMerchantForTrade(Long id);
     PageResult<ProductMerchantDO> getMerchantPage(ProductMerchantPageReqVO reqVO);
     /**
      * Approves an application after checking the merchant is still in the expected review state.

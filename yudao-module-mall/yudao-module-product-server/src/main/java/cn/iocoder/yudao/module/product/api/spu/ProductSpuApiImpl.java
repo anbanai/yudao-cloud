@@ -59,7 +59,8 @@ public class ProductSpuApiImpl implements ProductSpuApi {
         List<ProductSpuRespDTO> result = BeanUtils.toBean(spus, ProductSpuRespDTO.class);
         result.forEach(dto -> {
             if (dto.getMerchantId() != null) {
-                var merchant = merchantService.getMerchant(dto.getMerchantId());
+                // 交易价格快照必须能解析平台全局商家；普通租户查询会把 tenant_id=0 的商家过滤掉。
+                var merchant = merchantService.getMerchantForTrade(dto.getMerchantId());
                 if (merchant != null) {
                     dto.setMerchantName(merchant.getStoreName() != null ? merchant.getStoreName() : merchant.getName());
                 }
