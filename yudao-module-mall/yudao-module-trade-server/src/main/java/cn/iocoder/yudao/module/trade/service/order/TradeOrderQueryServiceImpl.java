@@ -137,9 +137,10 @@ public class TradeOrderQueryServiceImpl implements TradeOrderQueryService {
         for (Map<String, Object> map : list) {
             Long count = MapUtil.getLong(map, "count", 0L);
             Long price = MapUtil.getLong(map, "price", 0L);
+            Long productCount = MapUtil.getLong(map, "productCount", 0L);
             // 未退款的计入订单，部分退款、全部退款计入售后
             if (TradeOrderRefundStatusEnum.NONE.getStatus().equals(MapUtil.getInt(map, "refundStatus"))) {
-                vo.setOrderCount(count).setOrderPayPrice(price);
+                vo.setOrderCount(count).setOrderPayPrice(price).setProductCount(productCount);
             } else {
                 vo.setAfterSaleCount(vo.getAfterSaleCount() + count).setAfterSalePrice(vo.getAfterSalePrice() + price);
             }

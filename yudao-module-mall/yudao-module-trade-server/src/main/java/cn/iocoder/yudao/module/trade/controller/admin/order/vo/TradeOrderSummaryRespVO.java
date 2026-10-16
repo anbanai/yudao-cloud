@@ -13,6 +13,9 @@ public class TradeOrderSummaryRespVO {
     @Schema(description = "订单金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long orderPayPrice;
 
+    @Schema(description = "商品销量", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
+    private Long productCount;
+
     @Schema(description = "退款单数", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long afterSaleCount;
 

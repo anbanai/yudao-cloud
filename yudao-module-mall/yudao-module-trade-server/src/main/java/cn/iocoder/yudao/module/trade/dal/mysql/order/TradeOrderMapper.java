@@ -56,6 +56,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .selectAs(TradeOrderDO::getRefundStatus, TradeOrderDO::getRefundStatus)  // 售后状态
                 .selectCount(TradeOrderDO::getId, "count") // 售后状态对应的数量
                 .selectSum(TradeOrderDO::getPayPrice, "price")  // 售后状态对应的支付金额
+                .selectSum(TradeOrderDO::getProductCount, "productCount") // 售后状态对应的商品数量
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
                 .eqIfPresent(TradeOrderDO::getUserId, reqVO.getUserId())
                 .eqIfPresent(TradeOrderDO::getDeliveryType, reqVO.getDeliveryType())
