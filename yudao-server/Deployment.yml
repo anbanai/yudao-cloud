@@ -27,6 +27,8 @@ spec:
               value: applog=${micro_service_name}-${version_switch}
             - name: version_switch
               value: ${version_switch}
+            - name: SPRING_PROFILES_INCLUDE
+              value: aliyun-k8s
             - name: version_switch
               value: ${version_switch}
             - name: TZ
