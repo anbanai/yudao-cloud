@@ -7840,6 +7840,7 @@ CREATE TABLE `product_category`  (
   `parent_id` bigint NOT NULL COMMENT '父分类编号',
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类名称',
   `pic_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '移动端分类图',
+  `display_product_count` int NOT NULL DEFAULT 6 COMMENT '小程序展示商品数量',
   `sort` int NULL DEFAULT 0 COMMENT '分类排序',
   `status` tinyint NOT NULL COMMENT '开启状态',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',

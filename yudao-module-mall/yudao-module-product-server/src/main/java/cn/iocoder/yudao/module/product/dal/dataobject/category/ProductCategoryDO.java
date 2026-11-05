@@ -22,6 +22,8 @@ import lombok.*;
 @AllArgsConstructor
 public class ProductCategoryDO extends BaseDO {
 
+    public static final int DEFAULT_DISPLAY_PRODUCT_COUNT = 6;
+
     /**
      * 父分类编号 - 根分类
      */
@@ -50,6 +52,11 @@ public class ProductCategoryDO extends BaseDO {
      * 建议 180*180 分辨率
      */
     private String picUrl;
+    /**
+     * 小程序展示商品数量
+     */
+    @Builder.Default
+    private Integer displayProductCount = DEFAULT_DISPLAY_PRODUCT_COUNT;
     /**
      * 分类排序
      */

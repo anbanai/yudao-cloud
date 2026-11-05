@@ -21,6 +21,9 @@ public class ProductCategoryRespVO {
     @Schema(description = "移动端分类图", requiredMode = Schema.RequiredMode.REQUIRED)
     private String picUrl;
 
+    @Schema(description = "小程序展示商品数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "6")
+    private Integer displayProductCount;
+
     @Schema(description = "分类排序", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer sort;
 

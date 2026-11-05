@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS `product_category` (
     `name` varchar(255) NOT NULL COMMENT '分类名称',
     `pic_url` varchar(255) NOT NULL COMMENT '移动端分类图',
     `big_pic_url` varchar(255) DEFAULT NULL COMMENT 'PC 端分类图',
+    `display_product_count` int NOT NULL DEFAULT '6' COMMENT '小程序展示商品数量',
     `sort` int DEFAULT '0' COMMENT '分类排序',
     `status` tinyint NOT NULL COMMENT '开启状态',
     "creator" varchar(64) DEFAULT '',

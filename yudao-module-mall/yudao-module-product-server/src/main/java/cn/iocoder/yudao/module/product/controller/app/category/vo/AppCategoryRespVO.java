@@ -24,4 +24,7 @@ public class AppCategoryRespVO {
     @NotBlank(message = "分类图片不能为空")
     private String picUrl;
 
+    @Schema(description = "小程序展示商品数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "6")
+    private Integer displayProductCount;
+
 }

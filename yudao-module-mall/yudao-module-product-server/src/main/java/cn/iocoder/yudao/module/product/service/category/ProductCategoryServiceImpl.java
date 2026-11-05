@@ -50,6 +50,7 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
 
         // 插入
         ProductCategoryDO category = BeanUtils.toBean(createReqVO, ProductCategoryDO.class);
+        normalizeDisplayProductCount(category);
         productCategoryMapper.insert(category);
         // 返回
         return category.getId();
@@ -65,6 +66,7 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
 
         // 更新
         ProductCategoryDO updateObj = BeanUtils.toBean(updateReqVO, ProductCategoryDO.class);
+        normalizeDisplayProductCount(updateObj);
         productCategoryMapper.updateById(updateObj);
     }
 
@@ -142,7 +144,9 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
 
     @Override
     public ProductCategoryDO getCategory(Long id) {
-        return productCategoryMapper.selectById(id);
+        ProductCategoryDO category = productCategoryMapper.selectById(id);
+        applyDisplayProductCountDefault(category);
+        return category;
     }
 
     @Override
@@ -179,17 +183,44 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
 
     @Override
     public List<ProductCategoryDO> getCategoryList(ProductCategoryListReqVO listReqVO) {
-        return productCategoryMapper.selectList(listReqVO);
+        List<ProductCategoryDO> list = productCategoryMapper.selectList(listReqVO);
+        list.forEach(this::applyDisplayProductCountDefault);
+        return list;
     }
 
     @Override
     public List<ProductCategoryDO> getEnableCategoryList() {
-        return productCategoryMapper.selectListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        List<ProductCategoryDO> list = productCategoryMapper.selectListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        list.forEach(this::applyDisplayProductCountDefault);
+        return list;
     }
 
     @Override
     public List<ProductCategoryDO> getEnableCategoryList(List<Long> ids) {
-        return productCategoryMapper.selectListByIdAndStatus(ids, CommonStatusEnum.ENABLE.getStatus());
+        List<ProductCategoryDO> list = productCategoryMapper.selectListByIdAndStatus(ids, CommonStatusEnum.ENABLE.getStatus());
+        list.forEach(this::applyDisplayProductCountDefault);
+        return list;
+    }
+
+    private void applyDisplayProductCountDefault(ProductCategoryDO category) {
+        if (category != null && !isValidDisplayProductCount(category.getDisplayProductCount())) {
+            category.setDisplayProductCount(ProductCategoryDO.DEFAULT_DISPLAY_PRODUCT_COUNT);
+        }
+    }
+
+    private void normalizeDisplayProductCount(ProductCategoryDO category) {
+        if (category == null) {
+            return;
+        }
+        if (Objects.equals(category.getParentId(), PARENT_ID_NULL)) {
+            category.setDisplayProductCount(ProductCategoryDO.DEFAULT_DISPLAY_PRODUCT_COUNT);
+        } else if (!isValidDisplayProductCount(category.getDisplayProductCount())) {
+            category.setDisplayProductCount(ProductCategoryDO.DEFAULT_DISPLAY_PRODUCT_COUNT);
+        }
+    }
+
+    private boolean isValidDisplayProductCount(Integer count) {
+        return count != null && count >= 1 && count <= 50;
     }
 
 }
