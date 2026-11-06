@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_IMAGE_INVALID;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -46,6 +48,18 @@ class ProductCategoryServiceImplTest {
 
         verify(productCategoryMapper, never()).insert(any(ProductCategoryDO.class));
         verify(fileApi).validateImageUrl(eq(reqVO.getPicUrl()), eq("product"));
+    }
+
+    @Test
+    void getEnableCategoryList_defaultsMissingDisplayProductCountForLegacyCategories() {
+        ProductCategoryDO legacyCategory = new ProductCategoryDO()
+                .setId(1L)
+                .setDisplayProductCount(null);
+        when(productCategoryMapper.selectListByStatus(anyInt())).thenReturn(java.util.List.of(legacyCategory));
+
+        ProductCategoryDO result = productCategoryService.getEnableCategoryList().get(0);
+
+        assertEquals(6, result.getDisplayProductCount());
     }
 
 }
