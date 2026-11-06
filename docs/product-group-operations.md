@@ -41,10 +41,11 @@ Content-Type: application/json
 
 ## 发布顺序
 
-1. 已启用分组的数据库执行 `sql/mysql/product_group_operations.sql`。尚未创建分组表的数据库先执行 `sql/mysql/product_group.sql`。两份脚本均可重复执行；不会把已设为内部的分组重新改成公开。
-2. 发布后端，再发布管理后台和商城。新后端读取 `storefront_visible` 字段，必须先完成数据库升级。
-3. 使用实际角色检查商品查询、导出、分组更新权限。批量修改允许 `product:spu:update` 或 `product:group:update`；查询和导出沿用商品对应权限。
-4. 在实际 MySQL 与微信开发者工具中验收公开/内部切换、分组页分享和小程序上传体积。H2 自动化测试不能替代真实 MySQL 迁移验收。
+1. 执行 `db/mall-2026-11-05-category-display-count.sql`，为商品分类补齐小程序展示数量字段。新版后台分类列表会读取该字段，升级旧数据库时必须先执行。
+2. 尚未创建分组表的数据库执行 `sql/mysql/product_group.sql`；已启用分组但缺少 `storefront_visible` 字段的数据库执行 `sql/mysql/product_group_operations.sql`。脚本可重复执行，升级时不会把已设为内部的分组重新改成公开。`product_group.sql` 也会插入后台菜单和权限点。
+3. 完成数据库升级后发布后端，再发布管理后台和商城。新后端读取 `storefront_visible` 字段，必须先完成对应数据库升级。
+4. 在后台将商品分组菜单及权限点授权给实际角色，并检查商品查询、导出、分组更新权限。批量修改允许 `product:spu:update` 或 `product:group:update`；查询和导出沿用商品对应权限。
+5. 在实际 MySQL 与微信开发者工具中验收公开/内部切换、分组页分享和小程序上传体积。H2 自动化测试不能替代真实 MySQL 迁移验收。
 
 回滚旧客户端时，未提交 `groupIds` 的商品更新保留已有关系；分组更新未提交 `storefrontVisible` 时保留已有公开性设置。数据库新增字段可保留，勿通过删除关系表回滚客户端。
 
