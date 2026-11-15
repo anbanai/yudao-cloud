@@ -159,6 +159,11 @@ public class TradeOrderQueryServiceImpl implements TradeOrderQueryService {
     }
 
     @Override
+    public boolean hasOrderHistory(Long userId) {
+        return tradeOrderMapper.selectExistsByUserId(userId);
+    }
+
+    @Override
     public List<ExpressTrackRespDTO> getExpressTrackList(Long id, Long userId) {
         // 查询订单
         TradeOrderDO order = tradeOrderMapper.selectByIdAndUserId(id, userId);

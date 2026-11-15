@@ -30,6 +30,12 @@ public class TradePriceCalculateReqBO {
      */
     private Long couponId;
 
+    @jakarta.validation.constraints.Size(max = 10)
+    private List<Long> couponIds;
+
+    /** Internal flag: settlement previews explain exclusions; creation rejects them. */
+    private Boolean strictCouponSelection = true;
+
     /**
      * 是否使用积分
      */

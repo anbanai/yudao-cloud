@@ -94,6 +94,9 @@ public interface TradeOrderQueryService {
      */
     Long getOrderCount(Long userId, Integer status, Boolean commonStatus);
 
+    /** 查询用户是否存在任意状态的订单，取消单和未支付订单也计入历史。 */
+    boolean hasOrderHistory(Long userId);
+
     /**
      * 【前台】获得订单的物流轨迹
      *

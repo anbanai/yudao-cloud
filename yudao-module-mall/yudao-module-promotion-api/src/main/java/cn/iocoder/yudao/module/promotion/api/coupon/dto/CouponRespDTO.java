@@ -29,6 +29,12 @@ public class CouponRespDTO {
      * 优惠劵名
      */
     private String name;
+    private Integer couponType;
+    private Boolean stackWithPromotion;
+    private Long exchangeSpuId;
+    private Long exchangeSkuId;
+    private Boolean canStack;
+    private Integer stackLimit;
     /**
      * 优惠码状态
      *

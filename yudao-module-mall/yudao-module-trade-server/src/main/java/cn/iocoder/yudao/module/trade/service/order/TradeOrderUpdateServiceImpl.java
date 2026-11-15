@@ -154,7 +154,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         }
 
         // 2. 计算价格
-        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, settlementReqVO);
+        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, settlementReqVO, false);
 
         // 3. 拼接返回
         return TradeOrderConvert.INSTANCE.convert(calculateRespBO, address);
@@ -181,13 +181,14 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
      * @param settlementReqVO 结算信息
      * @return 订单价格
      */
-    private TradePriceCalculateRespBO calculatePrice(Long userId, AppTradeOrderSettlementReqVO settlementReqVO) {
+    private TradePriceCalculateRespBO calculatePrice(Long userId, AppTradeOrderSettlementReqVO settlementReqVO, boolean strict) {
         // 1. 如果来自购物车，则获得购物车的商品
         List<CartDO> cartList = cartService.getCartList(userId,
                 convertSet(settlementReqVO.getItems(), AppTradeOrderSettlementReqVO.Item::getCartId));
 
         // 2. 计算价格
         TradePriceCalculateReqBO calculateReqBO = TradeOrderConvert.INSTANCE.convert(userId, settlementReqVO, cartList);
+        calculateReqBO.setStrictCouponSelection(strict);
         calculateReqBO.getItems().forEach(item -> Assert.isTrue(item.getSelected(), // 防御性编程，保证都是选中的
                 "商品({}) 未设置为选中", item.getSkuId()));
         return tradePriceService.calculateOrderPrice(calculateReqBO);
@@ -198,7 +199,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.MEMBER_CREATE)
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
         // 1.1 价格计算
-        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO);
+        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO, true);
         validateExpectedPrice(userId, createReqVO, calculateRespBO);
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
@@ -699,7 +700,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                 && !TradeOrderStatusEnum.isUndelivered(order.getStatus())) {
             throw exception(ORDER_ADMIN_CANCEL_FAIL_STATUS);
         }
-        if (!TradeOrderRefundStatusEnum.NONE.getStatus().equals(order.getRefundStatus())) {
+        if (TradeOrderRefundStatusEnum.NONE.getStatus().equals(order.getRefundStatus()) == false) {
             throw exception(ORDER_ADMIN_CANCEL_FAIL_STATUS);
         }
 
@@ -1225,19 +1226,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                         ? TradeOrderRefundStatusEnum.ALL.getStatus() : TradeOrderRefundStatusEnum.PART.getStatus()));
     }
 
-    /**
-     * Order-level refunds encode the expected cumulative amount in the merchant refund id.
-     * This makes payment callbacks idempotent even when the same notification is delivered twice.
-     */
     private int resolveTargetRefundPrice(String merchantRefundId, int orderPayPrice) {
-        if (StrUtil.isBlank(merchantRefundId)) {
+        if (StrUtil.isBlank(merchantRefundId) || !merchantRefundId.startsWith("order-")) {
             return 0;
         }
-        String fullPrefix = "order-";
-        if (!merchantRefundId.startsWith(fullPrefix)) {
-            return 0;
-        }
-        String suffix = merchantRefundId.substring(fullPrefix.length());
+        String suffix = merchantRefundId.substring("order-".length());
         int partialMarker = suffix.indexOf("-partial-");
         String target = partialMarker >= 0 ? suffix.substring(partialMarker + "-partial-".length()) : null;
         if (target == null || target.isEmpty()) {

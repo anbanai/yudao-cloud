@@ -33,6 +33,18 @@ public class CouponApiImpl implements CouponApi {
     }
 
     @Override
+    public CommonResult<Boolean> useCoupons(List<Long> ids, Long userId, Long orderId) {
+        couponService.useCoupons(ids, userId, orderId); return success(true);
+    }
+    @Override
+    public CommonResult<Boolean> returnCoupons(List<Long> ids, Long orderId) {
+        couponService.returnCoupons(ids, orderId); return success(true);
+    }
+    @Override
+    public CommonResult<Boolean> fulfillExchange(Long orderId) {
+        couponService.fulfillExchange(orderId); return success(true);
+    }
+    @Override
     public CommonResult<Boolean> useCoupon(CouponUseReqDTO useReqDTO) {
         couponService.useCoupon(useReqDTO.getId(), useReqDTO.getUserId(), useReqDTO.getOrderId());
         return success(true);

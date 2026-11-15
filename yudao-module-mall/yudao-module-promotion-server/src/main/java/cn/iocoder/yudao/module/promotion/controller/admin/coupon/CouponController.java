@@ -35,6 +35,28 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 public class CouponController {
 
     @Resource
+    private cn.iocoder.yudao.module.promotion.service.coupon.CouponBatchService batchService;
+
+    @PostMapping("/send-preview")
+    @PreAuthorize("@ss.hasPermission('promotion:coupon:send')")
+    public CommonResult<cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponSendBatchDO> preview(
+            @Valid @RequestBody cn.iocoder.yudao.module.promotion.controller.admin.coupon.vo.CouponSendBatchReqVO req) {
+        return success(batchService.preview(req, cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/send-submit")
+    @PreAuthorize("@ss.hasPermission('promotion:coupon:send')")
+    public CommonResult<cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponSendBatchDO> submit(@RequestParam("batchId") Long batchId) {
+        return success(batchService.submit(batchId, cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/send-batch")
+    @PreAuthorize("@ss.hasPermission('promotion:coupon:query')")
+    public CommonResult<cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponSendBatchDO> batch(@RequestParam("id") Long id) {
+        return success(batchService.get(id));
+    }
+
+    @Resource
     private CouponService couponService;
     @Resource
     private MemberUserApi memberUserApi;

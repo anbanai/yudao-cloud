@@ -50,6 +50,11 @@ public class MemberUserApiImpl implements MemberUserApi {
     }
 
     @Override
+    public CommonResult<List<MemberUserRespDTO>> getUserListByTags(Collection<Long> tagIds) {
+        return success(MemberUserConvert.INSTANCE.convertList2(userService.getUserListByTagIds(tagIds)));
+    }
+
+    @Override
     public CommonResult<Boolean> validateUser(Long id) {
         MemberUserDO user = userService.getUser(id);
         if (user == null) {

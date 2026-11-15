@@ -31,6 +31,15 @@ public interface TradeOrderApi {
     @Parameter(name = "id", description = "订单编号", required = true)
     CommonResult<TradeOrderRespDTO> getOrder(@RequestParam("id") Long id);
 
+    @GetMapping(PREFIX + "/coupon-order-status")
+    @Operation(summary = "优惠券补偿使用的订单状态，包含逻辑删除订单；null表示订单不存在")
+    CommonResult<Integer> getCouponOrderStatus(@RequestParam("id") Long id);
+
+    @GetMapping(PREFIX + "/has-history")
+    @Operation(summary = "查询用户是否存在历史订单（包含未支付及已取消订单）")
+    @Parameter(name = "userId", description = "用户编号", required = true)
+    CommonResult<Boolean> hasOrderHistory(@RequestParam("userId") Long userId);
+
     @PutMapping(PREFIX + "/cancel-paid")
     @Parameters({
             @Parameter(name = "userId", description = "用户编号", required = true, example = "1024"),

@@ -13,7 +13,7 @@ public class TradeOrderCancelReqVO {
     @NotNull(message = "订单编号不能为空")
     private Long id;
 
-    @Schema(description = "取消原因", example = "用户申请取消")
+    @Schema(description = "取消原因", requiredMode = Schema.RequiredMode.REQUIRED, example = "用户申请取消")
     @Length(max = 128, message = "取消原因长度不能超过 128")
     private String reason;
 

@@ -53,6 +53,19 @@ public class CouponTemplateDO extends BaseDO {
      * 优惠券说明
      */
     private String description;
+    /** 券类型：1 折扣券，2 兑换券 */
+    private Boolean newcomerOnly;
+
+    private Boolean stackWithPromotion;
+
+    private Integer couponType;
+    /** 兑换券绑定的 SPU/SKU */
+    private Long exchangeSpuId;
+    private Long exchangeSkuId;
+    /** 是否允许与其它优惠券叠加 */
+    private Boolean canStack;
+    /** 同一叠加组内最多生效数量 */
+    private Integer stackLimit;
     /**
      * 状态
      *

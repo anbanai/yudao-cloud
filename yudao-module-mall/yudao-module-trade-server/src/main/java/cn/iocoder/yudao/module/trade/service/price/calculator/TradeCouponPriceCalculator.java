@@ -41,54 +41,54 @@ public class TradeCouponPriceCalculator implements TradePriceCalculator {
 
     @Override
     public void calculate(TradePriceCalculateReqBO param, TradePriceCalculateRespBO result) {
-        // 只有【普通】订单，才允许使用优惠劵
+        java.util.LinkedHashSet<Long> selected = new java.util.LinkedHashSet<>();
+        if (param.getCouponId() != null) { selected.add(param.getCouponId()); }
+        if (param.getCouponIds() != null) { selected.addAll(param.getCouponIds()); }
+        if (selected.size() > 10 || selected.contains(null)) { throw exception(PRICE_CALCULATE_COUPON_CAN_NOT_USE, "最多选择10张有效优惠券"); }
+        result.setEffectiveCouponIds(new java.util.ArrayList<>());
+        result.setExchangeOrder(false).setAllowPointStack(true);
+        result.setCouponExclusionReasons(new java.util.LinkedHashMap<>());
         if (ObjectUtil.notEqual(result.getType(), TradeOrderTypeEnum.NORMAL.getType())) {
-            if (param.getCouponId() != null) {
-                throw exception(PRICE_CALCULATE_COUPON_NOT_MATCH_NORMAL_ORDER);
-            }
+            if (!selected.isEmpty()) { throw exception(PRICE_CALCULATE_COUPON_NOT_MATCH_NORMAL_ORDER); }
             return;
         }
-
-        // 1.1 加载用户的优惠劵列表
         List<CouponRespDTO> coupons = couponApi.getCouponListByUserId(param.getUserId(), CouponStatusEnum.UNUSED.getStatus()).getCheckedData();
-        coupons.removeIf(coupon -> LocalDateTimeUtils.beforeNow(coupon.getValidEndTime()));
-        // 1.2 计算优惠劵的使用条件
         result.setCoupons(calculateCoupons(coupons, result));
-
-        // 2. 校验优惠劵是否可用
-        if (param.getCouponId() == null) {
-            return;
+        java.util.List<CouponRespDTO> applied = new java.util.ArrayList<>();
+        for (Long id : selected) {
+            CouponRespDTO coupon = CollUtil.findOne(coupons, item -> item.getId().equals(id));
+            TradePriceCalculateRespBO.Coupon eligibility = coupon == null ? null : calculateCoupons(java.util.Collections.singletonList(coupon), result).get(0);
+            String reason = eligibility == null ? "优惠券不存在" : Boolean.TRUE.equals(eligibility.getMatch()) ? null : eligibility.getMismatchReason();
+            if (reason == null) {
+                reason = TradeCouponStackPolicy.exclusion(coupon.getCanStack(), coupon.getStackLimit(), coupon.getStackWithPromotion(),
+                        applied.size(), applied.stream().allMatch(c -> Boolean.TRUE.equals(c.getCanStack())
+                                && (c.getStackLimit() == null ? 1 : c.getStackLimit()) > applied.size()),
+                        result.getItems().stream().anyMatch(i -> Boolean.TRUE.equals(i.getSelected())
+                                && ((i.getDiscountPrice() != null && i.getDiscountPrice() > 0) || (i.getVipPrice() != null && i.getVipPrice() > 0))));
+            }
+            if (reason != null) {
+                result.getCouponExclusionReasons().put(id, reason);
+                if (Boolean.TRUE.equals(param.getStrictCouponSelection())) { throw exception(PRICE_CALCULATE_COUPON_CAN_NOT_USE, reason); }
+                continue;
+            }
+            List<TradePriceCalculateRespBO.OrderItem> orderItems = filterMatchCouponOrderItems(result, coupon);
+            int total = TradePriceCalculatorHelper.calculateTotalPayPrice(orderItems);
+            int amount = getCouponPrice(coupon, total);
+            List<Integer> shares = TradePriceCalculatorHelper.dividePrice(orderItems, amount);
+            TradePriceCalculatorHelper.addPromotion(result, orderItems, id, coupon.getName(), PromotionTypeEnum.COUPON.getType(),
+                    StrUtil.format("优惠券：省 {} 元", TradePriceCalculatorHelper.formatPrice(amount)), shares);
+            for (int i = 0; i < orderItems.size(); i++) {
+                TradePriceCalculateRespBO.OrderItem item = orderItems.get(i);
+                item.setCouponPrice((item.getCouponPrice() == null ? 0 : item.getCouponPrice()) + shares.get(i));
+                TradePriceCalculatorHelper.recountPayPrice(item);
+            }
+            TradePriceCalculatorHelper.recountAllPrice(result);
+            applied.add(coupon);
+            if (Integer.valueOf(2).equals(coupon.getCouponType())) { result.setExchangeOrder(true); }
+            if (!Boolean.TRUE.equals(coupon.getStackWithPromotion())) { result.setAllowPointStack(false); }
+            result.getEffectiveCouponIds().add(id);
         }
-        TradePriceCalculateRespBO.Coupon couponBO = CollUtil.findOne(result.getCoupons(), item -> item.getId().equals(param.getCouponId()));
-        CouponRespDTO coupon = CollUtil.findOne(coupons, item -> item.getId().equals(param.getCouponId()));
-        if (couponBO == null || coupon == null) {
-            throw exception(PRICE_CALCULATE_COUPON_CAN_NOT_USE, "优惠劵不存在");
-        }
-        if (Boolean.FALSE.equals(couponBO.getMatch())) {
-            throw exception(PRICE_CALCULATE_COUPON_CAN_NOT_USE, couponBO.getMismatchReason());
-        }
-
-        // 3.1 计算可以优惠的金额
-        List<TradePriceCalculateRespBO.OrderItem> orderItems = filterMatchCouponOrderItems(result, coupon);
-        Integer totalPayPrice = TradePriceCalculatorHelper.calculateTotalPayPrice(orderItems);
-        Integer couponPrice = getCouponPrice(coupon, totalPayPrice);
-        // 3.2 计算分摊的优惠金额
-        List<Integer> divideCouponPrices = TradePriceCalculatorHelper.dividePrice(orderItems, couponPrice);
-
-        // 4.1 记录使用的优惠劵
-        result.setCouponId(param.getCouponId());
-        // 4.2 记录优惠明细
-        TradePriceCalculatorHelper.addPromotion(result, orderItems,
-                param.getCouponId(), couponBO.getName(), PromotionTypeEnum.COUPON.getType(),
-                StrUtil.format("优惠劵：省 {} 元", TradePriceCalculatorHelper.formatPrice(couponPrice)),
-                divideCouponPrices);
-        // 4.3 更新 SKU 优惠金额
-        for (int i = 0; i < orderItems.size(); i++) {
-            TradePriceCalculateRespBO.OrderItem orderItem = orderItems.get(i);
-            orderItem.setCouponPrice(divideCouponPrices.get(i));
-            TradePriceCalculatorHelper.recountPayPrice(orderItem);
-        }
-        TradePriceCalculatorHelper.recountAllPrice(result);
+        if (!result.getEffectiveCouponIds().isEmpty()) { result.setCouponId(result.getEffectiveCouponIds().get(0)); }
     }
 
     /**
@@ -102,6 +102,18 @@ public class TradeCouponPriceCalculator implements TradePriceCalculator {
                                                                     TradePriceCalculateRespBO result) {
         return convertList(coupons, coupon -> {
             TradePriceCalculateRespBO.Coupon matchCoupon = BeanUtils.toBean(coupon, TradePriceCalculateRespBO.Coupon.class);
+            if (!LocalDateTimeUtils.isBetween(coupon.getValidStartTime(), coupon.getValidEndTime())) {
+                return matchCoupon.setMatch(false).setMismatchReason("优惠券不在有效期内");
+            }
+            if (Integer.valueOf(2).equals(coupon.getCouponType())) {
+                java.util.List<TradePriceCalculateRespBO.OrderItem> selectedItems = filterList(result.getItems(), i -> Boolean.TRUE.equals(i.getSelected()));
+                if (selectedItems.size() != 1 || selectedItems.get(0).getCount() != 1
+                        || !java.util.Objects.equals(selectedItems.get(0).getSpuId(), coupon.getExchangeSpuId())
+                        || !java.util.Objects.equals(selectedItems.get(0).getSkuId(), coupon.getExchangeSkuId())) {
+                    return matchCoupon.setMatch(false).setMismatchReason("兑换券仅能兑换绑定SKU的一件商品");
+                }
+                return matchCoupon.setMatch(true);
+            }
             // 1.1 优惠劵未到使用时间
             if (LocalDateTimeUtils.afterNow(coupon.getValidStartTime())) {
                 return matchCoupon.setMatch(false).setMismatchReason("优惠劵未到使用时间");
@@ -119,7 +131,7 @@ public class TradeCouponPriceCalculator implements TradePriceCalculator {
             }
             // 1.4 优惠金额超过订单金额
             Integer couponPrice = getCouponPrice(coupon, totalPayPrice);
-            if (couponPrice >= totalPayPrice) {
+            if (couponPrice <= 0 || totalPayPrice <= 0 || couponPrice >= totalPayPrice) {
                 return matchCoupon.setMatch(false).setMismatchReason("优惠金额超过订单金额");
             }
 
@@ -129,8 +141,9 @@ public class TradeCouponPriceCalculator implements TradePriceCalculator {
     }
 
     private Integer getCouponPrice(CouponRespDTO coupon, Integer totalPayPrice) {
+        if (Integer.valueOf(2).equals(coupon.getCouponType())) { return totalPayPrice; }
         if (PromotionDiscountTypeEnum.PRICE.getType().equals(coupon.getDiscountType())) { // 减价
-            return coupon.getDiscountPrice();
+            return Math.min(coupon.getDiscountPrice(), totalPayPrice);
         } else if (PromotionDiscountTypeEnum.PERCENT.getType().equals(coupon.getDiscountType())) { // 打折
             int couponPrice = totalPayPrice - (totalPayPrice * coupon.getDiscountPercent() / 100);
             return coupon.getDiscountLimitPrice() == null ? couponPrice

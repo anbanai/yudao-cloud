@@ -19,7 +19,7 @@ public class TradeOrderRefundReqVO {
     @Min(value = 1, message = "退款金额必须大于零")
     private Integer refundPrice;
 
-    @Schema(description = "退款原因", example = "补偿运费差价")
+    @Schema(description = "退款原因", requiredMode = Schema.RequiredMode.REQUIRED, example = "补偿运费差价")
     @Length(max = 128, message = "退款原因长度不能超过 128")
     private String reason;
 

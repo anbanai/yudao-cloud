@@ -39,6 +39,16 @@ public class CouponTemplateServiceImpl implements CouponTemplateService {
     private ProductCategoryApi productCategoryApi;
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private cn.iocoder.yudao.module.product.api.sku.ProductSkuApi skuApi;
+
+    private void validateExchange(cn.iocoder.yudao.module.promotion.controller.admin.coupon.vo.template.CouponTemplateBaseVO req) {
+        if (!Integer.valueOf(1).equals(req.getCouponType()) && !Integer.valueOf(2).equals(req.getCouponType())) { throw new IllegalArgumentException("券类型无效"); }
+        if (!Integer.valueOf(2).equals(req.getCouponType())) { return; }
+        cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO sku = req.getExchangeSkuId() == null ? null : skuApi.getSku(req.getExchangeSkuId()).getCheckedData();
+        if (sku == null || !Objects.equals(sku.getSpuId(), req.getExchangeSpuId())) { throw new IllegalArgumentException("兑换SKU必须属于绑定SPU"); }
+        if (Boolean.TRUE.equals(req.getCanStack()) || Boolean.TRUE.equals(req.getStackWithPromotion())) { throw new IllegalArgumentException("兑换券不允许叠加"); }
+    }
 
     @Override
     public boolean isTakeLimitCountUnlimited(Integer takeLimitCount) {
@@ -57,6 +67,7 @@ public class CouponTemplateServiceImpl implements CouponTemplateService {
                 createReqVO.getTakeLimitCount());
         // 校验商品范围
         validateProductScope(createReqVO.getProductScope(), createReqVO.getProductScopeValues());
+        validateExchange(createReqVO);
         // 插入
         CouponTemplateDO couponTemplate = CouponTemplateConvert.INSTANCE.convert(createReqVO)
                 .setStatus(CommonStatusEnum.ENABLE.getStatus());
@@ -81,6 +92,7 @@ public class CouponTemplateServiceImpl implements CouponTemplateService {
         // 校验商品范围
         validateProductScope(updateReqVO.getProductScope(), updateReqVO.getProductScopeValues());
 
+        validateExchange(updateReqVO);
         // 更新
         CouponTemplateDO updateObj = CouponTemplateConvert.INSTANCE.convert(updateReqVO);
         couponTemplateMapper.updateById(updateObj);

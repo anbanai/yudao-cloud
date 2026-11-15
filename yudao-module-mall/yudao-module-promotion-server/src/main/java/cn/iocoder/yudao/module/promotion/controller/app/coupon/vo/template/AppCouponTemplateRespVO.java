@@ -13,6 +13,12 @@ public class AppCouponTemplateRespVO {
 
     @Schema(description = "优惠劵模板编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Long id;
+    private Integer couponType;
+    private Long exchangeSpuId;
+    private Long exchangeSkuId;
+    private Boolean canStack;
+    private Integer stackLimit;
+    private Boolean stackWithPromotion;
 
     @Schema(description = "优惠劵名", requiredMode = Schema.RequiredMode.REQUIRED, example = "春节送送送")
     private String name;

@@ -32,6 +32,8 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
 
     @Resource
     private AfterSaleService afterSaleService;
+    @Resource private cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper orderMapper;
+    @Resource private cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper itemMapper;
 
     @Override
     public void afterOrderCreate(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
@@ -50,7 +52,6 @@ public class TradeMemberPointOrderHandler implements TradeOrderHandler {
             addPoint(order.getUserId(), order.getGivePoint(), MemberPointBizTypeEnum.ORDER_GIVE,
                     order.getId(), order);
         }
-
         // 增加用户经验
         memberLevelApi.addExperience(order.getUserId(), order.getPayPrice(),
                 MemberExperienceBizTypeEnum.ORDER_GIVE.getType(), String.valueOf(order.getId())).checkError();

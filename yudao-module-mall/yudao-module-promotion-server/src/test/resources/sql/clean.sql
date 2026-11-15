@@ -13,3 +13,7 @@ DELETE FROM "promotion_diy_template";
 DELETE FROM "promotion_diy_page";
 DELETE FROM "promotion_bargain_activity";
 DELETE FROM "promotion_seckill_activity";
+DELETE FROM promotion_coupon_send_batch;
+DELETE FROM promotion_coupon_promotion_take;
+DELETE FROM promotion_coupon_promotion;
+DELETE FROM promotion_coupon_exchange_record;

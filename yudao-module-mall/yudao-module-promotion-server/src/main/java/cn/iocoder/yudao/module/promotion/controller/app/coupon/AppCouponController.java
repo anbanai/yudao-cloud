@@ -7,6 +7,8 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.coupon.AppCouponPageReqVO;
 import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.coupon.AppCouponRespVO;
 import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.coupon.AppCouponTakeReqVO;
+import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.template.AppNewcomerCouponRespVO;
+import cn.iocoder.yudao.module.promotion.controller.app.coupon.AppCouponTemplateController;
 import cn.iocoder.yudao.module.promotion.convert.coupon.CouponConvert;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponDO;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponTemplateDO;
@@ -36,6 +38,8 @@ public class AppCouponController {
     private CouponService couponService;
     @Resource
     private CouponTemplateService couponTemplateService;
+    @Resource
+    private cn.iocoder.yudao.module.promotion.service.coupon.CouponNewcomerService newcomerService;
 
     @PostMapping("/take")
     @Operation(summary = "领取优惠劵")
@@ -53,6 +57,27 @@ public class AppCouponController {
             canTakeAgain = takeCount < couponTemplate.getTakeLimitCount();
         }
         return success(canTakeAgain);
+    }
+
+    @PostMapping("/take-newcomer")
+    @Operation(summary = "领取首页新人券")
+    public CommonResult<AppNewcomerCouponRespVO> takeNewcomerCoupon(@Valid @RequestBody AppCouponTakeReqVO reqVO) {
+        Long userId = getLoginUserId();
+        CouponTemplateDO template = couponTemplateService.getCouponTemplate(reqVO.getTemplateId());
+        if (template == null || !Boolean.TRUE.equals(template.getNewcomerOnly()) || !Integer.valueOf(0).equals(template.getStatus())
+                || !Integer.valueOf(CouponTakeTypeEnum.USER.getType()).equals(template.getTakeType())) {
+            return success(new AppNewcomerCouponRespVO().setTemplateId(reqVO.getTemplateId())
+                    .setCanTake(false).setReasonCode("TEMPLATE_NOT_CLAIMABLE").setReason("新人券配置不可领取"));
+        }
+        // Shared public qualification endpoint is authoritative; repeat checks before the atomic coupon insert.
+        AppNewcomerCouponRespVO qualification = newcomerService.qualification(reqVO.getTemplateId(), userId);
+        if (qualification == null || !Boolean.TRUE.equals(qualification.getCanTake())) {
+            return success(qualification);
+        }
+        couponService.takeCouponByUser(reqVO.getTemplateId(), userId);
+        AppNewcomerCouponRespVO response = qualification;
+        response.setCanTake(false).setReasonCode("ALREADY_TAKEN").setReason("新人券已领取");
+        return success(response);
     }
 
     @GetMapping("/page")

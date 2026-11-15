@@ -21,6 +21,9 @@ public class AppTradeOrderSettlementRespVO {
     private List<Item> items;
 
     @Schema(description = "优惠劵数组", requiredMode = Schema.RequiredMode.REQUIRED)
+    private List<Long> effectiveCouponIds;
+    private java.util.Map<Long, String> couponExclusionReasons;
+
     private List<Coupon> coupons; // 可用 + 不可用
 
     @Schema(description = "费用", requiredMode = Schema.RequiredMode.REQUIRED)
