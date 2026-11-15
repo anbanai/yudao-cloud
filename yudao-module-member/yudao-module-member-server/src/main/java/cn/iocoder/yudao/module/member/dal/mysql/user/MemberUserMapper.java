@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -43,6 +44,16 @@ public interface MemberUserMapper extends BaseMapperX<MemberUserDO> {
     default List<MemberUserDO> selectListByNicknameLike(String nickname) {
         return selectList(new LambdaQueryWrapperX<MemberUserDO>()
                 .likeIfPresent(MemberUserDO::getNickname, nickname));
+    }
+
+    default List<MemberUserDO> selectListByTagIds(Collection<Long> tagIds, int limit) {
+        String tagIdSql = IntStream.range(0, tagIds.size())
+                .mapToObj(index -> MyBatisUtils.findInSetWithParamIndex("tag_ids", index))
+                .collect(Collectors.joining(" OR "));
+        return selectList(new LambdaQueryWrapperX<MemberUserDO>()
+                .apply(tagIdSql, tagIds.toArray())
+                .orderByAsc(MemberUserDO::getId)
+                .last("LIMIT " + limit));
     }
 
     default PageResult<MemberUserDO> selectPage(MemberUserPageReqVO reqVO) {

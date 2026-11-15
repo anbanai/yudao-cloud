@@ -26,6 +26,15 @@ public interface CouponApi {
     CommonResult<List<CouponRespDTO>> getCouponListByUserId(@RequestParam("userId") Long userId,
                                                             @RequestParam("status") Integer status);
 
+    @PutMapping(PREFIX + "/use-batch")
+    CommonResult<Boolean> useCoupons(@RequestBody List<Long> ids, @RequestParam("userId") Long userId, @RequestParam("orderId") Long orderId);
+
+    @PutMapping(PREFIX + "/return-batch")
+    CommonResult<Boolean> returnCoupons(@RequestBody List<Long> ids, @RequestParam("orderId") Long orderId);
+
+    @PutMapping(PREFIX + "/fulfill-exchange")
+    CommonResult<Boolean> fulfillExchange(@RequestParam("orderId") Long orderId);
+
     @PutMapping(PREFIX + "/use")
     @Operation(summary = "使用优惠劵")
     CommonResult<Boolean> useCoupon(@RequestBody @Valid CouponUseReqDTO useReqDTO);

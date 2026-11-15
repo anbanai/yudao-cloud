@@ -90,6 +90,9 @@ public interface MemberUserService {
      */
     List<MemberUserDO> getUserList(Collection<Long> ids);
 
+    /** Returns at most 5001 users matching any requested tag. */
+    List<MemberUserDO> getUserListByTagIds(Collection<Long> tagIds);
+
     /**
      * 【会员】修改基本信息
      *

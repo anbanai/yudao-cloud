@@ -25,6 +25,9 @@ public interface CouponService {
      * @param orderId 订单编号
      */
     void useCoupon(Long id, Long userId, Long orderId);
+    void useCoupons(List<Long> ids, Long userId, Long orderId);
+    void returnCoupons(List<Long> ids, Long orderId);
+    void fulfillExchange(Long orderId);
 
     /**
      * 退还已使用的优惠券

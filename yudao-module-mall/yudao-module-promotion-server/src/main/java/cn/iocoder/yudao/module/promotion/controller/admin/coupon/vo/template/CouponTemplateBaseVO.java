@@ -36,6 +36,26 @@ public class CouponTemplateBaseVO {
     @Schema(description = "优惠券说明", example = "优惠券使用说明")
     private String description;
 
+    @Schema(description = "优惠券类型：1 折扣券，2 商品兑换券", example = "1")
+    private Boolean newcomerOnly;
+
+    private Boolean stackWithPromotion;
+
+    private Integer couponType = 1;
+
+    @Schema(description = "兑换券绑定 SPU")
+    private Long exchangeSpuId;
+
+    @Schema(description = "兑换券绑定 SKU")
+    private Long exchangeSkuId;
+
+    @Schema(description = "是否允许叠加")
+    private Boolean canStack = Boolean.FALSE;
+
+    @Schema(description = "同组最多生效数量")
+    @Min(value = 1, message = "叠加上限必须大于 0")
+    private Integer stackLimit = 1;
+
     @Schema(description = "发行总量", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024") // -1 - 则表示不限制发放数量
     @NotNull(message = "发行总量不能为空")
     private Integer totalCount;

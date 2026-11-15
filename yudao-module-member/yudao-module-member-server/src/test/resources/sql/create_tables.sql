@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS "member_user"
     "email"       varchar(50)  NULL COMMENT '邮箱',
     "password"    varchar(100) NOT NULL DEFAULT '' COMMENT '密码',
     "register_ip" varchar(32)  NOT NULL COMMENT '注册 IP',
+    "register_terminal" tinyint NOT NULL DEFAULT 0 COMMENT '注册终端',
     "login_ip"    varchar(50)  NULL     DEFAULT '' COMMENT '最后登录IP',
     "login_date"  datetime     NULL     DEFAULT NULL COMMENT '最后登录时间',
     "tag_ids"     varchar(255) NULL     DEFAULT NULL COMMENT '用户标签编号列表,以逗号分隔',

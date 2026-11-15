@@ -46,7 +46,13 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
         MemberUserRespDTO user = memberUserApi.getUser(param.getUserId()).getCheckedData();
         result.setTotalPoint(user.getPoint()).setUsePoint(0);
 
-        // 1.1 校验积分抵扣是否开启
+        if (Boolean.TRUE.equals(result.getExchangeOrder())) { return; }
+
+        // 1.1 校验是否使用积分
+        if (!BooleanUtil.isTrue(param.getPointStatus())) {
+            return;
+        }
+        // 1.2 校验积分抵扣是否开启
         MemberConfigRespDTO config = memberConfigApi.getConfig().getCheckedData();
         if (!isDeductPointEnable(config)) {
             return;
@@ -65,8 +71,15 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
         if (!BooleanUtil.isTrue(param.getPointStatus()) || maxUsePoint == 0) {
             return;
         }
+        if (Boolean.FALSE.equals(result.getAllowPointStack())) {
+            if (Boolean.TRUE.equals(param.getStrictCouponSelection())) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                        cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRICE_CALCULATE_COUPON_CAN_NOT_USE,
+                        "所选券不允许与积分抵扣叠加");
+            }
+            return;
+        }
         result.setUsePoint(maxUsePoint);
-
         // 2.2 计算分摊的积分、抵扣金额
         List<TradePriceCalculateRespBO.OrderItem> orderItems = filterList(result.getItems(), TradePriceCalculateRespBO.OrderItem::getSelected);
         List<Integer> divideUsePoints = TradePriceCalculatorHelper.dividePointValue(orderItems, maxUsePoint);

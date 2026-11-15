@@ -1,0 +1,14 @@
+CMP-100 review verification, 2026-11-15
+
+Source revision: local review branch based on `teaworthshare` `9cdc610b`; remote advanced to `bbe6610c` during review and is being integrated before push.
+Environment: Temurin JDK 17.0.21, Maven 3.9.11, H2 service tests. No production database was contacted.
+
+Compile command: Maven reactor compile for member-server, promotion-server, and trade-server with `-am -DskipTests`.
+Compile result: BUILD SUCCESS, all 31 reactor projects.
+
+Test command: Maven reactor test for the same modules with `-am`, selecting `MemberUserMapperTest`, `MemberPointRecordServiceImplTest`, `CouponControllerBatchTest`, `CouponNewcomerServiceTest`, `CouponMarketingIntegrationTest`, `TradeCouponOrderHandlerTest`, `TradeCouponStackPolicyTest`, `TradeCouponPriceCalculatorTest`, and `TradeMemberPointOrderHandlerTest`.
+Test result: BUILD SUCCESS. Member: 10 tests; promotion: 15 tests; trade: 16 tests. Total: 41 tests, 0 failures, 0 errors, 0 skipped.
+
+The H2 tests cover tag union and cap behavior, controller operator/permission wiring, newcomer qualification, issuance preview and terminal failure persistence, atomic rollback and retry idempotency, promotion attribution, exchange lifecycle, coupon use/return, stack policy, and order handling.
+
+Not covered: MySQL 8 migration/re-run/rollback, live Feign order/payment/stock integration, real multi-tenant scheduler execution, and the cross-service order-creation/newcomer-eligibility race. These remain staging/release checks.

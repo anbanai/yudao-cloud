@@ -8,10 +8,16 @@ import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
 import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.template.AppCouponTemplatePageReqVO;
 import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.template.AppCouponTemplateRespVO;
+import cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.template.AppNewcomerCouponRespVO;
 import cn.iocoder.yudao.module.promotion.convert.coupon.CouponTemplateConvert;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponTemplateDO;
 import cn.iocoder.yudao.module.promotion.enums.common.PromotionProductScopeEnum;
 import cn.iocoder.yudao.module.promotion.enums.coupon.CouponTakeTypeEnum;
+import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
+import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
+import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
+import cn.iocoder.yudao.module.member.api.level.dto.MemberLevelRespDTO;
+import cn.iocoder.yudao.module.trade.api.order.TradeOrderApi;
 import cn.iocoder.yudao.module.promotion.service.coupon.CouponService;
 import cn.iocoder.yudao.module.promotion.service.coupon.CouponTemplateService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,9 +48,17 @@ public class AppCouponTemplateController {
     private CouponTemplateService couponTemplateService;
     @Resource
     private CouponService couponService;
+    @Resource
+    private cn.iocoder.yudao.module.promotion.service.coupon.CouponNewcomerService newcomerService;
 
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private MemberUserApi memberUserApi;
+    @Resource
+    private MemberLevelApi memberLevelApi;
+    @Resource
+    private TradeOrderApi tradeOrderApi;
 
     @GetMapping("/get")
     @Operation(summary = "获得优惠劵模版")
@@ -59,6 +73,14 @@ public class AppCouponTemplateController {
         Map<Long, Boolean> canCanTakeMap = couponService.getUserCanCanTakeMap(getLoginUserId(), singletonList(template));
         return success(BeanUtils.toBean(template, AppCouponTemplateRespVO.class)
                 .setCanTake(canCanTakeMap.get(template.getId())));
+    }
+
+    @GetMapping("/newcomer")
+    @Operation(summary = "首页新人券配置与当前领取资格")
+    @Parameter(name = "id", description = "首页 DIY 配置的优惠券模板编号", required = true, example = "1024")
+    @PermitAll
+    public CommonResult<AppNewcomerCouponRespVO> getNewcomerCoupon(@RequestParam("id") Long id) {
+        return success(newcomerService.qualification(id, getLoginUserId()));
     }
 
     @GetMapping("/list")

@@ -25,7 +25,7 @@ public enum TradeOrderOperateTypeEnum {
     SYSTEM_COMMENT(34, "到期未评价，系统自动评价"),
     MEMBER_CANCEL(40, "取消订单"),
     SYSTEM_CANCEL(41, "到期未支付，系统自动取消订单"),
-    // 42 预留：管理员取消订单
+    ADMIN_CANCEL(42, "运营取消订单"),
     ADMIN_CANCEL_AFTER_SALE(43, "订单全部售后，管理员自动取消订单"),
     MEMBER_DELETE(49, "删除订单"),
     ;

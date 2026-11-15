@@ -47,7 +47,7 @@ public interface CouponTemplateMapper extends BaseMapperX<CouponTemplateDO> {
                 .setSql("take_count = take_count + " + incrCount);
         // 增加已领取的数量（incrCount 为正数），需要考虑发放数量 totalCount 的限制
         if (incrCount > 0) {
-            updateWrapper.and(i -> i.apply("take_count < total_count")
+            updateWrapper.and(i -> i.apply("take_count + {0} <= total_count", incrCount)
                     .or().eq(CouponTemplateDO::getTotalCount, CouponTemplateDO.TOTAL_COUNT_MAX));
         }
         return update(updateWrapper);

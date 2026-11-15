@@ -55,6 +55,14 @@ public interface CouponMapper extends BaseMapperX<CouponDO> {
                 .eq(CouponDO::getId, id).eq(CouponDO::getStatus, status));
     }
 
+    default int useExchangeCoupon(Long id, Long userId, Long orderId) {
+        return update(null, new LambdaUpdateWrapper<CouponDO>()
+                .eq(CouponDO::getId, id).eq(CouponDO::getUserId, userId)
+                .eq(CouponDO::getStatus, cn.iocoder.yudao.module.promotion.enums.coupon.CouponStatusEnum.UNUSED.getStatus())
+                .set(CouponDO::getStatus, cn.iocoder.yudao.module.promotion.enums.coupon.CouponStatusEnum.USED.getStatus())
+                .set(CouponDO::getUseOrderId, orderId).set(CouponDO::getUseTime, LocalDateTime.now()));
+    }
+
     default Long selectCountByUserIdAndStatus(Long userId, Integer status) {
         return selectCount(new LambdaQueryWrapperX<CouponDO>()
                 .eq(CouponDO::getUserId, userId)

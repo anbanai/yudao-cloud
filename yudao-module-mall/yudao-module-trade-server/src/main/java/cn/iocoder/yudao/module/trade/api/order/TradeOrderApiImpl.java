@@ -38,6 +38,15 @@ public class TradeOrderApiImpl implements TradeOrderApi {
         return success(TradeOrderConvert.INSTANCE.convert(tradeOrderQueryService.getOrder(id)));
     }
 
+    @Resource private cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper couponOrderMapper;
+    @Override
+    public CommonResult<Integer> getCouponOrderStatus(Long id) { return success(couponOrderMapper.selectCouponOrderStatus(id)); }
+
+    @Override
+    public CommonResult<Boolean> hasOrderHistory(Long userId) {
+        return success(tradeOrderQueryService.hasOrderHistory(userId));
+    }
+
     @Override
     public CommonResult<Boolean> cancelPaidOrder(Long userId, Long orderId, Integer cancelType) {
         tradeOrderUpdateService.cancelPaidOrder(userId, orderId, cancelType);

@@ -36,7 +36,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
     default PageResult<TradeOrderDO> selectPage(TradeOrderPageReqVO reqVO, Set<Long> userIds) {
         return selectPage(reqVO, new LambdaQueryWrapperX<TradeOrderDO>()
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
-                .eqIfPresent(TradeOrderDO::getUserId, reqVO.getUserId())
+                .eq(reqVO.getUserId() != null, TradeOrderDO::getUserId, reqVO.getUserId())
                 .eqIfPresent(TradeOrderDO::getDeliveryType, reqVO.getDeliveryType())
                 .inIfPresent(TradeOrderDO::getUserId, userIds)
                 .eqIfPresent(TradeOrderDO::getType, reqVO.getType())
@@ -47,6 +47,9 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .inIfPresent(TradeOrderDO::getPickUpStoreId, reqVO.getPickUpStoreIds())
                 .likeIfPresent(TradeOrderDO::getPickUpVerifyCode, reqVO.getPickUpVerifyCode())
                 .betweenIfPresent(TradeOrderDO::getCreateTime, reqVO.getCreateTime())
+                .apply(cn.hutool.core.util.StrUtil.isNotBlank(reqVO.getProductName()),
+                        "EXISTS (SELECT 1 FROM trade_order_item toi WHERE toi.order_id = trade_order.id " +
+                                "AND toi.spu_name LIKE {0})", "%" + reqVO.getProductName() + "%")
                 .orderByDesc(TradeOrderDO::getId));
     }
 
@@ -58,7 +61,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .selectSum(TradeOrderDO::getPayPrice, "price")  // 售后状态对应的支付金额
                 .selectSum(TradeOrderDO::getProductCount, "productCount") // 售后状态对应的商品数量
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
-                .eqIfPresent(TradeOrderDO::getUserId, reqVO.getUserId())
+                .eq(reqVO.getUserId() != null, TradeOrderDO::getUserId, reqVO.getUserId())
                 .eqIfPresent(TradeOrderDO::getDeliveryType, reqVO.getDeliveryType())
                 .inIfPresent(TradeOrderDO::getUserId, userIds)
                 .eqIfPresent(TradeOrderDO::getType, reqVO.getType())
@@ -69,6 +72,9 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .inIfPresent(TradeOrderDO::getPickUpStoreId, reqVO.getPickUpStoreIds())
                 .likeIfPresent(TradeOrderDO::getPickUpVerifyCode, reqVO.getPickUpVerifyCode())
                 .betweenIfPresent(TradeOrderDO::getCreateTime, reqVO.getCreateTime())
+                .apply(cn.hutool.core.util.StrUtil.isNotBlank(reqVO.getProductName()),
+                        "EXISTS (SELECT 1 FROM trade_order_item toi WHERE toi.order_id = trade_order.id " +
+                                "AND toi.spu_name LIKE {0})", "%" + reqVO.getProductName() + "%")
                 .groupBy(TradeOrderDO::getRefundStatus)); // 按售后状态分组
     }
 
@@ -86,6 +92,13 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .eqIfPresent(TradeOrderDO::getStatus, status)
                 .eqIfPresent(TradeOrderDO::getCommentStatus, commentStatus));
     }
+
+    @org.apache.ibatis.annotations.Select("SELECT status FROM trade_order WHERE id = #{id}")
+    Integer selectCouponOrderStatus(@org.apache.ibatis.annotations.Param("id") Long id);
+
+    // Logical deletion of an order does not restore newcomer eligibility; tenant interceptor still applies.
+    @org.apache.ibatis.annotations.Select("SELECT COUNT(*) > 0 FROM trade_order WHERE user_id = #{userId}")
+    boolean selectExistsByUserId(@org.apache.ibatis.annotations.Param("userId") Long userId);
 
     default TradeOrderDO selectOrderByIdAndUserId(Long orderId, Long loginUserId) {
         return selectOne(new LambdaQueryWrapperX<TradeOrderDO>()

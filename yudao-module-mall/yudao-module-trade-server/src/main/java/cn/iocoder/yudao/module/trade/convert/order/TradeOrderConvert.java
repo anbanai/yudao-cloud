@@ -62,7 +62,8 @@ public interface TradeOrderConvert {
     @Mappings({
             @Mapping(target = "id", ignore = true),
             @Mapping(source = "userId", target = "userId"),
-            @Mapping(source = "createReqVO.couponId", target = "couponId"),
+            @Mapping(source = "calculateRespBO.couponId", target = "couponId"),
+            @Mapping(source = "calculateRespBO.effectiveCouponIds", target = "couponIds"),
             @Mapping(target = "remark", ignore = true),
             @Mapping(source = "createReqVO.remark", target = "userRemark"),
             @Mapping(source = "calculateRespBO.price.totalPrice", target = "totalPrice"),
@@ -237,7 +238,7 @@ public interface TradeOrderConvert {
                                              List<CartDO> cartList) {
         TradePriceCalculateReqBO reqBO = new TradePriceCalculateReqBO().setUserId(userId)
                 .setItems(new ArrayList<>(settlementReqVO.getItems().size()))
-                .setCouponId(settlementReqVO.getCouponId()).setPointStatus(settlementReqVO.getPointStatus())
+                .setCouponId(settlementReqVO.getCouponId()).setCouponIds(settlementReqVO.getCouponIds()).setPointStatus(settlementReqVO.getPointStatus())
                 // 物流信息
                 .setDeliveryType(settlementReqVO.getDeliveryType()).setAddressId(settlementReqVO.getAddressId())
                 .setPickUpStoreId(settlementReqVO.getPickUpStoreId())

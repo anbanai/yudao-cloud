@@ -1,9 +1,11 @@
 package cn.iocoder.yudao.module.trade.controller.admin.order;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.*;
@@ -19,10 +21,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +39,8 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
+import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
 
 @Tag(name = "管理后台 - 交易订单")
 @RestController
@@ -79,6 +87,35 @@ public class TradeOrderController {
     @PreAuthorize("@ss.hasPermission('trade:order:query')")
     public CommonResult<TradeOrderSummaryRespVO> getOrderSummary(TradeOrderPageReqVO reqVO) {
         return success(tradeOrderQueryService.getOrderSummary(reqVO));
+    }
+
+    @GetMapping("/export-excel")
+    @Operation(summary = "导出交易订单")
+    @PreAuthorize("@ss.hasPermission('trade:order:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportOrderExcel(@ModelAttribute TradeOrderPageReqVO reqVO,
+                                 HttpServletResponse response) throws IOException {
+        reqVO.setPageNo(1);
+        reqVO.setPageSize(-1);
+        List<TradeOrderExcelVO> data = tradeOrderQueryService.getOrderPage(reqVO).getList().stream()
+                .map(order -> BeanUtils.toBean(order, TradeOrderExcelVO.class)).toList();
+        ExcelUtils.write(response, "交易订单.xls", "订单列表", TradeOrderExcelVO.class, data);
+    }
+
+    @PutMapping("/cancel")
+    @Operation(summary = "运营取消订单")
+    @PreAuthorize("@ss.hasPermission('trade:order:update')")
+    public CommonResult<Boolean> cancelOrder(@Valid @RequestBody TradeOrderCancelReqVO reqVO) {
+        tradeOrderUpdateService.cancelOrderByAdmin(reqVO.getId(), reqVO.getReason());
+        return success(true);
+    }
+
+    @PostMapping("/refund")
+    @Operation(summary = "订单部分退款")
+    @PreAuthorize("@ss.hasPermission('trade:order:refund')")
+    public CommonResult<Boolean> refundOrder(@Valid @RequestBody TradeOrderRefundReqVO reqVO) {
+        tradeOrderUpdateService.refundOrderPartially(reqVO, getClientIP());
+        return success(true);
     }
 
     @GetMapping("/get-detail")

@@ -35,6 +35,7 @@ import cn.iocoder.yudao.module.promotion.enums.combination.CombinationRecordStat
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRefundReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRemarkReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateAddressReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdatePriceReqVO;
@@ -153,7 +154,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         }
 
         // 2. 计算价格
-        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, settlementReqVO);
+        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, settlementReqVO, false);
 
         // 3. 拼接返回
         return TradeOrderConvert.INSTANCE.convert(calculateRespBO, address);
@@ -180,13 +181,14 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
      * @param settlementReqVO 结算信息
      * @return 订单价格
      */
-    private TradePriceCalculateRespBO calculatePrice(Long userId, AppTradeOrderSettlementReqVO settlementReqVO) {
+    private TradePriceCalculateRespBO calculatePrice(Long userId, AppTradeOrderSettlementReqVO settlementReqVO, boolean strict) {
         // 1. 如果来自购物车，则获得购物车的商品
         List<CartDO> cartList = cartService.getCartList(userId,
                 convertSet(settlementReqVO.getItems(), AppTradeOrderSettlementReqVO.Item::getCartId));
 
         // 2. 计算价格
         TradePriceCalculateReqBO calculateReqBO = TradeOrderConvert.INSTANCE.convert(userId, settlementReqVO, cartList);
+        calculateReqBO.setStrictCouponSelection(strict);
         calculateReqBO.getItems().forEach(item -> Assert.isTrue(item.getSelected(), // 防御性编程，保证都是选中的
                 "商品({}) 未设置为选中", item.getSkuId()));
         return tradePriceService.calculateOrderPrice(calculateReqBO);
@@ -197,7 +199,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.MEMBER_CREATE)
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
         // 1.1 价格计算
-        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO);
+        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO, true);
         validateExpectedPrice(userId, createReqVO, calculateRespBO);
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
@@ -687,6 +689,63 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.ADMIN_CANCEL)
+    public void cancelOrderByAdmin(Long id, String reason) {
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(id);
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        if (!TradeOrderStatusEnum.isUnpaid(order.getStatus())
+                && !TradeOrderStatusEnum.isUndelivered(order.getStatus())) {
+            throw exception(ORDER_ADMIN_CANCEL_FAIL_STATUS);
+        }
+        if (TradeOrderRefundStatusEnum.NONE.getStatus().equals(order.getRefundStatus()) == false) {
+            throw exception(ORDER_ADMIN_CANCEL_FAIL_STATUS);
+        }
+
+        boolean paid = Boolean.TRUE.equals(order.getPayStatus());
+        cancelOrder0(order, TradeOrderCancelTypeEnum.ADMIN_CANCEL);
+        if (paid) {
+            createOrderRefund(order, order.getPayPrice(), StrUtil.blankToDefault(reason, "运营取消订单"),
+                    "order-" + order.getId(), getClientIP());
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refundOrderPartially(TradeOrderRefundReqVO reqVO, String userIp) {
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(reqVO.getId());
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        if (!Boolean.TRUE.equals(order.getPayStatus())) {
+            throw exception(ORDER_REFUND_FAIL_NOT_PAID);
+        }
+        if (TradeOrderStatusEnum.isCanceled(order.getStatus())) {
+            throw exception(ORDER_REFUND_FAIL_ALREADY_CANCELLED);
+        }
+        int refunded = order.getRefundPrice() == null ? 0 : order.getRefundPrice();
+        int remaining = order.getPayPrice() - refunded;
+        if (reqVO.getRefundPrice() > remaining) {
+            throw exception(ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING);
+        }
+        createOrderRefund(order, reqVO.getRefundPrice(), StrUtil.blankToDefault(reqVO.getReason(), "订单部分退款"),
+                "order-partial-" + order.getId() + "-" + reqVO.getRefundPrice(), userIp);
+    }
+
+    private void createOrderRefund(TradeOrderDO order, Integer refundPrice, String reason,
+                                   String merchantRefundId, String userIp) {
+        payRefundApi.createRefund(new PayRefundCreateReqDTO()
+                .setAppKey(tradeOrderProperties.getPayAppKey())
+                .setUserIp(StrUtil.blankToDefault(userIp, NetUtil.getLocalhostStr()))
+                .setUserId(order.getUserId()).setUserType(UserTypeEnum.MEMBER.getValue())
+                .setMerchantOrderId(String.valueOf(order.getId()))
+                .setMerchantRefundId(merchantRefundId)
+                .setReason(reason).setPrice(refundPrice)).checkError();
+    }
+
+    @Override
     public int cancelOrderBySystem() {
         // 1. 查询过期的待支付订单
         LocalDateTime expireTime = minusTime(tradeOrderProperties.getPayExpireTime());
@@ -1148,6 +1207,23 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (!PayRefundStatusEnum.isSuccess(payRefund.getStatus())) {
             throw exception(ORDER_UPDATE_PAID_ORDER_REFUNDED_FAIL_REFUND_STATUS_NOT_SUCCESS);
         }
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(id);
+        if (order == null || !String.valueOf(id).equals(payRefund.getMerchantOrderId())) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        int refundPrice = payRefund.getRefundPrice() == null ? 0 : payRefund.getRefundPrice();
+        int currentRefundPrice = order.getRefundPrice() == null ? 0 : order.getRefundPrice();
+        if (refundPrice <= 0 || currentRefundPrice >= order.getPayPrice()) {
+            return;
+        }
+        int totalRefundPrice = currentRefundPrice + refundPrice;
+        if (totalRefundPrice > order.getPayPrice()) {
+            throw exception(ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING);
+        }
+        tradeOrderMapper.updateById(new TradeOrderDO().setId(id)
+                .setRefundPrice(totalRefundPrice)
+                .setRefundStatus(totalRefundPrice == order.getPayPrice()
+                        ? TradeOrderRefundStatusEnum.ALL.getStatus() : TradeOrderRefundStatusEnum.PART.getStatus()));
     }
 
     @Override

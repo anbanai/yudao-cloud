@@ -45,6 +45,13 @@ public class CouponDO extends BaseDO {
      * 冗余 {@link CouponTemplateDO#getName()}
      */
     private String name;
+    private Integer couponType;
+    private Boolean stackWithPromotion;
+    private Long promotionId;
+    private Long exchangeSpuId;
+    private Long exchangeSkuId;
+    private Boolean canStack;
+    private Integer stackLimit;
     /**
      * 优惠码状态
      *

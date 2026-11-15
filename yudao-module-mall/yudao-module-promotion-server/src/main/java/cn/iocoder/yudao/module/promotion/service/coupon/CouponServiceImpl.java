@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.promotion.convert.coupon.CouponConvert;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponDO;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponTemplateDO;
 import cn.iocoder.yudao.module.promotion.dal.mysql.coupon.CouponMapper;
+import cn.iocoder.yudao.module.promotion.dal.mysql.coupon.CouponTemplateMapper;
 import cn.iocoder.yudao.module.promotion.enums.coupon.CouponStatusEnum;
 import cn.iocoder.yudao.module.promotion.enums.coupon.CouponTakeTypeEnum;
 import cn.iocoder.yudao.module.promotion.enums.coupon.CouponTemplateValidityTypeEnum;
@@ -48,6 +49,11 @@ public class CouponServiceImpl implements CouponService {
 
     @Resource
     private CouponTemplateService couponTemplateService;
+    @Resource
+    private CouponNewcomerService newcomerService;
+
+    @Resource
+    private CouponTemplateMapper couponTemplateMapper;
 
     @Resource
     private CouponMapper couponMapper;
@@ -55,10 +61,46 @@ public class CouponServiceImpl implements CouponService {
     @Resource
     private MemberUserApi memberUserApi;
 
+    @Resource private cn.iocoder.yudao.module.promotion.dal.mysql.coupon.CouponExchangeRecordMapper exchangeMapper;
+
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void useCoupons(List<Long> ids, Long userId, Long orderId) {
+        for (Long id : new TreeSet<>(ids)) { useCoupon(id, userId, orderId); }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void returnCoupons(List<Long> ids, Long orderId) {
+        for (Long id : new TreeSet<>(ids)) {
+            CouponDO coupon = couponMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<CouponDO>()
+                .eq(CouponDO::getId, id).last("FOR UPDATE"));
+            if (coupon == null) { throw exception(COUPON_NOT_EXISTS); }
+            // Reject an old cancel callback after a returned coupon was used on another order.
+            if (Objects.equals(coupon.getUseOrderId(), orderId)) { returnUsedCoupon(id); }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void fulfillExchange(Long orderId) {
+        exchangeMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO>()
+                .eq(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getOrderId, orderId)
+                .eq(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getStatus, 0)
+                .set(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getStatus, 1)
+                .set(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getFulfilledTime, LocalDateTime.now()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void useCoupon(Long id, Long userId, Long orderId) {
         // 校验状态
-        CouponDO coupon = couponMapper.selectByIdAndUserId(id, userId);
+        CouponDO coupon = couponMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<CouponDO>()
+                .eq(CouponDO::getId, id).eq(CouponDO::getUserId, userId).last("FOR UPDATE"));
+        if (coupon == null) {
+            throw exception(COUPON_NOT_EXISTS);
+        }
+        if (Objects.equals(coupon.getStatus(), CouponStatusEnum.USED.getStatus()) && Objects.equals(coupon.getUseOrderId(), orderId)) { return; }
         if (ObjectUtil.notEqual(coupon.getStatus(), CouponStatusEnum.UNUSED.getStatus())) {
             throw exception(COUPON_STATUS_NOT_UNUSED);
         }
@@ -74,19 +116,24 @@ public class CouponServiceImpl implements CouponService {
         if (updateCount == 0) {
             throw exception(COUPON_STATUS_NOT_UNUSED);
         }
+        if (Integer.valueOf(2).equals(coupon.getCouponType())) {
+            exchangeMapper.insert(new cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO()
+                    .setCouponId(id).setUserId(userId).setSpuId(coupon.getExchangeSpuId()).setSkuId(coupon.getExchangeSkuId())
+                    .setStatus(0).setOrderId(orderId).setIdempotencyKey(orderId + ":" + id));
+        }
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void returnUsedCoupon(Long id) {
         // 校验存在
-        CouponDO coupon = couponMapper.selectById(id);
+        CouponDO coupon = couponMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<CouponDO>()
+                .eq(CouponDO::getId, id).last("FOR UPDATE"));
         if (coupon == null) {
             throw exception(COUPON_NOT_EXISTS);
         }
-        // 校验状态
-        if (ObjectUtil.notEqual(coupon.getStatus(), CouponStatusEnum.USED.getStatus())) {
-            throw exception(COUPON_STATUS_NOT_USED);
-        }
+        // Duplicate refund callbacks are no-ops after the first return.
+        if (ObjectUtil.notEqual(coupon.getStatus(), CouponStatusEnum.USED.getStatus())) { return; }
 
         // 退还
         Integer status = LocalDateTimeUtils.beforeNow(coupon.getValidEndTime())
@@ -98,7 +145,12 @@ public class CouponServiceImpl implements CouponService {
             throw exception(COUPON_STATUS_NOT_USED);
         }
 
-        // TODO 增加优惠券变动记录？
+        exchangeMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO>()
+                .eq(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getCouponId, id)
+                .eq(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getOrderId, coupon.getUseOrderId())
+                .ne(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getStatus, 2)
+                .set(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getStatus, 2)
+                .set(cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponExchangeRecordDO::getCancelTime, LocalDateTime.now()));
     }
 
     @Override
@@ -121,22 +173,33 @@ public class CouponServiceImpl implements CouponService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Map<Long, List<Long>> takeCoupon(Long templateId, Set<Long> userIds, CouponTakeTypeEnum takeType) {
-        CouponTemplateDO template = couponTemplateService.getCouponTemplate(templateId);
+        CouponTemplateDO template = couponTemplateMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<CouponTemplateDO>()
+                .eq(CouponTemplateDO::getId, templateId).last("FOR UPDATE"));
+        userIds = new HashSet<>(userIds);
         return takeCoupon(template, userIds, takeType);
     }
 
     private Map<Long, List<Long>> takeCoupon(CouponTemplateDO template, Set<Long> userIds, CouponTakeTypeEnum takeType) {
+        // Validate before filtering so a missing template cannot produce an NPE.
+        validateCouponTemplateCanTake(template, userIds, takeType);
+        if (takeType == CouponTakeTypeEnum.USER && Boolean.TRUE.equals(template.getNewcomerOnly())) {
+            for (Long userId : userIds) {
+                cn.iocoder.yudao.module.promotion.controller.app.coupon.vo.template.AppNewcomerCouponRespVO q = newcomerService.qualification(template.getId(), userId);
+                if (q == null || !Boolean.TRUE.equals(q.getCanTake())) { throw exception(COUPON_TEMPLATE_CANNOT_TAKE); }
+            }
+        }
         // 1. 过滤掉达到领取限制的用户
         removeTakeLimitUser(userIds, template);
         // 2. 校验优惠劵是否可以领取
         validateCouponTemplateCanTake(template, userIds, takeType);
+
+        couponTemplateService.updateCouponTemplateTakeCount(template.getId(), userIds.size());
 
         // 3. 批量保存优惠劵
         List<CouponDO> couponList = convertList(userIds, userId -> CouponConvert.INSTANCE.convert(template, userId));
         couponMapper.insertBatch(couponList);
 
         // 4. 增加优惠劵模板的领取数量
-        couponTemplateService.updateCouponTemplateTakeCount(template.getId(), userIds.size());
         return convertMultiMap(couponList, CouponDO::getUserId, CouponDO::getId);
     }
 
@@ -243,10 +306,8 @@ public class CouponServiceImpl implements CouponService {
             return;
         }
 
-        // 2.1 减少优惠劵模板的领取数量
-        couponTemplateService.updateCouponTemplateTakeCount(couponTemplate.getId(), -1);
-        // 2.2 作废优惠劵
-        couponMapper.deleteById(couponId);
+        int deleted = couponMapper.delete(couponId, asList(CouponStatusEnum.UNUSED.getStatus(), CouponStatusEnum.EXPIRE.getStatus()));
+        if (deleted > 0) { couponTemplateService.updateCouponTemplateTakeCount(couponTemplate.getId(), -1); }
     }
 
     @Override
@@ -325,15 +386,17 @@ public class CouponServiceImpl implements CouponService {
         if (couponTemplate == null) {
             throw exception(COUPON_TEMPLATE_NOT_EXISTS);
         }
+        if (!Integer.valueOf(0).equals(couponTemplate.getStatus())) {
+            throw exception(COUPON_TEMPLATE_CANNOT_TAKE);
+        }
         // 校验领取方式
         if (ObjUtil.notEqual(couponTemplate.getTakeType(), takeType.getType())) {
             throw exception(COUPON_TEMPLATE_CANNOT_TAKE);
         }
         // 校验剩余发放数量是否充足（仅在 CouponTakeTypeEnum.USER 用户领取时）
         // 关联案例：https://t.zsxq.com/mElGQ、https://t.zsxq.com/6pLzr
-        if (CouponTakeTypeEnum.isUser(couponTemplate.getTakeType())
-                && !couponTemplateService.isTotalCountUnlimited(couponTemplate.getTotalCount()) // 校验不限制总发放数量
-                && couponTemplate.getTakeCount() > couponTemplate.getTotalCount()) { // 已领取数量 > 总发放数量
+        if (!couponTemplateService.isTotalCountUnlimited(couponTemplate.getTotalCount()) // 校验不限制总发放数量
+                && (long) couponTemplate.getTakeCount() + userIds.size() > couponTemplate.getTotalCount()) { // 已领取数量已达到总发放数量
             throw exception(COUPON_TEMPLATE_NOT_ENOUGH);
         }
         // 校验"固定日期"的有效期类型是否过期
@@ -431,7 +494,8 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private CouponDO validateCouponExists(Long id) {
-        CouponDO coupon = couponMapper.selectById(id);
+        CouponDO coupon = couponMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<CouponDO>()
+                .eq(CouponDO::getId, id).last("FOR UPDATE"));
         if (coupon == null) {
             throw exception(COUPON_NOT_EXISTS);
         }

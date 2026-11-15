@@ -148,6 +148,17 @@ public class MemberUserServiceImpl implements MemberUserService {
     }
 
     @Override
+    public List<MemberUserDO> getUserListByTagIds(Collection<Long> tagIds) {
+        if (CollUtil.isEmpty(tagIds)) {
+            return ListUtil.empty();
+        }
+        if (tagIds.size() > 100) {
+            throw new IllegalArgumentException("每次最多查询100个会员标签");
+        }
+        return memberUserMapper.selectListByTagIds(tagIds, 5001);
+    }
+
+    @Override
     public void updateUser(Long userId, AppMemberUserUpdateReqVO reqVO) {
         // 1.1 检测用户是否存在
         validateUserExists(userId);

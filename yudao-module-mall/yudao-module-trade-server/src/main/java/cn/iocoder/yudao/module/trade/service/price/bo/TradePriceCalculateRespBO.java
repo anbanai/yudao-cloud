@@ -54,6 +54,12 @@ public class TradePriceCalculateRespBO {
      */
     private List<Coupon> coupons;
 
+    /** 结算时实际生效的券及被排除原因，保留单券 couponId 兼容旧客户端。 */
+    private List<Long> effectiveCouponIds;
+    private Boolean exchangeOrder;
+    private Boolean allowPointStack;
+    private Map<Long, String> couponExclusionReasons;
+
     /**
      * 会员剩余积分
      */
