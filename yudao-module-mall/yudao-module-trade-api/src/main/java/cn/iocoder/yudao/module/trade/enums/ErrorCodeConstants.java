@@ -45,6 +45,10 @@ public interface ErrorCodeConstants {
     ErrorCode ORDER_PICK_UP_FAIL_STATUS_NOT_UNDELIVERED = new ErrorCode(1_011_000_039, "交易订单自提失败，订单不是【待核销】状态");
     ErrorCode ORDER_CREATE_PRICE_CHANGED = new ErrorCode(1_011_000_040, "订单价格或积分抵扣已变化，请重新确认");
     ErrorCode ORDER_CREATE_MERCHANT_REQUIRED = new ErrorCode(1_011_000_042, "交易订单创建失败，商品缺少有效商家归属，请先完成数据迁移");
+    ErrorCode ORDER_ADMIN_CANCEL_FAIL_STATUS = new ErrorCode(1_011_000_043, "运营取消失败，订单当前状态不允许取消");
+    ErrorCode ORDER_REFUND_FAIL_NOT_PAID = new ErrorCode(1_011_000_044, "订单尚未支付，不能退款");
+    ErrorCode ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING = new ErrorCode(1_011_000_045, "退款金额超过订单剩余可退金额");
+    ErrorCode ORDER_REFUND_FAIL_ALREADY_CANCELLED = new ErrorCode(1_011_000_046, "订单已取消，请勿重复退款");
 
     // ========== After Sale 模块 1-011-000-100 ==========
     ErrorCode AFTER_SALE_NOT_FOUND = new ErrorCode(1_011_000_100, "售后单不存在");

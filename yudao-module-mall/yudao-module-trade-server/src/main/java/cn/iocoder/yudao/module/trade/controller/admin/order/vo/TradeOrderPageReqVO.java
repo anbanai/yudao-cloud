@@ -21,6 +21,9 @@ public class TradeOrderPageReqVO extends PageParam {
     @Schema(description = "订单号", example = "88888888")
     private String no;
 
+    @Schema(description = "商品名称", example = "红茶")
+    private String productName;
+
     @Schema(description = "用户编号", example = "1024")
     private Long userId;
 

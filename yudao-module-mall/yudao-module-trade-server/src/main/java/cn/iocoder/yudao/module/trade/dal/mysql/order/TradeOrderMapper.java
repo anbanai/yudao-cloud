@@ -36,6 +36,9 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
     default PageResult<TradeOrderDO> selectPage(TradeOrderPageReqVO reqVO, Set<Long> userIds) {
         return selectPage(reqVO, new LambdaQueryWrapperX<TradeOrderDO>()
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
+                .apply(cn.hutool.core.util.StrUtil.isNotBlank(reqVO.getProductName()),
+                        "EXISTS (SELECT 1 FROM trade_order_item toi WHERE toi.order_id = trade_order.id " +
+                                "AND toi.spu_name LIKE {0})", "%" + reqVO.getProductName() + "%")
                 .eqIfPresent(TradeOrderDO::getUserId, reqVO.getUserId())
                 .eqIfPresent(TradeOrderDO::getDeliveryType, reqVO.getDeliveryType())
                 .inIfPresent(TradeOrderDO::getUserId, userIds)
@@ -58,6 +61,9 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .selectSum(TradeOrderDO::getPayPrice, "price")  // 售后状态对应的支付金额
                 .selectSum(TradeOrderDO::getProductCount, "productCount") // 售后状态对应的商品数量
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
+                .apply(cn.hutool.core.util.StrUtil.isNotBlank(reqVO.getProductName()),
+                        "EXISTS (SELECT 1 FROM trade_order_item toi WHERE toi.order_id = trade_order.id " +
+                                "AND toi.spu_name LIKE {0})", "%" + reqVO.getProductName() + "%")
                 .eqIfPresent(TradeOrderDO::getUserId, reqVO.getUserId())
                 .eqIfPresent(TradeOrderDO::getDeliveryType, reqVO.getDeliveryType())
                 .inIfPresent(TradeOrderDO::getUserId, userIds)

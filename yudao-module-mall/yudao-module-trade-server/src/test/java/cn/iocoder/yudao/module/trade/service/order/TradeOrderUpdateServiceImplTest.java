@@ -4,6 +4,10 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderUpdatePriceReqDTO;
+import cn.iocoder.yudao.module.pay.api.refund.PayRefundApi;
+import cn.iocoder.yudao.module.pay.api.refund.dto.PayRefundRespDTO;
+import cn.iocoder.yudao.module.pay.enums.refund.PayRefundStatusEnum;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRefundReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdatePriceReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -84,6 +88,75 @@ class TradeOrderUpdateServiceImplTest {
             assertThat(plan.getMerchantId()).isEqualTo(2L);
             assertThat(plan.getAmount()).isEqualTo(150);
         });
+    }
+
+    @Test
+    void updatePaidOrderRefunded_usesCumulativeTargetAndIgnoresDuplicateCallback() {
+        TradeOrderMapper orderMapper = mock(TradeOrderMapper.class);
+        PayRefundApi refundApi = mock(PayRefundApi.class);
+        ReflectionTestUtils.setField(service, "tradeOrderMapper", orderMapper);
+        ReflectionTestUtils.setField(service, "payRefundApi", refundApi);
+        TradeOrderDO order = new TradeOrderDO().setId(1L).setPayPrice(100).setRefundPrice(0);
+        when(orderMapper.selectByIdForUpdate(1L)).thenReturn(order);
+        PayRefundRespDTO refund = new PayRefundRespDTO().setStatus(PayRefundStatusEnum.SUCCESS.getStatus())
+                .setRefundPrice(40).setMerchantOrderId("1").setMerchantRefundId("order-1-partial-40");
+        when(refundApi.getRefund(7L)).thenReturn(CommonResult.success(refund));
+
+        service.updatePaidOrderRefunded(1L, 7L);
+
+        ArgumentCaptor<TradeOrderDO> update = ArgumentCaptor.forClass(TradeOrderDO.class);
+        verify(orderMapper).updateById(update.capture());
+        assertThat(update.getValue().getRefundPrice()).isEqualTo(40);
+
+        order.setRefundPrice(40);
+        service.updatePaidOrderRefunded(1L, 7L);
+        verify(orderMapper, times(1)).updateById(any(TradeOrderDO.class));
+    }
+
+    @Test
+    void updatePaidOrderRefunded_rejectsTargetAboveOrderPayPrice() {
+        TradeOrderMapper orderMapper = mock(TradeOrderMapper.class);
+        PayRefundApi refundApi = mock(PayRefundApi.class);
+        ReflectionTestUtils.setField(service, "tradeOrderMapper", orderMapper);
+        ReflectionTestUtils.setField(service, "payRefundApi", refundApi);
+        when(orderMapper.selectByIdForUpdate(1L)).thenReturn(new TradeOrderDO().setId(1L)
+                .setPayPrice(100).setRefundPrice(0));
+        PayRefundRespDTO refund = new PayRefundRespDTO().setStatus(PayRefundStatusEnum.SUCCESS.getStatus())
+                .setRefundPrice(120).setMerchantOrderId("1").setMerchantRefundId("order-1-partial-120");
+        when(refundApi.getRefund(7L)).thenReturn(CommonResult.success(refund));
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> service.updatePaidOrderRefunded(1L, 7L));
+        assertThat(exception.getCode()).isEqualTo(1_011_000_045);
+    }
+
+    @Test
+    void refundOrderPartially_rejectsAmountAboveRemainingBalance() {
+        TradeOrderMapper orderMapper = mock(TradeOrderMapper.class);
+        PayRefundApi refundApi = mock(PayRefundApi.class);
+        ReflectionTestUtils.setField(service, "tradeOrderMapper", orderMapper);
+        ReflectionTestUtils.setField(service, "payRefundApi", refundApi);
+        when(orderMapper.selectByIdForUpdate(1L)).thenReturn(new TradeOrderDO().setId(1L)
+                .setPayStatus(true).setStatus(TradeOrderStatusEnum.UNDELIVERED.getStatus())
+                .setPayPrice(100).setRefundPrice(90));
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> service.refundOrderPartially(new TradeOrderRefundReqVO().setId(1L).setRefundPrice(11), "127.0.0.1"));
+        assertThat(exception.getCode()).isEqualTo(1_011_000_045);
+        verifyNoInteractions(refundApi);
+    }
+
+    @Test
+    void cancelOrderByAdmin_rejectsDeliveredOrder() {
+        TradeOrderMapper orderMapper = mock(TradeOrderMapper.class);
+        ReflectionTestUtils.setField(service, "tradeOrderMapper", orderMapper);
+        when(orderMapper.selectByIdForUpdate(1L)).thenReturn(new TradeOrderDO().setId(1L)
+                .setPayStatus(true).setStatus(TradeOrderStatusEnum.DELIVERED.getStatus())
+                .setRefundStatus(0));
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> service.cancelOrderByAdmin(1L, "运营取消"));
+        assertThat(exception.getCode()).isEqualTo(1_011_000_043);
     }
 
     private static TradePriceCalculateRespBO actualPrice(int payPrice, int usePoint) {

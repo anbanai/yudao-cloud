@@ -35,6 +35,7 @@ import cn.iocoder.yudao.module.promotion.enums.combination.CombinationRecordStat
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRefundReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRemarkReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateAddressReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdatePriceReqVO;
@@ -687,6 +688,64 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.ADMIN_CANCEL)
+    public void cancelOrderByAdmin(Long id, String reason) {
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(id);
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        if (!TradeOrderStatusEnum.isUnpaid(order.getStatus())
+                && !TradeOrderStatusEnum.isUndelivered(order.getStatus())) {
+            throw exception(ORDER_ADMIN_CANCEL_FAIL_STATUS);
+        }
+        if (!TradeOrderRefundStatusEnum.NONE.getStatus().equals(order.getRefundStatus())) {
+            throw exception(ORDER_ADMIN_CANCEL_FAIL_STATUS);
+        }
+
+        boolean paid = Boolean.TRUE.equals(order.getPayStatus());
+        cancelOrder0(order, TradeOrderCancelTypeEnum.ADMIN_CANCEL);
+        if (paid) {
+            createOrderRefund(order, order.getPayPrice(), StrUtil.blankToDefault(reason, "运营取消订单"),
+                    "order-" + order.getId(), getClientIP());
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refundOrderPartially(TradeOrderRefundReqVO reqVO, String userIp) {
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(reqVO.getId());
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        if (!Boolean.TRUE.equals(order.getPayStatus())) {
+            throw exception(ORDER_REFUND_FAIL_NOT_PAID);
+        }
+        if (TradeOrderStatusEnum.isCanceled(order.getStatus())) {
+            throw exception(ORDER_REFUND_FAIL_ALREADY_CANCELLED);
+        }
+        int refunded = order.getRefundPrice() == null ? 0 : order.getRefundPrice();
+        int remaining = order.getPayPrice() - refunded;
+        if (reqVO.getRefundPrice() > remaining) {
+            throw exception(ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING);
+        }
+        int targetRefundPrice = refunded + reqVO.getRefundPrice();
+        createOrderRefund(order, reqVO.getRefundPrice(), StrUtil.blankToDefault(reqVO.getReason(), "订单部分退款"),
+                "order-" + order.getId() + "-partial-" + targetRefundPrice, userIp);
+    }
+
+    private void createOrderRefund(TradeOrderDO order, Integer refundPrice, String reason,
+                                   String merchantRefundId, String userIp) {
+        payRefundApi.createRefund(new PayRefundCreateReqDTO()
+                .setAppKey(tradeOrderProperties.getPayAppKey())
+                .setUserIp(StrUtil.blankToDefault(userIp, NetUtil.getLocalhostStr()))
+                .setUserId(order.getUserId()).setUserType(UserTypeEnum.MEMBER.getValue())
+                .setMerchantOrderId(String.valueOf(order.getId()))
+                .setMerchantRefundId(merchantRefundId)
+                .setReason(reason).setPrice(refundPrice)).checkError();
+    }
+
+    @Override
     public int cancelOrderBySystem() {
         // 1. 查询过期的待支付订单
         LocalDateTime expireTime = minusTime(tradeOrderProperties.getPayExpireTime());
@@ -1147,6 +1206,47 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 特殊：因为在 cancelPaidOrder 已经进行订单的取消，所以这里必须退款成功！！！
         if (!PayRefundStatusEnum.isSuccess(payRefund.getStatus())) {
             throw exception(ORDER_UPDATE_PAID_ORDER_REFUNDED_FAIL_REFUND_STATUS_NOT_SUCCESS);
+        }
+        TradeOrderDO order = tradeOrderMapper.selectByIdForUpdate(id);
+        if (order == null || !String.valueOf(id).equals(payRefund.getMerchantOrderId())) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        int currentRefundPrice = order.getRefundPrice() == null ? 0 : order.getRefundPrice();
+        int targetRefundPrice = resolveTargetRefundPrice(payRefund.getMerchantRefundId(), order.getPayPrice());
+        if (targetRefundPrice <= 0 || currentRefundPrice >= targetRefundPrice) {
+            return;
+        }
+        if (targetRefundPrice > order.getPayPrice()) {
+            throw exception(ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING);
+        }
+        tradeOrderMapper.updateById(new TradeOrderDO().setId(id)
+                .setRefundPrice(targetRefundPrice)
+                .setRefundStatus(targetRefundPrice == order.getPayPrice()
+                        ? TradeOrderRefundStatusEnum.ALL.getStatus() : TradeOrderRefundStatusEnum.PART.getStatus()));
+    }
+
+    /**
+     * Order-level refunds encode the expected cumulative amount in the merchant refund id.
+     * This makes payment callbacks idempotent even when the same notification is delivered twice.
+     */
+    private int resolveTargetRefundPrice(String merchantRefundId, int orderPayPrice) {
+        if (StrUtil.isBlank(merchantRefundId)) {
+            return 0;
+        }
+        String fullPrefix = "order-";
+        if (!merchantRefundId.startsWith(fullPrefix)) {
+            return 0;
+        }
+        String suffix = merchantRefundId.substring(fullPrefix.length());
+        int partialMarker = suffix.indexOf("-partial-");
+        String target = partialMarker >= 0 ? suffix.substring(partialMarker + "-partial-".length()) : null;
+        if (target == null || target.isEmpty()) {
+            return orderPayPrice;
+        }
+        try {
+            return Integer.parseInt(target);
+        } catch (NumberFormatException ignored) {
+            return 0;
         }
     }
 
