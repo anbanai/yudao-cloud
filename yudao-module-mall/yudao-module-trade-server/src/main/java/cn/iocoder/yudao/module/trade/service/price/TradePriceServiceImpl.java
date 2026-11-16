@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.member.api.level.dto.MemberLevelRespDTO;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
+import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuAccessRespDTO;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
 import cn.iocoder.yudao.module.promotion.api.discount.DiscountActivityApi;
 import cn.iocoder.yudao.module.promotion.api.discount.dto.DiscountProductRespDTO;
@@ -25,12 +26,15 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_NOT_EXISTS;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_STOCK_NOT_ENOUGH;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRICE_CALCULATE_PAY_PRICE_ILLEGAL;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRODUCT_PURCHASE_LIMIT_REACHED;
 
 /**
  * 价格计算 Service 实现类
@@ -46,6 +50,8 @@ public class TradePriceServiceImpl implements TradePriceService {
     private ProductSkuApi productSkuApi;
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper tradeOrderItemMapper;
     @Resource
     private DiscountActivityApi discountActivityApi;
     @Resource
@@ -63,6 +69,7 @@ public class TradePriceServiceImpl implements TradePriceService {
         List<ProductSkuRespDTO> skuList = checkSkuList(calculateReqBO);
         // 1.2 获得商品 SPU 数组
         List<ProductSpuRespDTO> spuList = checkSpuList(skuList);
+        checkProductAccess(calculateReqBO, skuList);
 
         // 2.1 计算价格
         TradePriceCalculateRespBO calculateRespBO = TradePriceCalculatorHelper
@@ -76,6 +83,27 @@ public class TradePriceServiceImpl implements TradePriceService {
             throw exception(PRICE_CALCULATE_PAY_PRICE_ILLEGAL);
         }
         return calculateRespBO;
+    }
+
+    private void checkProductAccess(TradePriceCalculateReqBO req, List<ProductSkuRespDTO> skus) {
+        Map<Long, ProductSkuRespDTO> skuMap = convertMap(skus, ProductSkuRespDTO::getId);
+        Map<Long, Integer> requested = new HashMap<>();
+        for (TradePriceCalculateReqBO.Item item : req.getItems()) {
+            if (item.getCount() == null || item.getCount() < 1) throw exception(PRODUCT_PURCHASE_LIMIT_REACHED);
+            ProductSkuRespDTO sku = skuMap.get(item.getSkuId());
+            if (sku != null) requested.merge(sku.getSpuId(), item.getCount(), Math::addExact);
+        }
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        for (Map.Entry<Long, Integer> entry : requested.entrySet()) {
+            ProductSpuAccessRespDTO access = productSpuApi.checkAccess(entry.getKey(), req.getUserId(), entry.getValue()).getCheckedData();
+            if (access == null || !Boolean.TRUE.equals(access.getVisible()) || !Boolean.TRUE.equals(access.getPurchasable())) {
+                throw exception(PRODUCT_PURCHASE_LIMIT_REACHED);
+            }
+            if (access.getEffectiveBuyLimit() != null && access.getEffectiveBuyLimit() > 0 && req.getUserId() != null) {
+                int prior = tradeOrderItemMapper.selectPurchasedCountByUserIdAndSpuId(req.getUserId(), entry.getKey(), tenantId);
+                if ((long) prior + entry.getValue() > access.getEffectiveBuyLimit()) throw exception(PRODUCT_PURCHASE_LIMIT_REACHED);
+            }
+        }
     }
 
     private List<ProductSkuRespDTO> checkSkuList(TradePriceCalculateReqBO reqBO) {

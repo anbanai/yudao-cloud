@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import lombok.Data;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 // TODO @LeeYan9: ProductSpuRespDTO
 
@@ -102,6 +103,14 @@ public class ProductSpuRespDTO {
      * 赠送积分
      */
     private Integer giveIntegral;
+
+    private Boolean isPreSale;
+    private Integer deliveryDays;
+    private Integer buyLimit;
+    private String buyLimitLevel;
+    private BigDecimal pointDiscountRate;
+
+    private List<Long> groupIds;
 
     // ========== 分销相关字段 =========
 

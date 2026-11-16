@@ -271,9 +271,14 @@ public class TradeOrderDO extends BaseDO {
      * 优惠劵编号
      */
     private Long couponId;
-
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.LongListTypeHandler.class)
     private List<Long> couponIds;
+
+    /** Pre-sale delivery period snapshotted when the order is created. */
+    private Integer preSaleDays;
+
+    /** Payment-success time plus the snapshotted pre-sale period. */
+    private LocalDateTime promisedDeliveryTime;
     /**
      * 优惠劵减免金额，单位：分
      *

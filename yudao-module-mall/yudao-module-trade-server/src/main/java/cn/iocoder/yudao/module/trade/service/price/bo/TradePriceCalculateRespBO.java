@@ -8,6 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 /**
  * 价格计算 Response BO
@@ -225,6 +226,8 @@ public class TradePriceCalculateRespBO {
          * 使用的积分
          */
         private Integer usePoint;
+        private BigDecimal pointDiscountRate;
+        private Integer preSaleDays;
         /**
          * VIP 减免金额，单位：分
          */

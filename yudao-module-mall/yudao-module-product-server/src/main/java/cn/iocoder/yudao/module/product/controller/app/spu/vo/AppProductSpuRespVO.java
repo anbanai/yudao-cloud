@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 @Schema(description = "用户 App - 商品 SPU Response VO")
 @Data
@@ -52,5 +53,12 @@ public class AppProductSpuRespVO {
 
     @Schema(description = "配送方式数组", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private List<Integer> deliveryTypes;
+
+    private Boolean isPreSale;
+    private Integer deliveryDays;
+    private Integer buyLimit;
+    private String buyLimitLevel;
+    private BigDecimal pointDiscountRate;
+    private List<Long> groupIds;
 
 }

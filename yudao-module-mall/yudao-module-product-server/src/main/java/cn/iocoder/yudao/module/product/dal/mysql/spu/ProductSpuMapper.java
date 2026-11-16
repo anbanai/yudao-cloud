@@ -30,6 +30,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     @Results({
             @Result(column = "slider_pic_urls", property = "sliderPicUrls", typeHandler = JacksonTypeHandler.class),
             @Result(column = "delivery_types", property = "deliveryTypes", typeHandler = IntegerListTypeHandler.class),
+            @Result(column = "marketing_config", property = "marketingConfig", typeHandler = JacksonTypeHandler.class),
     })
     ProductSpuDO selectByIdIncludeDeleted(@Param("id") Long id);
 
@@ -47,6 +48,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .eqIfPresent(ProductSpuDO::getMerchantId, reqVO.getMerchantId())
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
+        appendGroupQuery(queryWrapper, reqVO.getGroupIds(), reqVO.getUngrouped());
         appendTabQuery(tabType, queryWrapper);
         appendSortQuery(queryWrapper, reqVO.getSortField(), reqVO.getSortAsc());
         return selectPage(reqVO, queryWrapper);
@@ -86,6 +88,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
             query.apply("merchant_id IN (SELECT id FROM product_merchant WHERE tenant_id IN (0, {0}) "
                             + "AND status = {1} AND deleted = {2})",
                     tenantId, ProductMerchantStatusEnum.APPROVED.getStatus(), false);
+            appendGroupQuery(query, pageReqVO.getGroupIds(), null);
 
             appendSortQuery(query, pageReqVO.getSortField(), pageReqVO.getSortAsc());
             return selectPage(pageReqVO, query);
@@ -250,8 +253,21 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .eqIfPresent(ProductSpuDO::getMerchantId, reqVO.getMerchantId())
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds)
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
+        appendGroupQuery(queryWrapper, reqVO.getGroupIds(), reqVO.getUngrouped());
         appendTabQuery(tabType, queryWrapper);
         return selectCount(queryWrapper);
+    }
+
+    static void appendGroupQuery(LambdaQueryWrapperX<ProductSpuDO> query, java.util.List<Long> groupIds, Boolean ungrouped) {
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        if (Boolean.TRUE.equals(ungrouped)) {
+            query.notInSql(ProductSpuDO::getId, "SELECT spu_id FROM product_group_spu WHERE tenant_id=" + tenantId + " AND deleted=b'0'");
+        } else if (groupIds != null && !groupIds.isEmpty()) {
+            String ids = groupIds.stream().filter(java.util.Objects::nonNull).filter(id -> id > 0)
+                    .distinct().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            if (!ids.isEmpty()) query.inSql(ProductSpuDO::getId,
+                    "SELECT spu_id FROM product_group_spu WHERE tenant_id=" + tenantId + " AND deleted=b'0' AND group_id IN (" + ids + ")");
+        }
     }
 
     /**

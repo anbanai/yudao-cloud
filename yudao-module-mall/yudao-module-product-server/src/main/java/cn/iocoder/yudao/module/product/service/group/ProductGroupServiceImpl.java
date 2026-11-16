@@ -7,13 +7,16 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.controller.admin.group.vo.*;
 import cn.iocoder.yudao.module.product.controller.app.group.vo.AppProductGroupSpuPageReqVO;
+import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.group.ProductGroupDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.group.ProductGroupSpuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.group.ProductGroupMapper;
 import cn.iocoder.yudao.module.product.dal.mysql.group.ProductGroupOperationsMapper;
 import cn.iocoder.yudao.module.product.dal.mysql.group.ProductGroupSpuMapper;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import jakarta.annotation.Resource;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -35,6 +38,9 @@ public class ProductGroupServiceImpl implements ProductGroupService {
     private ProductGroupSpuMapper groupSpuMapper;
     @Resource
     private ProductGroupOperationsMapper spuMapper;
+    @Resource
+    @Lazy
+    private ProductSpuService productSpuService;
 
     @Override
     public Long createGroup(ProductGroupSaveReqVO reqVO) {
@@ -143,6 +149,19 @@ public class ProductGroupServiceImpl implements ProductGroupService {
 
     @Override
     public PageResult<ProductSpuDO> getAppSpuPage(AppProductGroupSpuPageReqVO reqVO) {
+        validatePublicGroups(reqVO);
+        return groupSpuMapper.selectAppSpuPage(reqVO);
+    }
+
+    @Override
+    public PageResult<ProductSpuDO> getVisibleAppSpuPage(AppProductGroupSpuPageReqVO reqVO) {
+        validatePublicGroups(reqVO);
+        AppProductSpuPageReqVO pageReqVO = BeanUtils.toBean(reqVO, AppProductSpuPageReqVO.class);
+        return productSpuService.getVisibleSpuPage(pageReqVO,
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId());
+    }
+
+    private void validatePublicGroups(AppProductGroupSpuPageReqVO reqVO) {
         validateEnabledGroups(new LinkedHashSet<>(reqVO.getGroupIds()));
         for (ProductGroupDO group : groupMapper.selectByIds(reqVO.getGroupIds())) {
             if (!Boolean.TRUE.equals(group.getStorefrontVisible())
@@ -150,7 +169,6 @@ public class ProductGroupServiceImpl implements ProductGroupService {
                 throw exception(GROUP_NOT_EXISTS);
             }
         }
-        return groupSpuMapper.selectAppSpuPage(reqVO);
     }
 
     @Override

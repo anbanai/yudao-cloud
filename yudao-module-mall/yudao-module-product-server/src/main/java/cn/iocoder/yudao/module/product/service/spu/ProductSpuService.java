@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReq
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuUpdateStatusReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
+import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuAccessRespDTO;
 import jakarta.validation.Valid;
 import org.springframework.scheduling.annotation.Async;
 
@@ -50,6 +51,10 @@ public interface ProductSpuService {
      * @return 商品 SPU
      */
     ProductSpuDO getSpu(Long id);
+
+    ProductSpuAccessRespDTO checkAccess(Long id, Long userId, Integer count);
+
+    List<Long> getGroupIds(Long spuId);
 
     /**
      * 获得商品 SPU
@@ -114,6 +119,8 @@ public interface ProductSpuService {
      * @return 商品 SPU 分页
      */
     PageResult<ProductSpuDO> getSpuPage(AppProductSpuPageReqVO pageReqVO);
+
+    PageResult<ProductSpuDO> getVisibleSpuPage(AppProductSpuPageReqVO pageReqVO, Long userId);
 
     /**
      * 更新商品 SPU 库存（增量）
