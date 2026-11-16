@@ -11,12 +11,15 @@ import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
@@ -44,26 +47,12 @@ public class AppMemberBenefitsController {
     }
 
     @GetMapping("/levels")
-    @Operation(summary = "获得指定等级权益")
-    public CommonResult<List<AppMemberBenefitRespVO>> getLevelBenefits(@RequestParam(required = false) Integer level) {
-        MemberLevelDO target = levelService.getEnableLevelList().stream()
-                .filter(item -> level == null || Objects.equals(item.getLevel(), level))
-                .findFirst().orElse(null);
-        return success(target == null ? Collections.emptyList() : buildBenefits(target));
-    }
-
-    @GetMapping("/records")
-    @Operation(summary = "获得会员权益领取记录")
-    public CommonResult<List<AppMemberBenefitRespVO>> getRecords() {
-        return success(Collections.emptyList());
-    }
-
-    @PostMapping("/{accountId}/claim")
-    @Operation(summary = "领取会员权益")
-    public CommonResult<Boolean> claim(@PathVariable Long accountId,
-                                       @RequestParam String requestId) {
-        // 当前等级折扣权益自动生效；接口保留给可领取权益扩展。
-        return success(false);
+    @Operation(summary = "获得全部启用会员等级及对应权益")
+    public CommonResult<List<AppMemberBenefitsLevelRespVO>> getLevels() {
+        return success(levelService.getEnableLevelList().stream()
+                .sorted(Comparator.comparing(MemberLevelDO::getLevel))
+                .map(this::buildLevelBenefits)
+                .collect(Collectors.toList()));
     }
 
     private AppMemberBenefitsOverviewRespVO buildOverview(MemberUserDO user, MemberLevelDO level) {
@@ -74,6 +63,10 @@ public class AppMemberBenefitsController {
         result.setExperience(user.getExperience());
         result.setNextExperience(findNextExperience(level));
         result.setBenefits(level == null ? Collections.emptyList() : buildBenefits(level));
+        result.setLevels(levelService.getEnableLevelList().stream()
+                .sorted(Comparator.comparing(MemberLevelDO::getLevel))
+                .map(this::buildLevelBenefits)
+                .collect(Collectors.toList()));
         if (configService.getConfig() != null) {
             Integer pointGive = configService.getConfig().getPointTradeGivePoint();
             result.setPointTradeGiveMultiplier(pointGive == null ? 1000 : pointGive * 10);
@@ -92,8 +85,15 @@ public class AppMemberBenefitsController {
         discount.setCode("LEVEL_DISCOUNT");
         discount.setName("会员折扣");
         discount.setDescription("当前等级享受 " + (level.getDiscountPercent() == null ? 100 : level.getDiscountPercent()) + " 折优惠");
-        discount.setAvailableQuantity(-1);
-        discount.setClaimable(false);
         return Collections.singletonList(discount);
+    }
+
+    private AppMemberBenefitsLevelRespVO buildLevelBenefits(MemberLevelDO level) {
+        AppMemberBenefitsLevelRespVO result = new AppMemberBenefitsLevelRespVO();
+        result.setLevel(level.getLevel());
+        result.setName(level.getName());
+        result.setExperience(level.getExperience());
+        result.setBenefits(buildBenefits(level));
+        return result;
     }
 }

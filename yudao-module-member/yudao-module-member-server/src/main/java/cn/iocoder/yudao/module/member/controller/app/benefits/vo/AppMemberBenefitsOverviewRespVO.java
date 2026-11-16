@@ -15,4 +15,5 @@ public class AppMemberBenefitsOverviewRespVO {
     private Integer nextExperience;
     private Integer pointTradeGiveMultiplier = 1000;
     private List<AppMemberBenefitRespVO> benefits;
+    private List<AppMemberBenefitsLevelRespVO> levels;
 }

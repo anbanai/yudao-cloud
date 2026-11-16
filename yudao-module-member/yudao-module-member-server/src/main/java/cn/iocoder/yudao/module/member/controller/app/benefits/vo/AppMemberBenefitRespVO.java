@@ -9,10 +9,4 @@ public class AppMemberBenefitRespVO {
     private String code;
     private String name;
     private String description;
-    private Integer actionType = 0;
-    private Integer claimType = 0;
-    private Integer availableQuantity = 0;
-    private Boolean claimable = false;
-    private Integer status = 0;
-    private String periodEnd;
 }
