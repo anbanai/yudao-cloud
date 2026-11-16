@@ -17,6 +17,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.filterList;
 
@@ -48,11 +49,7 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
 
         if (Boolean.TRUE.equals(result.getExchangeOrder())) { return; }
 
-        // 1.1 校验是否使用积分
-        if (!BooleanUtil.isTrue(param.getPointStatus())) {
-            return;
-        }
-        // 1.2 校验积分抵扣是否开启
+        // 1.1 校验积分抵扣是否开启
         MemberConfigRespDTO config = memberConfigApi.getConfig().getCheckedData();
         if (!isDeductPointEnable(config)) {
             return;
@@ -65,7 +62,16 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
         // 2.1 计算本单积分上限，只包含优惠后的商品金额，不抵扣运费。
         int productPayPrice = result.getPrice().getPayPrice()
                 - ObjectUtil.defaultIfNull(result.getPrice().getDeliveryPrice(), 0);
+        List<TradePriceCalculateRespBO.OrderItem> orderItems = filterList(result.getItems(), TradePriceCalculateRespBO.OrderItem::getSelected);
         int maxUsePoint = calculateMaxUsePoint(config, user.getPoint(), productPayPrice);
+        long rateLimitedPoints = 0;
+        for (TradePriceCalculateRespBO.OrderItem item : orderItems) {
+            long payable = Math.max(0L, (long) item.getPayPrice() - ObjectUtil.defaultIfNull(item.getDeliveryPrice(), 0));
+            BigDecimal ratio = item.getPointDiscountRate();
+            long capCents = ratio == null ? payable : BigDecimal.valueOf(payable).multiply(ratio).longValue();
+            rateLimitedPoints += capCents / config.getPointTradeDeductUnitPrice();
+        }
+        maxUsePoint = (int) Math.min(maxUsePoint, rateLimitedPoints);
         int maxPointPrice = maxUsePoint * config.getPointTradeDeductUnitPrice();
         result.setMaxUsePoint(maxUsePoint).setMaxPointPrice(maxPointPrice);
         if (!BooleanUtil.isTrue(param.getPointStatus()) || maxUsePoint == 0) {
@@ -79,17 +85,34 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
             }
             return;
         }
-        result.setUsePoint(maxUsePoint);
-        // 2.2 计算分摊的积分、抵扣金额
-        List<TradePriceCalculateRespBO.OrderItem> orderItems = filterList(result.getItems(), TradePriceCalculateRespBO.OrderItem::getSelected);
-        List<Integer> divideUsePoints = TradePriceCalculatorHelper.dividePointValue(orderItems, maxUsePoint);
-        List<Integer> dividePointPrices = divideUsePoints.stream()
-                .map(point -> point * config.getPointTradeDeductUnitPrice()).toList();
+        // 2.2 按商品各自的抵扣比例分摊，并保证商品金额至少保留 0.01 元。
+        long pointBudget = maxUsePoint;
+        int unitPrice = config.getPointTradeDeductUnitPrice();
+        long remainingCents = Math.max(0L, (long) productPayPrice - 1);
+        int pointPrice = 0;
+        int usePoint = 0;
+        List<Integer> dividePointPrices = new java.util.ArrayList<>();
+        List<Integer> divideUsePoints = new java.util.ArrayList<>();
+        for (TradePriceCalculateRespBO.OrderItem item : orderItems) {
+            long payable = Math.max(0L, (long) item.getPayPrice() - ObjectUtil.defaultIfNull(item.getDeliveryPrice(), 0));
+            BigDecimal ratio = item.getPointDiscountRate();
+            long capCents = ratio == null ? payable : BigDecimal.valueOf(payable).multiply(ratio).longValue();
+            long points = Math.min(pointBudget, Math.min(capCents, remainingCents) / unitPrice);
+            int cents = Math.toIntExact(points * unitPrice);
+            divideUsePoints.add(Math.toIntExact(points));
+            dividePointPrices.add(cents);
+            pointBudget -= points;
+            remainingCents -= cents;
+            usePoint += Math.toIntExact(points);
+            pointPrice += cents;
+        }
+        result.setUsePoint(usePoint);
+        if (pointPrice == 0) return;
 
         // 3.1 记录优惠明细
         TradePriceCalculatorHelper.addPromotion(result, orderItems,
                 param.getUserId(), "积分抵扣", PromotionTypeEnum.POINT.getType(),
-                StrUtil.format("积分抵扣：省 {} 元", TradePriceCalculatorHelper.formatPrice(maxPointPrice)),
+                StrUtil.format("积分抵扣：省 {} 元", TradePriceCalculatorHelper.formatPrice(pointPrice)),
                 dividePointPrices);
         // 3.2 更新 SKU 优惠金额
         for (int i = 0; i < orderItems.size(); i++) {
@@ -120,5 +143,4 @@ public class TradePointUsePriceCalculator implements TradePriceCalculator {
                 / config.getPointTradeDeductUnitPrice(), 0);
         return Math.min(userPoint, maxPointByPayPrice);
     }
-
 }

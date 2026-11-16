@@ -64,7 +64,9 @@ public class TradePriceCalculatorHelper {
             orderItem.setSpuName(spu.getName()).setCategoryId(spu.getCategoryId())
                     .setMerchantId(spu.getMerchantId()).setMerchantName(spu.getMerchantName())
                     .setDeliveryTypes(spu.getDeliveryTypes()).setDeliveryTemplateId(spu.getDeliveryTemplateId())
-                    .setGivePoint(ObjectUtil.defaultIfNull(spu.getGiveIntegral(), 0)).setUsePoint(0);
+                    .setGivePoint(ObjectUtil.defaultIfNull(spu.getGiveIntegral(), 0)).setUsePoint(0)
+                    .setPointDiscountRate(spu.getPointDiscountRate())
+                    .setPreSaleDays(Boolean.TRUE.equals(spu.getIsPreSale()) ? ObjectUtil.defaultIfNull(spu.getDeliveryDays(), 0) : 0);
             if (StrUtil.isBlank(orderItem.getPicUrl())) {
                 orderItem.setPicUrl(spu.getPicUrl());
             }

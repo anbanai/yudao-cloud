@@ -18,6 +18,9 @@ import java.util.Set;
 @Mapper
 public interface TradeOrderItemMapper extends BaseMapperX<TradeOrderItemDO> {
 
+    @org.apache.ibatis.annotations.Select("SELECT COALESCE(SUM(i.count),0) FROM trade_order_item i INNER JOIN trade_order o ON o.id=i.order_id WHERE o.user_id=#{userId} AND o.tenant_id=#{tenantId} AND o.status<>40 AND COALESCE(i.after_sale_status,0)<>20 AND i.spu_id=#{spuId}")
+    int selectPurchasedCountByUserIdAndSpuId(@Param("userId") Long userId, @Param("spuId") Long spuId, @Param("tenantId") Long tenantId);
+
     default int updateAfterSaleStatus(Long id, Integer oldAfterSaleStatus, Integer newAfterSaleStatus,
                                       Long afterSaleId) {
         return update(new TradeOrderItemDO().setAfterSaleStatus(newAfterSaleStatus).setAfterSaleId(afterSaleId),
