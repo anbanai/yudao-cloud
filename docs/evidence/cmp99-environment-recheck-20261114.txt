@@ -1,0 +1,49 @@
+# CMP-99 environment recheck
+
+Date: 2026-11-14
+
+## Docker
+
+Command:
+
+```text
+docker info
+```
+
+Result:
+
+```text
+Client Version: 29.9.3
+Server: failed to connect to the docker API at unix:///var/run/docker.sock;
+check if the path is correct and if the daemon is running: dial unix
+/var/run/docker.sock: connect: no such file or directory
+```
+
+Only the default Docker context is configured; no alternate reachable context
+was available to this agent workspace.
+
+## MySQL 8.4 native retry
+
+The existing ARM64 MySQL client and server binaries are present and report
+MySQL 8.4.13. A fresh disposable data directory was used:
+
+```sh
+mkdir -p .paperclip-tools/cmp99-live/mysql84-data
+./.paperclip-tools/mysql84/bin/mysqld --no-defaults --initialize-insecure \
+  --basedir=/Users/Shared/teaworthshare/.paperclip-tools/mysql84 \
+  --datadir=/Users/Shared/teaworthshare/.paperclip-tools/cmp99-live/mysql84-data \
+  --log-error=/Users/Shared/teaworthshare/.paperclip-tools/cmp99-live/mysql84-init.log
+```
+
+The process crashed before creating a usable instance or socket:
+
+```text
+MySQL Server Initialization - start
+mysqld 8.4.13 initializing of server in progress
+mysqld got signal 11; Signal SIGSEGV
+memory::Aligned_atomic<long>::Aligned_atomic()
+Delegate::Delegate(unsigned int)
+delegates_init()
+```
+
+The SQL harness was therefore not run. No production database was accessed.

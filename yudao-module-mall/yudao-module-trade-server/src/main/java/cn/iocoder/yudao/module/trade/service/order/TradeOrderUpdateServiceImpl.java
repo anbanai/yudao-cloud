@@ -730,8 +730,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (reqVO.getRefundPrice() > remaining) {
             throw exception(ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING);
         }
+        int targetRefundPrice = refunded + reqVO.getRefundPrice();
         createOrderRefund(order, reqVO.getRefundPrice(), StrUtil.blankToDefault(reqVO.getReason(), "订单部分退款"),
-                "order-partial-" + order.getId() + "-" + reqVO.getRefundPrice(), userIp);
+                "order-" + order.getId() + "-partial-" + targetRefundPrice, userIp);
     }
 
     private void createOrderRefund(TradeOrderDO order, Integer refundPrice, String reason,
@@ -1211,19 +1212,35 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (order == null || !String.valueOf(id).equals(payRefund.getMerchantOrderId())) {
             throw exception(ORDER_NOT_FOUND);
         }
-        int refundPrice = payRefund.getRefundPrice() == null ? 0 : payRefund.getRefundPrice();
         int currentRefundPrice = order.getRefundPrice() == null ? 0 : order.getRefundPrice();
-        if (refundPrice <= 0 || currentRefundPrice >= order.getPayPrice()) {
+        int targetRefundPrice = resolveTargetRefundPrice(payRefund.getMerchantRefundId(), order.getPayPrice());
+        if (targetRefundPrice <= 0 || currentRefundPrice >= targetRefundPrice) {
             return;
         }
-        int totalRefundPrice = currentRefundPrice + refundPrice;
-        if (totalRefundPrice > order.getPayPrice()) {
+        if (targetRefundPrice > order.getPayPrice()) {
             throw exception(ORDER_REFUND_FAIL_AMOUNT_EXCEEDS_REMAINING);
         }
         tradeOrderMapper.updateById(new TradeOrderDO().setId(id)
-                .setRefundPrice(totalRefundPrice)
-                .setRefundStatus(totalRefundPrice == order.getPayPrice()
+                .setRefundPrice(targetRefundPrice)
+                .setRefundStatus(targetRefundPrice == order.getPayPrice()
                         ? TradeOrderRefundStatusEnum.ALL.getStatus() : TradeOrderRefundStatusEnum.PART.getStatus()));
+    }
+
+    private int resolveTargetRefundPrice(String merchantRefundId, int orderPayPrice) {
+        if (StrUtil.isBlank(merchantRefundId) || !merchantRefundId.startsWith("order-")) {
+            return 0;
+        }
+        String suffix = merchantRefundId.substring("order-".length());
+        int partialMarker = suffix.indexOf("-partial-");
+        String target = partialMarker >= 0 ? suffix.substring(partialMarker + "-partial-".length()) : null;
+        if (target == null || target.isEmpty()) {
+            return orderPayPrice;
+        }
+        try {
+            return Integer.parseInt(target);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     @Override

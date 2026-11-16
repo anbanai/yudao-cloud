@@ -1,0 +1,45 @@
+# CMP-99 R01 correction verification
+
+Date: 2026-11-14
+
+## Implemented
+
+- V01 creates `marketing_point_lifecycle_backfill` and records each account's
+  pre-expiry balance, expired remainder and post-expiry balance in the same
+  transaction as the backfill.
+- V01 rejects an account whose current balance is lower than its expirable
+  ledger before changing member balances.
+- R01 copies the snapshot into a retry journal and updates the member balance
+  and journal state in one DML transaction. A committed journal row is not
+  applied twice after an interruption.
+- R01 verifies the expected pre/post balance on every retry, makes lifecycle
+  column/index drops conditional, and removes journals only after all DDL
+  succeeds.
+- The disposable MySQL harness now covers the inconsistent-balance preflight
+  and an injected interruption after compensation followed by an R01 retry.
+
+## Checks run
+
+```text
+node --check script/marketing-verification/mysql-lifecycle.cjs
+PASS (exit 0)
+```
+
+Static marker checks found the V01 balance preflight, lifecycle snapshot,
+R01 applied journal state, interruption failpoint, and harness assertions.
+
+The existing backend regression suite was rerun after the SQL changes:
+
+```text
+Member: 13 tests, 0 failures, 0 errors, 0 skipped
+Promotion: 13 tests, 0 failures, 0 errors, 0 skipped
+Trade: 9 tests, 0 failures, 0 errors, 0 skipped
+Maven BUILD SUCCESS (12.076 s)
+```
+
+## Not run
+
+The SQL harness assertions were not executed because both available ARM64
+MySQL 8.0.44 and 8.4.13 servers crash with SIGSEGV during initialization,
+before accepting a socket connection. A working isolated MySQL 8 instance is
+still required to verify SQL syntax and the migration/retry/rollback result.
