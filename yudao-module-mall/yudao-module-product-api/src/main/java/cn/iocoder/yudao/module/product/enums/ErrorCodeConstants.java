@@ -39,6 +39,7 @@ public interface ErrorCodeConstants {
     ErrorCode SPU_NOT_RECYCLE = new ErrorCode(1_008_005_004, "商品 SPU 不处于回收站状态");
     ErrorCode SPU_IMAGE_INVALID = new ErrorCode(1_008_005_005,
             "商品图片无效，仅支持 3MB 以内的 JPG、PNG、BMP 图片");
+    ErrorCode SPU_MARKETING_CONFIG_INVALID = new ErrorCode(1_008_005_006, "商品营销规则无效：{} ");
 
     // ========== 商品 SKU 1-008-006-000 ==========
     ErrorCode SKU_NOT_EXISTS = new ErrorCode(1_008_006_000, "商品 SKU 不存在");

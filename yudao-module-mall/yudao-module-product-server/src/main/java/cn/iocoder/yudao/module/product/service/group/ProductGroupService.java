@@ -20,6 +20,7 @@ public interface ProductGroupService {
     List<Long> getGroupIdsBySpuId(Long spuId);
     PageResult<ProductGroupSpuRespVO> getAdminSpuPage(ProductGroupSpuPageReqVO reqVO);
     PageResult<ProductSpuDO> getAppSpuPage(AppProductGroupSpuPageReqVO reqVO);
+    PageResult<ProductSpuDO> getVisibleAppSpuPage(AppProductGroupSpuPageReqVO reqVO);
     void addSpus(@Valid ProductGroupSpuBatchReqVO reqVO);
     void removeSpus(@Valid ProductGroupSpuBatchReqVO reqVO);
     void updateSpuSort(@Valid ProductGroupSpuSortReqVO reqVO);

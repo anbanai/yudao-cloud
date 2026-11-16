@@ -15,4 +15,7 @@ public class PointActivityPageReqVO extends PageParam {
     @Schema(description = "活动状态", example = "2")
     private Integer status;
 
+    @Schema(description = "商品 SPU 编号")
+    private Long spuId;
+
 }

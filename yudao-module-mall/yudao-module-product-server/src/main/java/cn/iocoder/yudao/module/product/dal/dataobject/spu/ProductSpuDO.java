@@ -11,6 +11,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import java.math.BigDecimal;
+import java.util.Map;
 import lombok.*;
 
 import java.util.List;
@@ -146,6 +148,16 @@ public class ProductSpuDO extends TenantBaseDO {
      * 赠送积分
      */
     private Integer giveIntegral;
+
+    private Boolean isPreSale;
+    private Integer deliveryDays;
+    private Integer buyLimit;
+    private String buyLimitLevel;
+    private BigDecimal pointDiscountRate;
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> marketingConfig;
+    @TableField(exist = false)
+    private List<Long> groupIds;
 
     // TODO @puhui999：字段估计要改成 brokerageType
     /**

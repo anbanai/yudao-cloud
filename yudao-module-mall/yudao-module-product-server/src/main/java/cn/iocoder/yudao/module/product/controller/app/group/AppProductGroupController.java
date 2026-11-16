@@ -70,7 +70,7 @@ public class AppProductGroupController {
     @Operation(summary = "获得商品分组商品分页")
     @PermitAll
     public CommonResult<PageResult<AppProductSpuRespVO>> getSpuPage(@Valid AppProductGroupSpuPageReqVO reqVO) {
-        PageResult<ProductSpuDO> page = groupService.getAppSpuPage(reqVO);
+        PageResult<ProductSpuDO> page = groupService.getVisibleAppSpuPage(reqVO);
         page.getList().forEach(spu -> spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount()));
         return success(BeanUtils.toBean(page, AppProductSpuRespVO.class));
     }

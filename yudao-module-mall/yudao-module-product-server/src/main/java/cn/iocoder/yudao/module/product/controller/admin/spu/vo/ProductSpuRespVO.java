@@ -11,6 +11,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.math.BigDecimal;
 
 @Schema(description = "管理后台 - 商品 SPU Response VO")
 @Data
@@ -115,6 +116,13 @@ public class ProductSpuRespVO {
     @Schema(description = "赠送积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "111")
     @ExcelProperty("赠送积分")
     private Integer giveIntegral;
+
+    private Boolean isPreSale;
+    private Integer deliveryDays;
+    private Integer buyLimit;
+    private String buyLimitLevel;
+    private BigDecimal pointDiscountRate;
+    private java.util.Map<String, Object> marketingConfig;
 
     @Schema(description = "分销类型", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     @ExcelProperty("分销类型")

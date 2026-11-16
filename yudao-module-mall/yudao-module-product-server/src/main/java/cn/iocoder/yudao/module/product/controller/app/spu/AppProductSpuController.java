@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageRe
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuRespVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
+import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
@@ -59,6 +60,7 @@ public class AppProductSpuController {
     @PermitAll
     public CommonResult<List<AppProductSpuRespVO>> getSpuList(@RequestParam("ids") Set<Long> ids) {
         List<ProductSpuDO> list = productSpuService.getAvailableSpuList(ids);
+        list.removeIf(spu -> !Boolean.TRUE.equals(productSpuService.checkAccess(spu.getId(), getLoginUserId(), 1).getVisible()));
         if (CollUtil.isNotEmpty(ids) && list.size() < ids.size()) {
             Set<Long> returnedIds = list.stream().map(ProductSpuDO::getId).collect(Collectors.toSet());
             Set<Long> missingIds = ids.stream().filter(id -> !returnedIds.contains(id)).collect(Collectors.toSet());
@@ -79,7 +81,7 @@ public class AppProductSpuController {
     @Operation(summary = "获得商品 SPU 分页")
     @PermitAll
     public CommonResult<PageResult<AppProductSpuRespVO>> getSpuPage(@Valid AppProductSpuPageReqVO pageVO) {
-        PageResult<ProductSpuDO> pageResult = productSpuService.getSpuPage(pageVO);
+        PageResult<ProductSpuDO> pageResult = productSpuService.getVisibleSpuPage(pageVO, getLoginUserId());
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(PageResult.empty(pageResult.getTotal()));
         }
@@ -99,6 +101,12 @@ public class AppProductSpuController {
         ProductSpuDO spu = productSpuService.getAvailableSpu(id);
         if (spu == null) {
             throw exception(SPU_NOT_EXISTS);
+        }
+        if (!ProductSpuStatusEnum.isEnable(spu.getStatus())) {
+            throw exception(SPU_NOT_ENABLE, spu.getName());
+        }
+        if (!Boolean.TRUE.equals(productSpuService.checkAccess(id, getLoginUserId(), 1).getVisible())) {
+            throw exception(SPU_NOT_ENABLE, spu.getName());
         }
         // 获得商品 SKU
         List<ProductSkuDO> skus = productSkuService.getAvailableSkuListBySpuId(spu.getId());
