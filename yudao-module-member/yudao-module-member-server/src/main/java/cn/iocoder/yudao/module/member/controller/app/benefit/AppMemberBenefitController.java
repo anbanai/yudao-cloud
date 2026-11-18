@@ -36,13 +36,13 @@ public class AppMemberBenefitController {
     @Resource
     private MemberLevelService levelService;
 
-    @GetMapping("/overview")
+    @GetMapping("/account/overview")
     @Operation(summary = "获得会员权益总览")
     public CommonResult<AppMemberBenefitOverviewRespVO> getOverview() {
         return success(benefitService.getOverview(getLoginUserId()));
     }
 
-    @GetMapping("/levels")
+    @GetMapping(value = "/levels", params = "level")
     @Operation(summary = "获得会员等级权益")
     @Parameter(name = "level", description = "等级序号", required = true, example = "1")
     public CommonResult<List<AppMemberBenefitRespVO>> getLevelBenefits(@RequestParam Integer level) {
