@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.member.controller.app.benefits;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.member.controller.app.benefits.vo.AppMemberBenefitRespVO;
+import cn.iocoder.yudao.module.member.controller.app.benefits.vo.AppMemberBenefitsLevelRespVO;
 import cn.iocoder.yudao.module.member.controller.app.benefits.vo.AppMemberBenefitsOverviewRespVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.level.MemberLevelDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.Collections;
 import java.util.List;
 import java.util.Comparator;
