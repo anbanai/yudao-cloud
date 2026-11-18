@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+// Spring Boot 3 uses Jakarta Bean Validation annotations.
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.util.LinkedHashMap;
