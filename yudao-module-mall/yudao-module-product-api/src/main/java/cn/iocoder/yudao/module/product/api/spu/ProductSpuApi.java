@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.api.spu;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuAccessRespDTO;
 import cn.iocoder.yudao.module.product.enums.ApiConstants;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -46,5 +47,10 @@ public interface ProductSpuApi {
     @Schema(description = "获得 SPU")
     @Parameter(name = "id", description = "SPU 编号", required = true, example = "1")
     CommonResult<ProductSpuRespDTO> getSpu(@RequestParam("id") Long id);
+
+    @GetMapping(PREFIX + "/check-access")
+    CommonResult<ProductSpuAccessRespDTO> checkAccess(@RequestParam("id") Long id,
+                                                       @RequestParam(value = "userId", required = false) Long userId,
+                                                       @RequestParam("count") Integer count);
 
 }

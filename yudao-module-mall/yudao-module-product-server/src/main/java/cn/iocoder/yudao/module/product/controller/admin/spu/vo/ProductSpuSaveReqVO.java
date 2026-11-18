@@ -20,11 +20,9 @@ public class ProductSpuSaveReqVO {
     private String name;
 
     @Schema(description = "关键字", requiredMode = Schema.RequiredMode.REQUIRED, example = "清凉丝滑不出汗")
-    @NotEmpty(message = "商品关键字不能为空")
     private String keyword;
 
     @Schema(description = "商品简介", requiredMode = Schema.RequiredMode.REQUIRED, example = "清凉小短袖简介")
-    @NotEmpty(message = "商品简介不能为空")
     private String introduction;
 
     @Schema(description = "商品详情", requiredMode = Schema.RequiredMode.REQUIRED, example = "清凉小短袖详情")
@@ -36,8 +34,10 @@ public class ProductSpuSaveReqVO {
     private Long categoryId;
 
     @Schema(description = "商品品牌编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
-    @NotNull(message = "商品品牌不能为空")
     private Long brandId;
+
+    @Schema(description = "商品分组编号列表")
+    private List<Long> groupIds;
 
     @Schema(description = "商品封面图", requiredMode = Schema.RequiredMode.REQUIRED, example = "https://www.iocoder.cn/xx.png")
     @NotEmpty(message = "商品封面图不能为空")
@@ -71,6 +71,24 @@ public class ProductSpuSaveReqVO {
     @Schema(description = "赠送积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "111")
     @NotNull(message = "商品赠送积分不能为空")
     private Integer giveIntegral;
+
+    @Schema(description = "是否预售")
+    private Boolean isPreSale;
+
+    @Schema(description = "付款后承诺发货天数；预售允许 3/5/7/15 或 1..90 自定义")
+    private Integer deliveryDays;
+
+    @Schema(description = "累计限购数，0 表示不限购")
+    private Integer buyLimit;
+
+    @Schema(description = "限购等级：ALL/L0/L1/L2/L3")
+    private String buyLimitLevel;
+
+    @Schema(description = "积分抵扣比例，范围 0..1")
+    private java.math.BigDecimal pointDiscountRate;
+
+    @Schema(description = "额外人群与标签限购规则（兼容扩展）")
+    private java.util.Map<String, Object> marketingConfig;
 
     @Schema(description = "分销类型", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     @NotNull(message = "商品分销类型不能为空")

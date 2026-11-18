@@ -54,6 +54,7 @@ public class AppProductSpuController {
     @PermitAll
     public CommonResult<List<AppProductSpuRespVO>> getSpuList(@RequestParam("ids") Set<Long> ids) {
         List<ProductSpuDO> list = productSpuService.getSpuList(ids);
+        if (!list.isEmpty()) list.removeIf(spu -> !Boolean.TRUE.equals(productSpuService.checkAccess(spu.getId(), getLoginUserId(), 1).getVisible()));
         if (CollUtil.isEmpty(list)) {
             return success(Collections.emptyList());
         }
@@ -68,7 +69,7 @@ public class AppProductSpuController {
     @Operation(summary = "获得商品 SPU 分页")
     @PermitAll
     public CommonResult<PageResult<AppProductSpuRespVO>> getSpuPage(@Valid AppProductSpuPageReqVO pageVO) {
-        PageResult<ProductSpuDO> pageResult = productSpuService.getSpuPage(pageVO);
+        PageResult<ProductSpuDO> pageResult = productSpuService.getVisibleSpuPage(pageVO, getLoginUserId());
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(PageResult.empty(pageResult.getTotal()));
         }
@@ -90,6 +91,9 @@ public class AppProductSpuController {
             throw exception(SPU_NOT_EXISTS);
         }
         if (!ProductSpuStatusEnum.isEnable(spu.getStatus())) {
+            throw exception(SPU_NOT_ENABLE, spu.getName());
+        }
+        if (!Boolean.TRUE.equals(productSpuService.checkAccess(id, getLoginUserId(), 1).getVisible())) {
             throw exception(SPU_NOT_ENABLE, spu.getName());
         }
         // 获得商品 SKU

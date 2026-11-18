@@ -98,6 +98,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Resource
     private TradeOrderItemMapper tradeOrderItemMapper;
     @Resource
+    private cn.iocoder.yudao.module.trade.dal.mysql.order.TradePurchaseLockMapper tradePurchaseLockMapper;
+    @Resource
     private TradeNoRedisDAO tradeNoRedisDAO;
 
     @Resource
@@ -184,6 +186,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Transactional(rollbackFor = Exception.class)
     @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.MEMBER_CREATE)
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        tradePurchaseLockMapper.ensureRow(tenantId, userId);
+        tradePurchaseLockMapper.lock(tenantId, userId);
         // 1.1 价格计算
         TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO);
         // 1.2 构建订单
@@ -214,6 +219,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         order.setUserIp(getClientIP()).setTerminal(getTerminal());
         // 使用 + 赠送优惠券
         order.setGiveCouponTemplateCounts(calculateRespBO.getGiveCouponTemplateCounts());
+        order.setPreSaleDays(calculateRespBO.getItems().stream().filter(item -> Boolean.TRUE.equals(item.getSelected()))
+                .map(item -> item.getPreSaleDays() == null ? 0 : item.getPreSaleDays()).max(Integer::compareTo).orElse(0));
         // 支付 + 退款信息
         order.setAdjustPrice(0).setPayStatus(false);
         order.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus()).setRefundPrice(0);
@@ -249,6 +256,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                                        AppTradeOrderCreateReqVO createReqVO) {
         // 1. 执行订单创建后置处理器
         tradeOrderHandlers.forEach(handler -> handler.afterOrderCreate(order, orderItems));
+
+        if (Boolean.TRUE.equals(order.getPayStatus()) && order.getPreSaleDays() != null && order.getPreSaleDays() > 0) {
+            order.setPromisedDeliveryTime(order.getPayTime().plusDays(order.getPreSaleDays()));
+            tradeOrderMapper.updateById(new TradeOrderDO().setId(order.getId()).setPromisedDeliveryTime(order.getPromisedDeliveryTime()));
+        }
 
         // 2. 删除购物车商品
         Set<Long> cartIds = convertSet(createReqVO.getItems(), AppTradeOrderSettlementReqVO.Item::getCartId);
@@ -299,11 +311,14 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
         // 2. 校验支付订单的合法性
         PayOrderRespDTO payOrder = validatePayOrderPaid(order, payOrderId);
+        LocalDateTime paidAt = payOrder.getSuccessTime() == null ? LocalDateTime.now() : payOrder.getSuccessTime();
+        LocalDateTime promised = order.getPreSaleDays() != null && order.getPreSaleDays() > 0
+                ? paidAt.plusDays(order.getPreSaleDays()) : null;
 
         // 3. 更新 TradeOrderDO 状态为已支付，等待发货
         int updateCount = tradeOrderMapper.updateByIdAndStatus(id, order.getStatus(),
                 new TradeOrderDO().setStatus(TradeOrderStatusEnum.UNDELIVERED.getStatus()).setPayStatus(true)
-                        .setPayTime(LocalDateTime.now()).setPayChannelCode(payOrder.getChannelCode()));
+                        .setPayTime(paidAt).setPromisedDeliveryTime(promised).setPayChannelCode(payOrder.getChannelCode()));
         if (updateCount == 0) {
             throw exception(ORDER_UPDATE_PAID_STATUS_NOT_UNPAID);
         }

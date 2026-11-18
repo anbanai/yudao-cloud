@@ -28,6 +28,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     @Results({
             @Result(column = "slider_pic_urls", property = "sliderPicUrls", typeHandler = JacksonTypeHandler.class),
             @Result(column = "delivery_types", property = "deliveryTypes", typeHandler = IntegerListTypeHandler.class),
+            @Result(column = "marketing_config", property = "marketingConfig", typeHandler = JacksonTypeHandler.class),
     })
     ProductSpuDO selectByIdIncludeDeleted(@Param("id") Long id);
 
@@ -45,6 +46,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime())
                 .orderByDesc(ProductSpuDO::getSort)
                 .orderByDesc(ProductSpuDO::getId);
+        appendGroupQuery(queryWrapper, reqVO.getGroupIds(), reqVO.getUngrouped());
         appendTabQuery(tabType, queryWrapper);
         return selectPage(reqVO, queryWrapper);
     }
@@ -72,6 +74,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .likeIfPresent(ProductSpuDO::getName, pageReqVO.getKeyword())
                 // 分类
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
+        appendGroupQuery(query, pageReqVO.getGroupIds(), null);
         // 上架状态 且有库存
         query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
 
@@ -159,8 +162,21 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getName())
                 .eqIfPresent(ProductSpuDO::getCategoryId, reqVO.getCategoryId())
                 .betweenIfPresent(ProductSpuDO::getCreateTime, reqVO.getCreateTime());
+        appendGroupQuery(queryWrapper, reqVO.getGroupIds(), reqVO.getUngrouped());
         appendTabQuery(tabType, queryWrapper);
         return selectCount(queryWrapper);
+    }
+
+    static void appendGroupQuery(LambdaQueryWrapperX<ProductSpuDO> query, java.util.List<Long> groupIds, Boolean ungrouped) {
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        if (Boolean.TRUE.equals(ungrouped)) {
+            query.notInSql(ProductSpuDO::getId, "SELECT spu_id FROM product_group_spu WHERE tenant_id=" + tenantId + " AND deleted=b'0'");
+        } else if (groupIds != null && !groupIds.isEmpty()) {
+            String ids = groupIds.stream().filter(java.util.Objects::nonNull).filter(id -> id > 0)
+                    .distinct().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            if (!ids.isEmpty()) query.inSql(ProductSpuDO::getId,
+                    "SELECT spu_id FROM product_group_spu WHERE tenant_id=" + tenantId + " AND deleted=b'0' AND group_id IN (" + ids + ")");
+        }
     }
 
     /**

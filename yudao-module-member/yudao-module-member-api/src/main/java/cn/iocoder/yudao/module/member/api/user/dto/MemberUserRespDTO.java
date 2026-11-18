@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "RPC 服务 - 用户信息 Response DTO")
 @Data
@@ -37,5 +38,8 @@ public class MemberUserRespDTO {
 
     @Schema(description = "积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "886")
     private Integer point;
+
+    @Schema(description = "客户标签编号列表")
+    private List<Long> tagIds;
 
 }

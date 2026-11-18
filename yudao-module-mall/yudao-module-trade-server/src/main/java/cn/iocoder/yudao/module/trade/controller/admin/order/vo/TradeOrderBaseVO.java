@@ -136,6 +136,9 @@ public class TradeOrderBaseVO {
     @Schema(description = "优惠劵编号", example = "1024")
     private Long couponId;
 
+    private Integer preSaleDays;
+    private LocalDateTime promisedDeliveryTime;
+
     @Schema(description = "优惠劵减免金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "100")
     private Integer couponPrice;
 

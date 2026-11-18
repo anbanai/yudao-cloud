@@ -26,6 +26,9 @@ public class AppTradeOrderPageItemRespVO {
     @Schema(description = "购买的商品数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     private Integer productCount;
 
+    private Integer preSaleDays;
+    private LocalDateTime promisedDeliveryTime;
+
     @Schema(description = "是否评价", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     private Boolean commentStatus;
 

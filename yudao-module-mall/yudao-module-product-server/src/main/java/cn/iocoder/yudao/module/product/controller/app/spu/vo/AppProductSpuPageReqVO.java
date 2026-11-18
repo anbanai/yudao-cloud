@@ -30,6 +30,9 @@ public class AppProductSpuPageReqVO extends PageParam {
     @Schema(description = "分类编号数组", example = "1,2,3")
     private List<Long> categoryIds;
 
+    @Schema(description = "商品分组编号数组")
+    private List<Long> groupIds;
+
     @Schema(description = "关键字", example = "好看")
     private String keyword;
 
@@ -45,7 +48,7 @@ public class AppProductSpuPageReqVO extends PageParam {
         if (StrUtil.isEmpty(sortField)) {
             return true;
         }
-        return StrUtil.equalsAny(sortField, SORT_FIELD_PRICE, SORT_FIELD_SALES_COUNT);
+        return StrUtil.equalsAny(sortField, SORT_FIELD_PRICE, SORT_FIELD_SALES_COUNT, SORT_FIELD_CREATE_TIME);
     }
 
 }

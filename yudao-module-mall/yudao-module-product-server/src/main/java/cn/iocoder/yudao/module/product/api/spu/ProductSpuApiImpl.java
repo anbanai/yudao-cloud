@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.product.api.spu;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuAccessRespDTO;
 import cn.iocoder.yudao.module.product.convert.spu.ProductSpuConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
@@ -31,19 +32,27 @@ public class ProductSpuApiImpl implements ProductSpuApi {
     @Override
     public CommonResult<List<ProductSpuRespDTO>> getSpuList(Collection<Long> ids) {
         List<ProductSpuDO> spus = spuService.getSpuList(ids);
+        spus.forEach(spu -> spu.setGroupIds(spuService.getGroupIds(spu.getId())));
         return success(BeanUtils.toBean(spus, ProductSpuRespDTO.class));
     }
 
     @Override
     public CommonResult<List<ProductSpuRespDTO>> validateSpuList(Collection<Long> ids) {
         List<ProductSpuDO> spus = spuService.validateSpuList(ids);
+        spus.forEach(spu -> spu.setGroupIds(spuService.getGroupIds(spu.getId())));
         return success(BeanUtils.toBean(spus, ProductSpuRespDTO.class));
     }
 
     @Override
     public CommonResult<ProductSpuRespDTO> getSpu(Long id) {
         ProductSpuDO spu = spuService.getSpu(id);
+        if (spu != null) spu.setGroupIds(spuService.getGroupIds(spu.getId()));
         return success(BeanUtils.toBean(spu, ProductSpuRespDTO.class));
+    }
+
+    @Override
+    public CommonResult<ProductSpuAccessRespDTO> checkAccess(Long id, Long userId, Integer count) {
+        return success(spuService.checkAccess(id, userId, count));
     }
 
 }

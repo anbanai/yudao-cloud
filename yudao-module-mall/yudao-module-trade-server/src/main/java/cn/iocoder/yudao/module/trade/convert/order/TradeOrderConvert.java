@@ -254,6 +254,9 @@ public interface TradeOrderConvert {
 
     AppTradeOrderSettlementRespVO convert0(TradePriceCalculateRespBO calculate, MemberAddressRespDTO address);
 
+    @Mapping(source = "preSaleDays", target = "deliveryDays")
+    AppTradeOrderSettlementRespVO.Item convertSettlementItem(TradePriceCalculateRespBO.OrderItem item);
+
     List<AppOrderExpressTrackRespDTO> convertList02(List<ExpressTrackRespDTO> list);
 
     TradeOrderDO convert(TradeOrderUpdateAddressReqVO reqVO);

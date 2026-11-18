@@ -54,6 +54,8 @@ public class AppTradeOrderSettlementRespVO {
         private Long spuId;
         @Schema(description = "SPU 名字", requiredMode = Schema.RequiredMode.REQUIRED, example = "Apple iPhone 12")
         private String spuName;
+        @Schema(description = "付款成功后承诺发货周期天数")
+        private Integer deliveryDays;
 
         // ========== SKU 信息 ==========
 
