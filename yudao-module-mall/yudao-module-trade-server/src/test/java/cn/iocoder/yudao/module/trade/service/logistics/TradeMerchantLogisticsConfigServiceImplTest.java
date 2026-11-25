@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -24,8 +24,23 @@ class TradeMerchantLogisticsConfigServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new TradeMerchantLogisticsConfigServiceImpl();
-        ReflectionTestUtils.setField(service, "configMapper", configMapper);
+        service = new TradeMerchantLogisticsConfigServiceImpl(configMapper);
+    }
+
+    @Test
+    void loadsMerchantMonthlyCardWhenAnotherConfigMapperExists() {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.registerBean("configMapper", Object.class);
+            context.registerBean("tradeMerchantLogisticsConfigMapper", TradeMerchantLogisticsConfigMapper.class,
+                    () -> configMapper);
+            context.register(TradeMerchantLogisticsConfigServiceImpl.class);
+            context.refresh();
+
+            when(configMapper.selectByMerchantId(12L)).thenReturn(new TradeMerchantLogisticsConfigDO()
+                    .setMerchantId(12L).setMonthlyCard("SF123456789"));
+            assertThat(context.getBean(TradeMerchantLogisticsConfigService.class).getRequiredMonthlyCard(12L))
+                    .isEqualTo("SF123456789");
+        }
     }
 
     @Test

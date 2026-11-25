@@ -7,19 +7,18 @@ import cn.iocoder.yudao.module.trade.controller.merchant.logistics.vo.MerchantSf
 import cn.iocoder.yudao.module.trade.controller.merchant.logistics.vo.MerchantSfLogisticsConfigSaveReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeMerchantLogisticsConfigDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeMerchantLogisticsConfigMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import jakarta.annotation.Resource;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.TRADE_MERCHANT_MONTHLY_CARD_NOT_CONFIGURED;
 
 @Service
+@RequiredArgsConstructor
 public class TradeMerchantLogisticsConfigServiceImpl implements TradeMerchantLogisticsConfigService {
 
-    @Resource
-    private TradeMerchantLogisticsConfigMapper configMapper;
+    private final TradeMerchantLogisticsConfigMapper configMapper;
 
     @Override
     public TradeMerchantLogisticsConfigRespVO get(Long merchantId) {
