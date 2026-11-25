@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS `product_group_spu` (
 ) COMMENT '商品分组与 SPU 关联';
 
 CREATE TABLE IF NOT EXISTS `product_brand` (
+    `show_on_detail` boolean NOT NULL DEFAULT FALSE,
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '品牌编号',
     `merchant_id` bigint DEFAULT NULL COMMENT '品牌默认归属商家编号',
     `name` varchar(255) NOT NULL COMMENT '品牌名称',

@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
+import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +54,8 @@ public class AppProductSpuController {
     private ProductSkuService productSkuService;
     @Resource
     private ProductBrowseHistoryService productBrowseHistoryService;
+    @Resource
+    private ProductBrandService productBrandService;
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得商品 SPU 列表")
@@ -120,6 +123,14 @@ public class AppProductSpuController {
         spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount());
         AppProductSpuDetailRespVO spuVO = BeanUtils.toBean(spu, AppProductSpuDetailRespVO.class)
                 .setSkus(BeanUtils.toBean(skus, AppProductSpuDetailRespVO.Sku.class));
+        if (spu.getBrandId() != null && spu.getMerchantId() != null) {
+            var brand = productBrandService.getBrand(spu.getBrandId());
+            if (brand != null && Boolean.TRUE.equals(brand.getShowOnDetail())
+                    && spu.getMerchantId().equals(brand.getMerchantId())
+                    && TenantContextHolder.getRequiredTenantId().equals(brand.getTenantId())) {
+                spuVO.setBrandName(brand.getName());
+            }
+        }
         return success(spuVO);
     }
 

@@ -19,6 +19,9 @@ public class ProductBrandBaseVO {
     @NotNull(message = "品牌归属商家不能为空")
     private Long merchantId;
 
+    @Schema(description = "在商品详情展示品牌名称；默认关闭，更新时省略则保留")
+    private Boolean showOnDetail;
+
     @Schema(description = "品牌图片", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "品牌图片不能为空")
     private String picUrl;

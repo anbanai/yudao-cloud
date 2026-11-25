@@ -29,6 +29,7 @@ public class ProductBrandDO extends TenantBaseDO {
     private Long id;
     /** 品牌默认归属商家编号 */
     private Long merchantId;
+    private Boolean showOnDetail;
     /**
      * 品牌名称
      */

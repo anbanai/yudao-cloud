@@ -83,6 +83,16 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createSpu(ProductSpuSaveReqVO createReqVO) {
+        return createSpu(createReqVO, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createUnlistedSpu(ProductSpuSaveReqVO createReqVO) {
+        return createSpu(createReqVO, true);
+    }
+
+    private Long createSpu(ProductSpuSaveReqVO createReqVO, boolean unlisted) {
         // 校验分类、品牌
         validateCategory(createReqVO.getCategoryId());
         brandService.validateProductBrand(createReqVO.getBrandId());
@@ -97,6 +107,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         applyProductDefaults(spu);
         // 初始化 SPU 中 SKU 相关属性
         initSpuFromSkus(spu, skuSaveReqList);
+        if (unlisted) spu.setStatus(ProductSpuStatusEnum.DISABLE.getStatus());
         // 插入 SPU
         productSpuMapper.insert(spu);
         // 插入 SKU
