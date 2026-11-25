@@ -19,7 +19,10 @@ public class CouponNewcomerService {
     @Resource @Lazy private CouponService couponService;
     @Resource private MemberUserApi memberUserApi;
     @Resource private MemberLevelApi memberLevelApi;
-    @Resource private TradeOrderApi tradeOrderApi;
+    @Resource
+    @Lazy // 订单处理和计价依赖 CouponApi，查询历史订单时再解析此依赖。
+    private TradeOrderApi tradeOrderApi;
+
     public AppNewcomerCouponRespVO qualification(Long id, Long userId) {
         CouponTemplateDO template = couponTemplateService.getCouponTemplate(id);
         if (template == null || !Objects.equals(template.getStatus(), 0) || !Boolean.TRUE.equals(template.getNewcomerOnly())) {
