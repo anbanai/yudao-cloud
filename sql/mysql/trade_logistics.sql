@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_account` (
   `endpoint` varchar(255) NOT NULL,
   `partner_id` varchar(512) NOT NULL COMMENT '加密保存',
   `check_word` varchar(512) NOT NULL COMMENT '加密保存',
-  `monthly_card` varchar(512) NOT NULL COMMENT '加密保存',
   `service_code` varchar(32) NOT NULL COMMENT '顺丰产品类型编号',
   `template_code` varchar(64) NOT NULL COMMENT '顺丰云打印模板代码（必须与纸张规格匹配）',
   `sender_name` varchar(64) NOT NULL,
@@ -31,11 +30,26 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_account` (
   KEY `idx_logistics_account_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顺丰开放平台账号';
 
+CREATE TABLE IF NOT EXISTS `trade_merchant_logistics_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `merchant_id` bigint NOT NULL COMMENT '商家编号',
+  `monthly_card` varchar(512) NOT NULL COMMENT '顺丰月结卡，加密保存',
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_merchant_logistics_config` (`tenant_id`,`merchant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商家顺丰物流配置';
+
 CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `tenant_id` bigint NOT NULL DEFAULT 0,
   `order_id` bigint NOT NULL,
   `sub_order_id` bigint DEFAULT NULL COMMENT '商家履约订单编号',
+  `merchant_id` bigint DEFAULT NULL COMMENT '商家编号快照',
   `order_no` varchar(64) NOT NULL,
   `account_id` bigint NOT NULL,
   `logistics_id` bigint NOT NULL,
@@ -380,15 +394,17 @@ INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,
 SELECT p.name,p.permission,3,p.sort,m.id,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
 FROM (SELECT '顺丰账号查询' name,'trade:logistics:sf-account:query' permission,1 sort
       UNION ALL SELECT '顺丰账号维护','trade:logistics:sf-account:update',2
-      UNION ALL SELECT '打印设备查询','trade:logistics:device:query',3
-      UNION ALL SELECT '打印设备维护','trade:logistics:device:update',4
-      UNION ALL SELECT '本机打印诊断','trade:logistics:diagnostics',5
-      UNION ALL SELECT '顺丰运单查询','trade:logistics:sf-waybill:query',6
-      UNION ALL SELECT '创建顺丰运单','trade:logistics:sf-waybill:create',7
-      UNION ALL SELECT '取消顺丰运单','trade:logistics:sf-waybill:cancel',8
-      UNION ALL SELECT '人工重打','trade:logistics:sf-waybill:reprint',9
-      UNION ALL SELECT '打印任务查询','trade:logistics:print-task:query',10
-      UNION ALL SELECT '顺丰轨迹查询','trade:logistics:sf-trace:query',11
-      UNION ALL SELECT '顺丰轨迹同步','trade:logistics:sf-trace:sync',12) p
+      UNION ALL SELECT '商家顺丰月结卡查询','trade:logistics:merchant-config:query',3
+      UNION ALL SELECT '商家顺丰月结卡维护','trade:logistics:merchant-config:update',4
+      UNION ALL SELECT '打印设备查询','trade:logistics:device:query',5
+      UNION ALL SELECT '打印设备维护','trade:logistics:device:update',6
+      UNION ALL SELECT '本机打印诊断','trade:logistics:diagnostics',7
+      UNION ALL SELECT '顺丰运单查询','trade:logistics:sf-waybill:query',8
+      UNION ALL SELECT '创建顺丰运单','trade:logistics:sf-waybill:create',9
+      UNION ALL SELECT '取消顺丰运单','trade:logistics:sf-waybill:cancel',10
+      UNION ALL SELECT '人工重打','trade:logistics:sf-waybill:reprint',11
+      UNION ALL SELECT '打印任务查询','trade:logistics:print-task:query',12
+      UNION ALL SELECT '顺丰轨迹查询','trade:logistics:sf-trace:query',13
+      UNION ALL SELECT '顺丰轨迹同步','trade:logistics:sf-trace:sync',14) p
 JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.permission=p.permission AND x.deleted=b'0');

@@ -63,8 +63,8 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
                 : accountMapper.selectById(request.getId());
         if (account == null) throw exception(LOGISTICS_ACCOUNT_NOT_EXISTS);
         if (request.getId() == null && (StrUtil.isBlank(request.getPartnerId())
-                || StrUtil.isBlank(request.getCheckWord()) || StrUtil.isBlank(request.getMonthlyCard()))) {
-            throw exception(LOGISTICS_SF_API_FAILED, "新建账号必须填写 Partner ID、校验码和月结卡号");
+                || StrUtil.isBlank(request.getCheckWord()))) {
+            throw exception(LOGISTICS_SF_API_FAILED, "新建账号必须填写 Partner ID 和校验码");
         }
         if (!List.of("1", "2").contains(request.getServiceCode())) {
             throw exception(LOGISTICS_SF_API_FAILED, "产品类型仅支持顺丰特快或顺丰标快");
@@ -82,7 +82,6 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
                 .setDefaultFlag(Boolean.TRUE.equals(request.getDefaultFlag())).setStatus(request.getStatus());
         if (StrUtil.isNotBlank(request.getPartnerId())) account.setPartnerId(request.getPartnerId());
         if (StrUtil.isNotBlank(request.getCheckWord())) account.setCheckWord(request.getCheckWord());
-        if (StrUtil.isNotBlank(request.getMonthlyCard())) account.setMonthlyCard(request.getMonthlyCard());
         if (Boolean.TRUE.equals(account.getDefaultFlag())) accountMapper.clearDefault(account.getId());
         if (account.getId() == null) accountMapper.insert(account); else accountMapper.updateById(account);
         return account.getId();
@@ -172,7 +171,7 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
 
     private SfLogisticsAccountRespVO toAccountResp(TradeLogisticsAccountDO account) {
         return new SfLogisticsAccountRespVO().setId(account.getId()).setName(account.getName())
-                .setPartnerIdMasked(mask(account.getPartnerId())).setMonthlyCardMasked(mask(account.getMonthlyCard()))
+                .setPartnerIdMasked(mask(account.getPartnerId()))
                 .setServiceCode(account.getServiceCode())
                 .setSenderName(account.getSenderName()).setSenderPhone(account.getSenderPhone())
                 .setSenderProvince(account.getSenderProvince()).setSenderCity(account.getSenderCity())

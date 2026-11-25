@@ -44,12 +44,12 @@ public class SfLogisticsClient {
     @Value("${yudao.trade.logistics.sf.label-host-suffixes:sf-express.com,sf-express.cn}")
     private String labelHostSuffixes;
 
-    public WaybillResult createWaybill(TradeLogisticsAccountDO account, String providerOrderNo,
+    public WaybillResult createWaybill(TradeLogisticsAccountDO account, String monthlyCard, String providerOrderNo,
                                        TradeOrderDO order, List<TradeOrderItemDO> items,
                                        Map<Long, ProductSkuRespDTO> skuMap) {
         ObjectNode request = JsonNodeFactory.instance.objectNode();
         request.put("language", "zh-CN").put("orderId", providerOrderNo)
-                .put("monthlyCard", account.getMonthlyCard())
+                .put("monthlyCard", monthlyCard)
                 .put("expressTypeId", Integer.parseInt(account.getServiceCode()))
                 .put("payMethod", 1).put("parcelQty", 1).put("isReturnRoutelabel", 1)
                 .put("totalWeight", calculateTotalWeight(items, skuMap, account.getDefaultWeightKg()));

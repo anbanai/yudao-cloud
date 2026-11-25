@@ -11,7 +11,6 @@ public class SfLogisticsAccountRespVO {
     private Long id;
     private String name;
     private String partnerIdMasked;
-    private String monthlyCardMasked;
     private String serviceCode;
     private String senderName;
     private String senderPhone;

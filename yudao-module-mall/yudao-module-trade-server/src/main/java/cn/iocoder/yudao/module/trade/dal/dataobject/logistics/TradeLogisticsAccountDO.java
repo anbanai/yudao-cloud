@@ -29,9 +29,6 @@ public class TradeLogisticsAccountDO extends TenantBaseDO {
     @TableField(typeHandler = EncryptTypeHandler.class)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String checkWord;
-    @TableField(typeHandler = EncryptTypeHandler.class)
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    private String monthlyCard;
     private String serviceCode;
     private String templateCode;
     private String senderName;

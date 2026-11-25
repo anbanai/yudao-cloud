@@ -19,7 +19,6 @@ public class SfLogisticsAccountSaveReqVO {
     @NotBlank private String name;
     private String partnerId;
     private String checkWord;
-    private String monthlyCard;
     @NotBlank
     @Pattern(regexp = "\\d+", message = "产品类型必须是顺丰数字服务代码")
     private String serviceCode;

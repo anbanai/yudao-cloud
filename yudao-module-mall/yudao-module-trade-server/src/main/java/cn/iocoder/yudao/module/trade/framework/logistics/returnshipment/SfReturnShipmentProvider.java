@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.framework.logistics.returnshipment;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleReturnShipmentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsAccountDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsAccountMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeMerchantLogisticsConfigMapper;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfApiException;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfOpenApiClient;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
@@ -39,6 +40,8 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
     private SfOpenApiClient openApiClient;
     @Resource
     private TradeLogisticsAccountMapper accountMapper;
+    @Resource
+    private TradeMerchantLogisticsConfigMapper merchantLogisticsConfigMapper;
 
     @Override
     public String getCode() {
@@ -112,7 +115,7 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
 
     private ObjectNode buildRequest(TradeLogisticsAccountDO account, AfterSaleReturnShipmentDO shipment) {
         ObjectNode request = JsonNodeFactory.instance.objectNode().put("language", "zh-CN")
-                .put("orderId", shipment.getProviderOrderNo()).put("monthlyCard", account.getMonthlyCard())
+                .put("orderId", shipment.getProviderOrderNo()).put("monthlyCard", resolveMonthlyCard(shipment))
                 .put("expressTypeId", resolveExpressTypeId(account)).put("payMethod", 1)
                 .put("parcelQty", 1).put("totalWeight", shipment.getPackageWeight().doubleValue());
         ArrayNode contacts = request.putArray("contactInfoList");
@@ -125,6 +128,15 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
         }
         request.putArray("cargoDetails").addObject().put("name", "退货商品").put("count", 1).put("unit", "件");
         return request;
+    }
+
+    private String resolveMonthlyCard(AfterSaleReturnShipmentDO shipment) {
+        var config = shipment.getMerchantId() == null ? null
+                : merchantLogisticsConfigMapper.selectByMerchantId(shipment.getMerchantId());
+        if (config == null || StrUtil.isBlank(config.getMonthlyCard())) {
+            throw new SfApiException("MERCHANT_MONTHLY_CARD_NOT_CONFIGURED", "商家未配置顺丰月结卡");
+        }
+        return config.getMonthlyCard();
     }
 
     private ObjectNode contact(int type, String name, String phone, String province, String city,

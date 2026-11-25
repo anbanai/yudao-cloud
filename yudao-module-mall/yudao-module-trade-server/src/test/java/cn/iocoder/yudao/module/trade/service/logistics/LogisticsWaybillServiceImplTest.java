@@ -6,11 +6,16 @@ import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.TradeMerchantLogisticsConfigRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.*;
+import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.*;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
+import cn.iocoder.yudao.module.trade.service.delivery.DeliveryExpressService;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsWaybillStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.WechatLogisticsPrintStatusEnum;
@@ -49,6 +54,7 @@ class LogisticsWaybillServiceImplTest {
     }
 
     @Mock private TradeOrderMapper orderMapper;
+    @Mock private TradeOrderSubMapper orderSubMapper;
     @Mock private TradeOrderItemMapper itemMapper;
     @Mock private TradeLogisticsAccountMapper accountMapper;
     @Mock private TradeLogisticsWaybillMapper waybillMapper;
@@ -60,12 +66,17 @@ class LogisticsWaybillServiceImplTest {
     @Mock private LogisticsLabelNormalizer labelNormalizer;
     @Mock private FileApi fileApi;
     @Mock private ProductSkuApi productSkuApi;
+    @Mock private TradeMerchantLogisticsConfigService merchantLogisticsConfigService;
+    @Mock private DeliveryExpressService deliveryExpressService;
     private LogisticsWaybillServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new LogisticsWaybillServiceImpl();
         ReflectionTestUtils.setField(service, "orderMapper", orderMapper);
+        ReflectionTestUtils.setField(service, "orderSubMapper", orderSubMapper);
+        ReflectionTestUtils.setField(service, "merchantLogisticsConfigService", merchantLogisticsConfigService);
+        ReflectionTestUtils.setField(service, "deliveryExpressService", deliveryExpressService);
         ReflectionTestUtils.setField(service, "orderItemMapper", itemMapper);
         ReflectionTestUtils.setField(service, "accountMapper", accountMapper);
         ReflectionTestUtils.setField(service, "waybillMapper", waybillMapper);
@@ -77,6 +88,18 @@ class LogisticsWaybillServiceImplTest {
         ReflectionTestUtils.setField(service, "labelNormalizer", labelNormalizer);
         ReflectionTestUtils.setField(service, "fileApi", fileApi);
         ReflectionTestUtils.setField(service, "productSkuApi", productSkuApi);
+        TradeOrderSubDO subOrder = new TradeOrderSubDO();
+        subOrder.setId(20L);
+        subOrder.setOrderId(10L);
+        subOrder.setMerchantId(30L);
+        subOrder.setMerchantName("商家 A");
+        subOrder.setStatus(10);
+        subOrder.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        lenient().when(orderSubMapper.selectById(20L)).thenReturn(subOrder);
+        lenient().when(merchantLogisticsConfigService.getRequiredMonthlyCard(30L)).thenReturn("CARD-30");
+        TradeMerchantLogisticsConfigRespVO config = new TradeMerchantLogisticsConfigRespVO();
+        config.setMonthlyCardMasked("****CARD");
+        lenient().when(merchantLogisticsConfigService.get(30L)).thenReturn(config);
     }
 
     @Test
@@ -88,18 +111,20 @@ class LogisticsWaybillServiceImplTest {
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account);
         when(deviceMapper.selectDefaultEnabled()).thenReturn(device);
-        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(null);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(null);
         doAnswer(invocation -> {
             ((TradeLogisticsWaybillDO) invocation.getArgument(0)).setId(3L);
             return 1;
         }).when(waybillMapper).insert(any(TradeLogisticsWaybillDO.class));
-        when(sfClient.createWaybill(eq(account), anyString(), eq(order), anyList(), anyMap()))
+        when(sfClient.createWaybill(eq(account), anyString(), anyString(), eq(order), anyList(), anyMap()))
                 .thenThrow(new SfApiException("TIMEOUT", "timeout", true, null));
 
-        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
         assertThat(result.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.UNKNOWN.name());
         assertThat(result.getErrorCode()).isEqualTo("TIMEOUT");
+        verify(sfClient).createWaybill(eq(account), eq("CARD-30"), anyString(), eq(order), anyList(), anyMap());
+        verify(waybillMapper).insert(argThat((TradeLogisticsWaybillDO waybill) -> waybill.getMerchantId().equals(30L)));
         verify(taskMapper, never()).insert(any(TradeLogisticsPrintTaskDO.class));
         verify(sfClient, never()).getLabel(any(), anyString());
     }
@@ -110,7 +135,7 @@ class LogisticsWaybillServiceImplTest {
                 .setRefundStatus(TradeOrderRefundStatusEnum.PART.getStatus());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
 
-        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L)))
+        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L)))
                 .isInstanceOf(cn.iocoder.yudao.framework.common.exception.ServiceException.class)
                 .extracting("code")
                 .isEqualTo(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants
@@ -129,10 +154,10 @@ class LogisticsWaybillServiceImplTest {
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
         when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
-        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(task);
 
-        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
         assertThat(result.getJobId()).isEqualTo("JOB-1");
         assertThat(result).extracting("reused").isEqualTo(true);
@@ -153,10 +178,10 @@ class LogisticsWaybillServiceImplTest {
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
         when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
-        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(failedTask);
 
-        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
         assertThat(result.getPrintStatus()).isEqualTo(LogisticsPrintTaskStatusEnum.PENDING.name());
         assertThat(result.getJobId()).isNotEqualTo("JOB-FAILED");
@@ -179,7 +204,7 @@ class LogisticsWaybillServiceImplTest {
         when(accountMapper.selectDefaultEnabled()).thenReturn(account);
         when(accountMapper.selectById(account.getId())).thenReturn(account);
         when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
-        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(waybill);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(waybillMapper.selectByIdForUpdate(3L)).thenReturn(waybill);
         when(fileApi.isPrivateMasterSupported()).thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
         when(sfClient.getLabel(account, "SF1164862794041")).thenReturn(new byte[]{1});
@@ -190,7 +215,7 @@ class LogisticsWaybillServiceImplTest {
 
         TenantContextHolder.setTenantId(9L);
         try {
-            var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+            var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
             assertThat(result.getJobId()).startsWith("JOB-");
             assertThat(waybill.getLabelFileId()).isEqualTo(99L);
@@ -198,7 +223,7 @@ class LogisticsWaybillServiceImplTest {
                     ArgumentCaptor.forClass(TradeLogisticsPrintTaskDO.class);
             verify(taskMapper).insert(taskCaptor.capture());
             assertThat(taskCaptor.getValue().getLabelFileId()).isEqualTo(99L);
-            verify(sfClient, never()).createWaybill(any(), anyString(), any(), anyList(), anyMap());
+            verify(sfClient, never()).createWaybill(any(), anyString(), anyString(), any(), anyList(), anyMap());
         } finally {
             TenantContextHolder.clear();
         }
@@ -213,7 +238,7 @@ class LogisticsWaybillServiceImplTest {
                 .setOrderId(10L).setStatus(WechatLogisticsWaybillStatusEnum.CREATED.name())
                 .setPrintStatus(WechatLogisticsPrintStatusEnum.PENDING.name()));
 
-        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L)))
+        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L)))
                 .isInstanceOf(cn.iocoder.yudao.framework.common.exception.ServiceException.class)
                 .extracting("code")
                 .isEqualTo(cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants
@@ -231,15 +256,15 @@ class LogisticsWaybillServiceImplTest {
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
         when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
-        when(waybillMapper.selectByOrderIdForUpdate(10L)).thenReturn(cancelled);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(cancelled);
         doAnswer(invocation -> {
             ((TradeLogisticsWaybillDO) invocation.getArgument(0)).setId(4L);
             return 1;
         }).when(waybillMapper).insert(any(TradeLogisticsWaybillDO.class));
-        when(sfClient.createWaybill(any(), anyString(), eq(order), anyList(), anyMap()))
+        when(sfClient.createWaybill(any(), anyString(), anyString(), eq(order), anyList(), anyMap()))
                 .thenThrow(new SfApiException("REJECTED", "rejected", false, null));
 
-        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L));
+        var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
         ArgumentCaptor<TradeLogisticsWaybillDO> captor = ArgumentCaptor.forClass(TradeLogisticsWaybillDO.class);
         verify(waybillMapper).insert(captor.capture());
@@ -258,7 +283,7 @@ class LogisticsWaybillServiceImplTest {
         when(deviceMapper.selectDefaultEnabled()).thenReturn(new TradeLogisticsPrintDeviceDO()
                 .setId(2L).setDeviceCode("device-1").setStatus(0));
 
-        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L)))
+        assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L)))
                 .hasMessageContaining("未选择打印机");
         verifyNoInteractions(sfClient);
     }
@@ -284,6 +309,7 @@ class LogisticsWaybillServiceImplTest {
     @Test
     void validateManualDelivery_locksOrderBeforeCheckingActiveWaybill() {
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(new TradeOrderDO().setId(10L));
+        when(deliveryExpressService.getDeliveryExpress(8L)).thenReturn(new DeliveryExpressDO().setCode("OTHER"));
         when(waybillMapper.selectActiveByOrderId(10L)).thenReturn(null);
 
         service.validateManualDelivery(10L, 8L, "SF-MANUAL");
@@ -291,6 +317,15 @@ class LogisticsWaybillServiceImplTest {
         var inOrder = inOrder(orderMapper, waybillMapper);
         inOrder.verify(orderMapper).selectByIdForUpdate(10L);
         inOrder.verify(waybillMapper).selectActiveByOrderId(10L);
+    }
+
+    @Test
+    void validateManualDelivery_rejectsSfExpress() {
+        when(deliveryExpressService.getDeliveryExpress(8L)).thenReturn(new DeliveryExpressDO().setCode("SF"));
+
+        assertThatThrownBy(() -> service.validateManualDelivery(10L, null, 8L, "SF-MANUAL"))
+                .hasMessageContaining("顺丰必须通过顺丰打单流程发货");
+        verifyNoInteractions(waybillMapper);
     }
 
     @Test

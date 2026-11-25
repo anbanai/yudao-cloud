@@ -103,6 +103,7 @@ CALL `tmp_add_column_if_missing`('trade_order_item', 'sub_order_id', 'bigint DEF
 CALL `tmp_add_column_if_missing`('trade_order_item', 'merchant_id', 'bigint DEFAULT NULL COMMENT ''商家编号快照''');
 CALL `tmp_add_column_if_missing`('trade_order_item', 'merchant_name', 'varchar(128) DEFAULT NULL COMMENT ''商家名称快照''');
 CALL `tmp_add_column_if_missing`('trade_logistics_waybill', 'sub_order_id', 'bigint DEFAULT NULL COMMENT ''商家履约订单编号'' AFTER `order_id`');
+CALL `tmp_add_column_if_missing`('trade_logistics_waybill', 'merchant_id', 'bigint DEFAULT NULL COMMENT ''商家编号快照'' AFTER `sub_order_id`');
 SET @drop_merchant_waybill_index = (
     SELECT IF(COUNT(*) > 0,
               'ALTER TABLE `trade_logistics_waybill` DROP INDEX `uk_logistics_active_order`',

@@ -30,6 +30,7 @@ import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfApiException;
 import cn.iocoder.yudao.module.trade.framework.logistics.sf.SfLogisticsClient;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
+import cn.iocoder.yudao.module.trade.service.delivery.DeliveryExpressService;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
@@ -56,6 +57,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     @Resource private TradeOrderItemMapper orderItemMapper;
     @Resource private TradeOrderSubMapper orderSubMapper;
     @Resource private TradeLogisticsAccountMapper accountMapper;
+    @Resource private TradeMerchantLogisticsConfigService merchantLogisticsConfigService;
     @Resource private TradeLogisticsWaybillMapper waybillMapper;
     @Resource private TradeWechatLogisticsWaybillMapper wechatWaybillMapper;
     @Resource private TradeLogisticsPrintDeviceMapper deviceMapper;
@@ -66,6 +68,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     @Resource private FileApi fileApi;
     @Resource private ProductSkuApi productSkuApi;
     @Resource private TradeOrderUpdateService orderUpdateService;
+    @Resource private DeliveryExpressService deliveryExpressService;
     @Resource private PlatformTransactionManager transactionManager;
 
     @Override
@@ -77,7 +80,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         }
         TradeLogisticsAccountDO account = preparation.account();
         if (preparation.newRecord() || LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus())) {
-            createRemoteWaybill(waybill, account, preparation.order());
+            createRemoteWaybill(waybill, account, preparation.monthlyCard(), preparation.order());
         } else if (List.of(LogisticsWaybillStatusEnum.CREATING.name(),
                 LogisticsWaybillStatusEnum.UNKNOWN.name()).contains(waybill.getStatus())) {
             queryRemoteWaybill(waybill, account);
@@ -91,7 +94,9 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     private CreationPreparation prepareCreation(LogisticsWaybillCreateReqVO request) {
         TradeOrderDO order = orderMapper.selectByIdForUpdate(request.getOrderId());
         validateOrder(order);
-        validateSubOrder(order, request.getSubOrderId());
+        TradeOrderSubDO subOrder = validateSubOrder(order, request.getSubOrderId());
+        Long merchantId = subOrder.getMerchantId();
+        String monthlyCard = merchantLogisticsConfigService.getRequiredMonthlyCard(merchantId);
         TradeWechatLogisticsWaybillDO wechatWaybill = wechatWaybillMapper.selectByOrderIdForUpdate(order.getId());
         if (wechatWaybill != null && List.of("CREATING", "CREATED", "UNKNOWN")
                 .contains(wechatWaybill.getStatus())) {
@@ -99,13 +104,11 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         }
         TradeLogisticsAccountDO account = getAccount(request.getAccountId());
         TradeLogisticsPrintDeviceDO device = getDevice(request.getDeviceId());
-        TradeLogisticsWaybillDO waybill = request.getSubOrderId() == null
-                ? waybillMapper.selectByOrderIdForUpdate(order.getId())
-                : waybillMapper.selectByOrderIdForUpdate(order.getId(), request.getSubOrderId());
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId(), request.getSubOrderId());
         boolean newRecord = false;
         if (waybill == null) {
-            String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId();
-            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setOrderNo(order.getNo())
+            String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId() + "-" + request.getSubOrderId();
+            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setMerchantId(merchantId).setOrderNo(order.getNo())
                     .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
                     .setRequestedDeviceId(device.getId())
                     .setProviderOrderNo(providerOrderNo).setStatus(LogisticsWaybillStatusEnum.CREATING.name())
@@ -116,7 +119,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             if (LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
                 String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId()
                         + "-" + IdUtil.fastSimpleUUID();
-                waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setOrderNo(order.getNo())
+                waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setMerchantId(merchantId).setOrderNo(order.getNo())
                         .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
                         .setRequestedDeviceId(device.getId()).setProviderOrderNo(providerOrderNo)
                         .setStatus(LogisticsWaybillStatusEnum.CREATING.name()).setDeliveryStatus("PENDING");
@@ -128,27 +131,26 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                     if (LogisticsPrintTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
                         TradeLogisticsPrintTaskDO retryTask = newTask(waybill, device);
                         taskMapper.insert(retryTask);
-                        return new CreationPreparation(order, account, device, waybill, retryTask, false, false);
+                        return new CreationPreparation(order, account, device, waybill, retryTask, false, false, monthlyCard);
                     }
-                    return new CreationPreparation(order, account, device, waybill, task, false, true);
+                    return new CreationPreparation(order, account, device, waybill, task, false, true, monthlyCard);
                 }
                 account = getAccount(waybill.getAccountId());
+                monthlyCard = merchantLogisticsConfigService.getRequiredMonthlyCard(waybill.getMerchantId());
             }
         }
-        return new CreationPreparation(order, account, device, waybill, null, newRecord, false);
+        return new CreationPreparation(order, account, device, waybill, null, newRecord, false, monthlyCard);
     }
 
     private void createRemoteWaybill(TradeLogisticsWaybillDO waybill, TradeLogisticsAccountDO account,
+                                     String monthlyCard,
                                      TradeOrderDO order) {
         try {
-            List<TradeOrderItemDO> items = orderItemMapper.selectListByOrderId(order.getId());
-            if (waybill.getSubOrderId() != null) {
-                items.removeIf(item -> !waybill.getSubOrderId().equals(item.getSubOrderId()));
-            }
+            List<TradeOrderItemDO> items = orderItemMapper.selectListBySubOrderId(waybill.getSubOrderId());
             Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Map.of()
                     : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId)
                             .collect(Collectors.toSet()));
-            markCreated(waybill, sfClient.createWaybill(account, waybill.getProviderOrderNo(), order, items, skuMap));
+            markCreated(waybill, sfClient.createWaybill(account, monthlyCard, waybill.getProviderOrderNo(), order, items, skuMap));
         } catch (SfApiException exception) {
             updateFailure(waybill, exception);
         }
@@ -374,6 +376,10 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     @Transactional(rollbackFor = Exception.class)
     public void validateManualDelivery(Long orderId, Long subOrderId, Long logisticsId, String logisticsNo) {
         orderMapper.selectByIdForUpdate(orderId);
+        var express = deliveryExpressService.getDeliveryExpress(logisticsId);
+        if (express != null && "SF".equalsIgnoreCase(express.getCode())) {
+            throw exception(LOGISTICS_SF_MANUAL_DELIVERY_NOT_ALLOWED);
+        }
         TradeLogisticsWaybillDO waybill = subOrderId == null
                 ? waybillMapper.selectActiveByOrderId(orderId)
                 : waybillMapper.selectActiveByOrderId(orderId, subOrderId);
@@ -429,7 +435,13 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     }
 
     private LogisticsWaybillRespVO toResp(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task) {
-        return new LogisticsWaybillRespVO().setId(waybill.getId()).setOrderId(waybill.getOrderId()).setSubOrderId(waybill.getSubOrderId())
+        TradeOrderSubDO subOrder = waybill.getSubOrderId() == null ? null : orderSubMapper.selectById(waybill.getSubOrderId());
+        String monthlyCardMasked = waybill.getMerchantId() == null ? null
+                : merchantLogisticsConfigService.get(waybill.getMerchantId()).getMonthlyCardMasked();
+        return new LogisticsWaybillRespVO().setId(waybill.getId()).setOrderId(waybill.getOrderId())
+                .setSubOrderId(waybill.getSubOrderId()).setMerchantId(waybill.getMerchantId())
+                .setMerchantName(subOrder == null ? null : subOrder.getMerchantName())
+                .setMerchantMonthlyCardMasked(monthlyCardMasked)
                 .setOrderNo(waybill.getOrderNo()).setProviderOrderNo(waybill.getProviderOrderNo())
                 .setWaybillNo(waybill.getWaybillNo()).setStatus(waybill.getStatus())
                 .setDeliveryStatus(waybill.getDeliveryStatus()).setPrintStatus(task == null ? null : task.getStatus())
@@ -438,15 +450,20 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                 .setCreateTime(waybill.getCreateTime());
     }
 
-    private void validateSubOrder(TradeOrderDO order, Long subOrderId) {
+    private TradeOrderSubDO validateSubOrder(TradeOrderDO order, Long subOrderId) {
         if (subOrderId == null) {
-            return;
+            throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
         }
         TradeOrderSubDO subOrder = orderSubMapper.selectById(subOrderId);
         if (subOrder == null || !order.getId().equals(subOrder.getOrderId())
-                || !TradeOrderStatusEnum.isUndelivered(subOrder.getStatus())) {
+                || !TradeOrderStatusEnum.isUndelivered(subOrder.getStatus())
+                || !TradeOrderRefundStatusEnum.NONE.getStatus().equals(subOrder.getRefundStatus())) {
             throw exception(ORDER_DELIVERY_FAIL_STATUS_NOT_UNDELIVERED);
         }
+        if (subOrder.getMerchantId() == null) {
+            throw exception(TRADE_MERCHANT_LOGISTICS_CONFIG_NOT_EXISTS, subOrderId);
+        }
+        return subOrder;
     }
 
     private LogisticsPrintTaskRespVO toTaskResp(TradeLogisticsPrintTaskDO task) {
@@ -503,7 +520,8 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     private record CreationPreparation(TradeOrderDO order, TradeLogisticsAccountDO account,
                                        TradeLogisticsPrintDeviceDO device, TradeLogisticsWaybillDO waybill,
-                                       TradeLogisticsPrintTaskDO task, boolean newRecord, boolean taskReused) {
+                                       TradeLogisticsPrintTaskDO task, boolean newRecord, boolean taskReused,
+                                       String monthlyCard) {
     }
 
     private record CancellationPreparation(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task,

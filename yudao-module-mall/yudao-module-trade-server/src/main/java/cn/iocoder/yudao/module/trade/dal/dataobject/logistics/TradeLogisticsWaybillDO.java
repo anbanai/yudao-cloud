@@ -21,6 +21,7 @@ public class TradeLogisticsWaybillDO extends TenantBaseDO {
     private Long id;
     private Long orderId;
     private Long subOrderId;
+    private Long merchantId;
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
     private Long activeOrderId;
     private String orderNo;

@@ -21,6 +21,7 @@ public class AfterSaleReturnShipmentDO extends TenantBaseDO {
 
     private Long id;
     private Long afterSaleId;
+    private Long merchantId;
     private Long accountId;
     private String provider;
     private String providerOrderNo;

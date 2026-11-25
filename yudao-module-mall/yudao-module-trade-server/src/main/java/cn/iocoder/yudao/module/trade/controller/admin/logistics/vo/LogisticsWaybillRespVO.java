@@ -11,6 +11,9 @@ public class LogisticsWaybillRespVO {
     private Long id;
     private Long orderId;
     private Long subOrderId;
+    private Long merchantId;
+    private String merchantName;
+    private String merchantMonthlyCardMasked;
     private String orderNo;
     private String providerOrderNo;
     private String waybillNo;

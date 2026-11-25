@@ -5,6 +5,9 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.*;
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsManagementService;
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsWaybillService;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -26,6 +29,7 @@ public class SfPrintBridgeLogisticsController {
 
     @Resource private LogisticsManagementService managementService;
     @Resource private LogisticsWaybillService waybillService;
+    @Resource private TradeOrderSubMapper orderSubMapper;
 
     @GetMapping("/accounts")
     @PreAuthorize("@ss.hasPermission('trade:logistics:sf-account:query')")
@@ -82,12 +86,29 @@ public class SfPrintBridgeLogisticsController {
             @Valid @RequestBody LogisticsWaybillBatchCreateReqVO request) {
         List<LogisticsWaybillRespVO> result = new ArrayList<>();
         for (Long orderId : request.getOrderIds().stream().distinct().toList()) {
-            try {
-                result.add(waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(orderId)
-                        .setAccountId(request.getAccountId()).setDeviceId(request.getDeviceId())));
-            } catch (ServiceException exception) {
+            List<TradeOrderSubDO> subOrders = orderSubMapper.selectListByOrderId(orderId);
+            if (subOrders.isEmpty()) {
                 result.add(new LogisticsWaybillRespVO().setOrderId(orderId).setStatus("FAILED")
-                        .setErrorCode(String.valueOf(exception.getCode())).setErrorMessage(exception.getMessage()));
+                        .setErrorCode("SUB_ORDER_NOT_EXISTS").setErrorMessage("订单没有可发货的商家子订单"));
+                continue;
+            }
+            List<TradeOrderSubDO> undeliveredSubOrders = subOrders.stream()
+                    .filter(item -> TradeOrderStatusEnum.isUndelivered(item.getStatus())).toList();
+            if (undeliveredSubOrders.isEmpty()) {
+                result.add(new LogisticsWaybillRespVO().setOrderId(orderId).setStatus("FAILED")
+                        .setErrorCode("NO_UNDELIVERED_SUB_ORDER").setErrorMessage("订单没有待发货的商家履约单"));
+                continue;
+            }
+            for (TradeOrderSubDO subOrder : undeliveredSubOrders) {
+                try {
+                    result.add(waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(orderId)
+                            .setSubOrderId(subOrder.getId()).setAccountId(request.getAccountId()).setDeviceId(request.getDeviceId())));
+                } catch (ServiceException exception) {
+                    result.add(new LogisticsWaybillRespVO().setOrderId(orderId).setSubOrderId(subOrder.getId())
+                            .setMerchantId(subOrder.getMerchantId()).setMerchantName(subOrder.getMerchantName())
+                            .setStatus("FAILED")
+                            .setErrorCode(String.valueOf(exception.getCode())).setErrorMessage(exception.getMessage()));
+                }
             }
         }
         return success(result);

@@ -130,6 +130,9 @@ public interface ErrorCodeConstants {
     ErrorCode LOGISTICS_CONFIGURATION_INVALID = new ErrorCode(1_011_004_312, "物流服务端配置不完整：{}");
     ErrorCode LOGISTICS_DEVICE_ENROLLMENT_PENDING = new ErrorCode(1_011_004_313,
             "PrintBridge 配置已生成，请导入刚下载的文件并等待设备连接");
+    ErrorCode TRADE_MERCHANT_LOGISTICS_CONFIG_NOT_EXISTS = new ErrorCode(1_011_004_314, "商家物流配置不存在");
+    ErrorCode TRADE_MERCHANT_MONTHLY_CARD_NOT_CONFIGURED = new ErrorCode(1_011_004_315, "商家未配置顺丰月结卡：{}");
+    ErrorCode LOGISTICS_SF_MANUAL_DELIVERY_NOT_ALLOWED = new ErrorCode(1_011_004_316, "顺丰必须通过顺丰打单流程发货");
 
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");

@@ -46,8 +46,9 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "ORDER-1", order(), List.of(first, second), skus);
+        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(first, second), skus);
 
+        assertThat(payload.getValue().path("monthlyCard").asText()).isEqualTo("CARD-1");
         assertThat(payload.getValue().path("totalWeight").decimalValue())
                 .isEqualByComparingTo(new BigDecimal("1.20"));
     }
@@ -60,7 +61,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "ORDER-1", order(), List.of(item), Map.of());
+        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(item), Map.of());
 
         JsonNode cargo = payload.getValue().path("cargoDetails").get(0);
         assertThat(cargo.path("name").asText()).isEqualTo("茶叶 35700 * 2");
@@ -76,7 +77,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "ORDER-1", order(), List.of(item), Map.of());
+        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(item), Map.of());
 
         String cargoName = payload.getValue().path("cargoDetails").get(0).path("name").asText();
         assertThat(cargoName).hasSize(100)
@@ -91,7 +92,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "ORDER-1", order(), List.of(item), Map.of());
+        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(item), Map.of());
 
         assertThat(payload.getValue().path("totalWeight").decimalValue())
                 .isEqualByComparingTo(new BigDecimal("0.80"));
@@ -102,7 +103,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), any()))
                 .thenReturn(JsonNodeFactory.instance.objectNode());
 
-        assertThatThrownBy(() -> client.createWaybill(account(), "ORDER-1", order(), List.of(), Map.of()))
+        assertThatThrownBy(() -> client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(), Map.of()))
                 .isInstanceOfSatisfying(SfApiException.class,
                         exception -> assertThat(exception.isUnknownResult()).isTrue());
     }
@@ -172,7 +173,7 @@ class SfLogisticsClientTest {
     }
 
     private static TradeLogisticsAccountDO account() {
-        return new TradeLogisticsAccountDO().setMonthlyCard("monthly").setServiceCode("1")
+        return new TradeLogisticsAccountDO().setServiceCode("1")
                 .setDefaultWeightKg(new BigDecimal("0.80")).setSenderName("仓库")
                 .setSenderPhone("13800138000").setSenderProvince("四川省").setSenderCity("成都市")
                 .setSenderDistrict("高新区").setSenderAddress("天府大道 1 号");

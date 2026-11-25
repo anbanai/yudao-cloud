@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS `trade_after_sale_return_shipment` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '逆向物流编号',
   `after_sale_id` bigint NOT NULL COMMENT '售后单编号',
+  `merchant_id` bigint DEFAULT NULL COMMENT '商家编号',
   `account_id` bigint DEFAULT NULL COMMENT '物流账号编号',
   `provider` varchar(32) NOT NULL COMMENT '服务商',
   `provider_order_no` varchar(64) DEFAULT NULL COMMENT '服务商订单号',

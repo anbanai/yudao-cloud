@@ -98,7 +98,7 @@ class LogisticsManagementServiceImplTest {
         SfLogisticsAccountSaveReqVO request = validRequest().setId(7L);
         TradeLogisticsAccountDO existing = new TradeLogisticsAccountDO().setId(7L)
                 .setTemplateCode("fm_verified_merchant_template")
-                .setPartnerId("partner").setCheckWord("check-word").setMonthlyCard("monthly-card");
+                .setPartnerId("partner").setCheckWord("check-word");
         when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L).setCode("SF"));
         when(accountMapper.selectById(7L)).thenReturn(existing);
 
@@ -225,7 +225,7 @@ class LogisticsManagementServiceImplTest {
 
     private static SfLogisticsAccountSaveReqVO validRequest() {
         return new SfLogisticsAccountSaveReqVO().setName("顺丰月结账号").setPartnerId("partner")
-                .setCheckWord("check-word").setMonthlyCard("monthly-card").setServiceCode("1")
+                .setCheckWord("check-word").setServiceCode("1")
                 .setSenderName("仓库").setSenderPhone("13800138000")
                 .setSenderProvince("四川省").setSenderCity("成都市").setSenderAddress("高新区 1 号")
                 .setDefaultWeightKg(BigDecimal.ONE).setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
