@@ -49,6 +49,7 @@ public class ProductBrandServiceImpl implements ProductBrandService {
 
         // 插入
         ProductBrandDO brand = ProductBrandConvert.INSTANCE.convert(createReqVO);
+        brand.setShowInDetail(Boolean.TRUE.equals(createReqVO.getShowInDetail()));
         brandMapper.insert(brand);
         // 返回
         return brand.getId();

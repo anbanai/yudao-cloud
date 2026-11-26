@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.product.controller.app.spu;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -12,6 +13,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
+import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +55,8 @@ public class AppProductSpuController {
     private ProductSkuService productSkuService;
     @Resource
     private ProductBrowseHistoryService productBrowseHistoryService;
+    @Resource
+    private ProductBrandService productBrandService;
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得商品 SPU 列表")
@@ -122,6 +126,14 @@ public class AppProductSpuController {
         spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount());
         AppProductSpuDetailRespVO spuVO = BeanUtils.toBean(spu, AppProductSpuDetailRespVO.class)
                 .setSkus(BeanUtils.toBean(skus, AppProductSpuDetailRespVO.Sku.class));
+        if (spu.getBrandId() != null && spu.getBrandId() > 0 && spu.getMerchantId() != null) {
+            var brand = productBrandService.getBrand(spu.getBrandId());
+            if (brand != null && CommonStatusEnum.isEnable(brand.getStatus()) && Boolean.TRUE.equals(brand.getShowInDetail())
+                    && spu.getMerchantId().equals(brand.getMerchantId())
+                    && TenantContextHolder.getRequiredTenantId().equals(brand.getTenantId())) {
+                spuVO.setBrandName(brand.getName());
+            }
+        }
         return success(spuVO);
     }
 

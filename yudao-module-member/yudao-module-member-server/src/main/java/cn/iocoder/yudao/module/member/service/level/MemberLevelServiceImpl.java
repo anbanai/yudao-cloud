@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.member.controller.admin.level.vo.level.MemberLevelCreateReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.level.vo.level.MemberLevelListReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.level.vo.level.MemberLevelUpdateReqVO;
@@ -14,12 +15,14 @@ import cn.iocoder.yudao.module.member.dal.dataobject.level.MemberLevelDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.level.MemberLevelRecordDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
 import cn.iocoder.yudao.module.member.dal.mysql.level.MemberLevelMapper;
+import cn.iocoder.yudao.module.member.dal.mysql.user.MemberUserMapper;
 import cn.iocoder.yudao.module.member.enums.MemberExperienceBizTypeEnum;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import com.google.common.annotations.VisibleForTesting;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.annotation.Resource;
@@ -50,6 +53,8 @@ public class MemberLevelServiceImpl implements MemberLevelService {
     private MemberExperienceRecordService memberExperienceRecordService;
     @Resource
     private MemberUserService memberUserService;
+    @Resource
+    private MemberUserMapper memberUserMapper;
 
     @Override
     public Long createLevel(MemberLevelCreateReqVO createReqVO) {
@@ -185,7 +190,7 @@ public class MemberLevelServiceImpl implements MemberLevelService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateUserLevel(MemberUserUpdateLevelReqVO updateReqVO) {
-        MemberUserDO user = memberUserService.getUser(updateReqVO.getId());
+        MemberUserDO user = memberUserService.getUserForUpdate(updateReqVO.getId());
         if (user == null) {
             throw exception(USER_NOT_EXISTS);
         }
@@ -228,6 +233,36 @@ public class MemberLevelServiceImpl implements MemberLevelService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    public void restoreHigherLevel(Long userId, Long snapshotLevelId) {
+        if (snapshotLevelId == null) {
+            return;
+        }
+        MemberUserDO user = memberUserService.getUserForUpdate(userId);
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
+        MemberLevelDO restored = getLevel(snapshotLevelId);
+        if (restored == null || !CommonStatusEnum.isEnable(restored.getStatus())) {
+            throw exception(LEVEL_NOT_EXISTS);
+        }
+        MemberLevelDO current = getLevel(user.getLevelId());
+        if (current == null && user.getLevelId() != null && user.getLevelId() != 0L) {
+            throw exception(LEVEL_NOT_EXISTS);
+        }
+        if (current != null && current.getLevel() >= restored.getLevel()) {
+            return;
+        }
+        if (memberUserMapper.updateById(new MemberUserDO().setId(userId).setLevelId(snapshotLevelId)
+                .setRecoveredFloorLevelId(snapshotLevelId)) != 1) {
+            throw exception(USER_NOT_EXISTS);
+        }
+        MemberLevelRecordDO record = MemberLevelRecordConvert.INSTANCE.copyTo(restored, new MemberLevelRecordDO());
+        memberLevelRecordService.createLevelRecord(record.setUserId(userId).setExperience(0)
+                .setUserExperience(user.getExperience()).setDescription("有赞旧等级恢复"));
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void addExperience(Long userId, Integer experience, MemberExperienceBizTypeEnum bizType, String bizId) {
         if (experience == 0) {
@@ -238,7 +273,7 @@ public class MemberLevelServiceImpl implements MemberLevelService {
         }
 
         // 1. 创建经验记录
-        MemberUserDO user = memberUserService.getUser(userId);
+        MemberUserDO user = memberUserService.getUserForUpdate(userId);
         Integer userExperience = ObjUtil.defaultIfNull(user.getExperience(), 0);
         userExperience = NumberUtil.max(userExperience + experience, 0); // 防止扣出负数
         MemberLevelRecordDO levelRecord = new MemberLevelRecordDO().setUserId(user.getId())
@@ -269,6 +304,11 @@ public class MemberLevelServiceImpl implements MemberLevelService {
      */
     private MemberLevelDO calculateNewLevel(MemberUserDO user, int userExperience) {
         List<MemberLevelDO> list = getEnableLevelList();
+        MemberLevelDO floor = null;
+        if (user.getRecoveredFloorLevelId() != null) {
+            floor = list.stream().filter(level -> level.getId().equals(user.getRecoveredFloorLevelId()))
+                    .findFirst().orElseThrow(() -> exception(LEVEL_NOT_EXISTS));
+        }
         if (CollUtil.isEmpty(list)) {
             log.warn("计算会员等级失败：会员等级配置不存在");
             return null;
@@ -278,6 +318,9 @@ public class MemberLevelServiceImpl implements MemberLevelService {
                 .filter(level -> userExperience >= level.getExperience())
                 .max(Comparator.nullsFirst(Comparator.comparing(MemberLevelDO::getLevel)))
                 .orElse(null);
+        if (floor != null && (matchLevel == null || floor.getLevel() > matchLevel.getLevel())) {
+            matchLevel = floor;
+        }
         if (matchLevel == null) {
             log.warn("计算会员等级失败：未找到会员{}经验{}对应的等级配置", user.getId(), userExperience);
             return null;

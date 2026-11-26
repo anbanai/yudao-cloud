@@ -8,6 +8,8 @@ import cn.iocoder.yudao.module.member.controller.admin.point.vo.recrod.MemberPoi
 import cn.iocoder.yudao.module.member.controller.app.point.vo.AppMemberPointRecordPageReqVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.point.MemberPointRecordDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 import java.util.Set;
@@ -19,6 +21,12 @@ import java.util.Set;
  */
 @Mapper
 public interface MemberPointRecordMapper extends BaseMapperX<MemberPointRecordDO> {
+
+    @Select("""
+            SELECT id FROM member_point_record
+            WHERE tenant_id = #{tenantId} AND youzan_recovery_source = #{bizId}
+            """)
+    Long findHistoricalRecovery(@Param("tenantId") long tenantId, @Param("bizId") String bizId);
 
     default MemberPointRecordDO selectByUserIdAndBizTypeAndBizId(Long userId, Integer bizType, String bizId) {
         List<MemberPointRecordDO> records = selectList(new LambdaQueryWrapperX<MemberPointRecordDO>()
