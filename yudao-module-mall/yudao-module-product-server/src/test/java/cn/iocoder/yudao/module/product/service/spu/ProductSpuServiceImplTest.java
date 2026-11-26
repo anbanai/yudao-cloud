@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.service.spu;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategoryListReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
@@ -30,12 +31,16 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_IMAGE_INVALID;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,6 +71,7 @@ class ProductSpuServiceImplTest {
         when(categoryService.getCategoryList(any())).thenReturn(List.of(
                 new ProductCategoryDO().setId(11L).setParentId(10L),
                 new ProductCategoryDO().setId(21L).setParentId(20L)));
+        when(productSpuMapper.selectPage(same(reqVO), anySet())).thenReturn(PageResult.empty());
 
         productSpuService.getSpuPage(reqVO);
 
@@ -82,13 +88,33 @@ class ProductSpuServiceImplTest {
     }
 
     @Test
-    void testUpdateSpuKeepsCategoryAndSynchronizesOptionalGroups() {
+    void testUpdateSpuKeepsExistingCategoryAndSynchronizesOptionalGroups() {
         ProductSkuSaveReqVO sku = new ProductSkuSaveReqVO()
                 .setPrice(100).setMarketPrice(120).setCostPrice(80).setStock(5);
         ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L)
                 .setCategoryId(9L).setBrandId(8L).setMerchantId(1L).setSpecType(false)
                 .setSkus(List.of(sku)).setGroupIds(null);
-        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setStatus(1));
+        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setCategoryId(9L).setStatus(1));
+        when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
+
+        productSpuService.updateSpu(reqVO);
+
+        ArgumentCaptor<ProductSpuDO> spuCaptor = ArgumentCaptor.forClass(ProductSpuDO.class);
+        verify(productSpuMapper).updateById(spuCaptor.capture());
+        assertNull(spuCaptor.getValue().getCategoryId());
+        verify(categoryService).validateCategory(9L);
+        verify(categoryService, never()).getCategoryLevel(9L);
+        verify(productGroupService).syncSpuGroups(100L, null);
+    }
+
+    @Test
+    void testUpdateSpuWritesChangedSecondLevelCategory() {
+        ProductSkuSaveReqVO sku = new ProductSkuSaveReqVO()
+                .setPrice(100).setMarketPrice(120).setCostPrice(80).setStock(5);
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L)
+                .setCategoryId(9L).setBrandId(8L).setMerchantId(1L).setSpecType(false)
+                .setSkus(List.of(sku));
+        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setCategoryId(10L).setStatus(1));
         when(categoryService.getCategoryLevel(9L)).thenReturn(2);
         when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
 
@@ -97,8 +123,23 @@ class ProductSpuServiceImplTest {
         ArgumentCaptor<ProductSpuDO> spuCaptor = ArgumentCaptor.forClass(ProductSpuDO.class);
         verify(productSpuMapper).updateById(spuCaptor.capture());
         assertEquals(9L, spuCaptor.getValue().getCategoryId());
-        verify(categoryService).validateCategory(9L);
-        verify(productGroupService).syncSpuGroups(100L, null);
+    }
+
+    @Test
+    void testUpdateSpuRejectsChangingToTopLevelCategory() {
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L).setCategoryId(9L);
+        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setCategoryId(10L));
+        when(categoryService.getCategoryLevel(9L)).thenReturn(1);
+
+        assertServiceException(() -> productSpuService.updateSpu(reqVO), SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR);
+    }
+
+    @Test
+    void testCreateSpuRejectsTopLevelCategory() {
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setCategoryId(9L);
+        when(categoryService.getCategoryLevel(9L)).thenReturn(1);
+
+        assertServiceException(() -> productSpuService.createSpu(reqVO), SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR);
     }
 
     @ParameterizedTest

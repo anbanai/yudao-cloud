@@ -112,7 +112,14 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验 SPU 是否存在
         ProductSpuDO spu = validateSpuExists(updateReqVO.getId());
         // 校验分类、品牌
-        validateCategory(updateReqVO.getCategoryId());
+        Long categoryId = updateReqVO.getCategoryId();
+        boolean categoryChanged = !Objects.equals(categoryId, spu.getCategoryId());
+        if (categoryChanged) {
+            validateCategory(categoryId);
+        } else {
+            // 历史商品可保留原分类，仍需确认分类存在并且启用。
+            categoryService.validateCategory(categoryId);
+        }
         brandService.validateProductBrand(updateReqVO.getBrandId());
         validateMerchantAndBrand(updateReqVO.getMerchantId(), updateReqVO.getBrandId());
         validateProductRules(updateReqVO);
@@ -123,6 +130,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
 
         // 更新 SPU
         ProductSpuDO updateObj = BeanUtils.toBean(updateReqVO, ProductSpuDO.class).setStatus(spu.getStatus());
+        if (!categoryChanged) updateObj.setCategoryId(null);
         if (updateReqVO.getIsPreSale() == null) updateObj.setIsPreSale(spu.getIsPreSale());
         if (updateReqVO.getDeliveryDays() == null) updateObj.setDeliveryDays(spu.getDeliveryDays());
         if (updateReqVO.getBuyLimit() == null) updateObj.setBuyLimit(spu.getBuyLimit());
