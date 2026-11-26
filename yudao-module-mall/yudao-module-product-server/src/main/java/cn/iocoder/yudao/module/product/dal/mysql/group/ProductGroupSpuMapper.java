@@ -119,7 +119,6 @@ public interface ProductGroupSpuMapper extends BaseMapperX<ProductGroupSpuDO> {
                 .eq(ProductGroupSpuDO::getTenantId, TenantContextHolder.getRequiredTenantId())
                 .eq(ProductGroupDO::getTenantId, TenantContextHolder.getRequiredTenantId())
                 .eq(ProductGroupDO::getStatus, cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.ENABLE.getStatus())
-                .eq(ProductGroupDO::getStorefrontVisible, true)
                 .eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus())
                 .likeIfPresent(ProductSpuDO::getName, reqVO.getKeyword());
         query.apply("t1.tenant_id = {0}", TenantContextHolder.getRequiredTenantId());

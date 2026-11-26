@@ -41,19 +41,12 @@ public class AppProductGroupController {
     @Resource
     private ProductGroupOperationsService operationsService;
 
-    @GetMapping("/list")
-    @Operation(summary = "获得商城公开且启用的商品分组")
+    // 兼容旧版小程序的分组入口。分组展示须由入口传入明确的分组编号。
+    @GetMapping({"/list", "/list-by-spu-id"})
+    @Operation(summary = "兼容旧版分组入口")
     @PermitAll
-    public CommonResult<List<AppProductGroupSimpleRespVO>> getPublicGroupList() {
-        return success(BeanUtils.toBean(operationsService.getPublicGroups(null), AppProductGroupSimpleRespVO.class));
-    }
-
-    @GetMapping("/list-by-spu-id")
-    @Operation(summary = "获得在售商品的公开分组")
-    @PermitAll
-    public CommonResult<List<AppProductGroupSimpleRespVO>> getGroupsBySpuId(
-            @RequestParam("spuId") @Positive Long spuId) {
-        return success(BeanUtils.toBean(operationsService.getPublicGroupsBySpuId(spuId), AppProductGroupSimpleRespVO.class));
+    public CommonResult<List<AppProductGroupSimpleRespVO>> getLegacyGroupList() {
+        return success(List.of());
     }
 
     @GetMapping("/list-by-ids")
@@ -62,7 +55,7 @@ public class AppProductGroupController {
     public CommonResult<List<AppProductGroupSimpleRespVO>> getGroupList(
             @RequestParam("ids") @NotEmpty @Size(max = 15, message = "最多查询 15 个商品分组")
             Set<@NotNull @Positive Long> ids) {
-        List<ProductGroupDO> groups = operationsService.getPublicGroups(ids);
+        List<ProductGroupDO> groups = operationsService.getEnabledGroupsByIds(ids);
         return success(BeanUtils.toBean(groups, AppProductGroupSimpleRespVO.class));
     }
 

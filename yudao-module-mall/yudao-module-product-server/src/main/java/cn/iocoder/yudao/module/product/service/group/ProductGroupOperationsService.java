@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.product.service.group;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
@@ -92,7 +93,6 @@ public class ProductGroupOperationsService {
                 .eq(ProductGroupDO::getTenantId, tenantId())
                 .likeIfPresent(ProductGroupDO::getName, request.getName())
                 .eqIfPresent(ProductGroupDO::getStatus, request.getStatus())
-                .eqIfPresent(ProductGroupDO::getStorefrontVisible, request.getStorefrontVisible())
                 .orderByDesc(ProductGroupDO::getSort).orderByDesc(ProductGroupDO::getId));
         PageResult<ProductGroupRespVO> response = BeanUtils.toBean(page, ProductGroupRespVO.class);
         Map<Long, ProductGroupCountRespVO> counts = page.getList().isEmpty() ? Map.of()
@@ -106,22 +106,15 @@ public class ProductGroupOperationsService {
         return response;
     }
 
-    public List<ProductGroupDO> getPublicGroups(Collection<Long> ids) {
-        if (ids != null && ids.isEmpty()) return List.of();
+    public List<ProductGroupDO> getEnabledGroupsByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
         return groupMapper.selectList(new LambdaQueryWrapperX<ProductGroupDO>()
                 .eq(ProductGroupDO::getTenantId, tenantId())
-                .eq(ProductGroupDO::getStatus, 0).eq(ProductGroupDO::getStorefrontVisible, true)
-                .inIfPresent(ProductGroupDO::getId, ids)
+                .eq(ProductGroupDO::getStatus, CommonStatusEnum.ENABLE.getStatus())
+                .in(ProductGroupDO::getId, ids)
                 .orderByDesc(ProductGroupDO::getSort).orderByDesc(ProductGroupDO::getId));
-    }
-
-    public List<ProductGroupDO> getPublicGroupsBySpuId(Long spuId) {
-        if (spuMapper.selectCount(new LambdaQueryWrapperX<ProductSpuDO>()
-                .eq(ProductSpuDO::getId, spuId).apply("tenant_id = {0}", tenantId())
-                .eq(ProductSpuDO::getStatus, 1)) == 0) return List.of();
-        List<Long> ids = relationMapper.selectRelationsBySpuIds(tenantId(), List.of(spuId)).stream()
-                .map(ProductGroupSpuDO::getGroupId).toList();
-        return getPublicGroups(ids);
     }
 
     @Transactional(rollbackFor = Exception.class)

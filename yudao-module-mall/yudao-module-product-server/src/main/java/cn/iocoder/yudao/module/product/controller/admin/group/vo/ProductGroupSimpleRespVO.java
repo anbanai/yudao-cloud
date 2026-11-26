@@ -10,5 +10,4 @@ public class ProductGroupSimpleRespVO {
     private String name;
     private Integer status;
     private Integer sort;
-    private Boolean storefrontVisible;
 }

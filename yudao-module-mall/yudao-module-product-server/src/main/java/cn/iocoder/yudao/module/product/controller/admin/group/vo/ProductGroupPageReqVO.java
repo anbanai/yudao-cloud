@@ -13,5 +13,4 @@ public class ProductGroupPageReqVO extends PageParam {
     private String name;
     @Schema(description = "状态")
     private Integer status;
-    private Boolean storefrontVisible;
 }

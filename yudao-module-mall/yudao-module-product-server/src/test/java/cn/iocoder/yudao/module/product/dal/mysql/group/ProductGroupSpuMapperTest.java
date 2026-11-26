@@ -123,7 +123,7 @@ class ProductGroupSpuMapperTest extends BaseDbUnitTest {
     }
 
     @Test
-    void testAppQueryExcludesInternalAndForeignRelationsEvenInMixedSelection() {
+    void testAppQueryIncludesLegacyGroupsAndExcludesForeignRelations() {
         insertGroup(10L, 0, 1L);
         insertGroup(20L, 0, 1L);
         insertGroup(30L, 0, 2L);
@@ -136,7 +136,7 @@ class ProductGroupSpuMapperTest extends BaseDbUnitTest {
         insertRelation(3L, 30L, 102L, 0, 2L);
         var request = new AppProductGroupSpuPageReqVO().setGroupIds(List.of(10L, 20L, 30L));
 
-        assertEquals(List.of(100L), groupSpuMapper.selectAppSpuPage(request).getList().stream()
+        assertEquals(List.of(101L, 100L), groupSpuMapper.selectAppSpuPage(request).getList().stream()
                 .map(spu -> spu.getId()).toList());
     }
 

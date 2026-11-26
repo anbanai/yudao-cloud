@@ -29,7 +29,6 @@ public interface ProductGroupMapper extends BaseMapperX<ProductGroupDO> {
         return selectPage(reqVO, new LambdaQueryWrapperX<ProductGroupDO>()
                 .likeIfPresent(ProductGroupDO::getName, reqVO.getName())
                 .eqIfPresent(ProductGroupDO::getStatus, reqVO.getStatus())
-                .eqIfPresent(ProductGroupDO::getStorefrontVisible, reqVO.getStorefrontVisible())
                 .orderByDesc(ProductGroupDO::getSort).orderByDesc(ProductGroupDO::getId));
     }
 

@@ -10,5 +10,4 @@ public class AppProductGroupSimpleRespVO {
     private String name;
     private Integer sort;
     private Integer status;
-    private Boolean storefrontVisible;
 }

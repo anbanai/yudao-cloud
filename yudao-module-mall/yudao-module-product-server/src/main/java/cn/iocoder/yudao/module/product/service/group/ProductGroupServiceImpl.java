@@ -46,9 +46,6 @@ public class ProductGroupServiceImpl implements ProductGroupService {
     public Long createGroup(ProductGroupSaveReqVO reqVO) {
         validateNameUnique(null, reqVO.getName());
         ProductGroupDO group = BeanUtils.toBean(reqVO, ProductGroupDO.class);
-        if (group.getStorefrontVisible() == null) {
-            group.setStorefrontVisible(true);
-        }
         groupMapper.insert(group);
         return group.getId();
     }
@@ -96,14 +93,15 @@ public class ProductGroupServiceImpl implements ProductGroupService {
 
     private void validateEnabledGroups(Collection<Long> groupIds) {
         if (CollUtil.isEmpty(groupIds)) {
-            return;
+            throw exception(GROUP_NOT_EXISTS);
         }
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
         List<ProductGroupDO> groups = groupMapper.selectByIds(groupIds);
         Map<Long, ProductGroupDO> groupMap = groups.stream()
                 .collect(Collectors.toMap(ProductGroupDO::getId, Function.identity()));
         for (Long groupId : groupIds) {
             ProductGroupDO group = groupMap.get(groupId);
-            if (group == null) {
+            if (group == null || !Objects.equals(group.getTenantId(), tenantId)) {
                 throw exception(GROUP_NOT_EXISTS);
             }
             if (!group.isEnabled()) {
@@ -149,26 +147,16 @@ public class ProductGroupServiceImpl implements ProductGroupService {
 
     @Override
     public PageResult<ProductSpuDO> getAppSpuPage(AppProductGroupSpuPageReqVO reqVO) {
-        validatePublicGroups(reqVO);
+        validateEnabledGroups(reqVO.getGroupIds());
         return groupSpuMapper.selectAppSpuPage(reqVO);
     }
 
     @Override
     public PageResult<ProductSpuDO> getVisibleAppSpuPage(AppProductGroupSpuPageReqVO reqVO) {
-        validatePublicGroups(reqVO);
+        validateEnabledGroups(reqVO.getGroupIds());
         AppProductSpuPageReqVO pageReqVO = BeanUtils.toBean(reqVO, AppProductSpuPageReqVO.class);
         return productSpuService.getVisibleSpuPage(pageReqVO,
                 cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId());
-    }
-
-    private void validatePublicGroups(AppProductGroupSpuPageReqVO reqVO) {
-        validateEnabledGroups(new LinkedHashSet<>(reqVO.getGroupIds()));
-        for (ProductGroupDO group : groupMapper.selectByIds(reqVO.getGroupIds())) {
-            if (!Boolean.TRUE.equals(group.getStorefrontVisible())
-                    || !Objects.equals(group.getTenantId(), TenantContextHolder.getRequiredTenantId())) {
-                throw exception(GROUP_NOT_EXISTS);
-            }
-        }
     }
 
     @Override

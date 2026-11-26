@@ -12,7 +12,6 @@ public class ProductGroupRespVO {
     private String name;
     private Integer sort;
     private Integer status;
-    private Boolean storefrontVisible;
     private Long spuCount;
     private Long saleSpuCount;
     private String remark;
