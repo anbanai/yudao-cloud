@@ -30,7 +30,7 @@ public class RecoveredPointCreditService {
         MemberUserDO user = users.selectByIdForUpdate(userId);
         if (user == null) throw new IllegalStateException("领取账户不存在");
         String bizId = Long.toString(snapshotId);
-        if (records.lockHistoricalSource(user.getTenantId(), RECOVERED_POINT_TYPE, bizId) != null) {
+        if (records.findHistoricalRecovery(user.getTenantId(), bizId) != null) {
             throw new IllegalStateException("待领快照已有恢复积分流水");
         }
         if (amount == 0) return 0;

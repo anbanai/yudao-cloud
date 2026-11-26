@@ -24,11 +24,9 @@ public interface MemberPointRecordMapper extends BaseMapperX<MemberPointRecordDO
 
     @Select("""
             SELECT id FROM member_point_record
-            WHERE tenant_id = #{tenantId} AND biz_type = #{bizType} AND biz_id = #{bizId}
-            LIMIT 1 FOR UPDATE
+            WHERE tenant_id = #{tenantId} AND youzan_recovery_source = #{bizId}
             """)
-    Long lockHistoricalSource(@Param("tenantId") long tenantId, @Param("bizType") int bizType,
-                              @Param("bizId") String bizId);
+    Long findHistoricalRecovery(@Param("tenantId") long tenantId, @Param("bizId") String bizId);
 
     default MemberPointRecordDO selectByUserIdAndBizTypeAndBizId(Long userId, Integer bizType, String bizId) {
         List<MemberPointRecordDO> records = selectList(new LambdaQueryWrapperX<MemberPointRecordDO>()
