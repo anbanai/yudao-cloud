@@ -52,6 +52,10 @@ public interface SocialClientApi {
     CommonResult<SocialWxPhoneNumberInfoRespDTO> getWxMaPhoneNumberInfo(@RequestParam("userType") Integer userType,
                                                                         @RequestParam("phoneCode") String phoneCode);
 
+    @PostMapping(PREFIX + "/exchange-wx-ma-phone-number")
+    CommonResult<SocialWxPhoneNumberInfoRespDTO> exchangeWxMaPhoneNumber(@RequestParam("userType") Integer userType,
+                                                                         @RequestBody String phoneCode);
+
     @GetMapping(PREFIX + "/get-wxa-qrcode")
     @Operation(summary = "获得小程序二维码")
     CommonResult<byte[]> getWxaQrcode(@SpringQueryMap SocialWxQrcodeReqDTO reqVO);
