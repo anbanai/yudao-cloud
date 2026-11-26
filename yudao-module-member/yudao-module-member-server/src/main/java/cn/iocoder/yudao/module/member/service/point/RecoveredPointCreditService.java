@@ -7,7 +7,6 @@ import cn.iocoder.yudao.module.member.dal.mysql.point.MemberPointBatchMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.point.MemberPointRecordMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.user.MemberUserMapper;
 import cn.iocoder.yudao.module.member.enums.point.MemberPointRecordStatusEnum;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -31,12 +30,8 @@ public class RecoveredPointCreditService {
         MemberUserDO user = users.selectByIdForUpdate(userId);
         if (user == null) throw new IllegalStateException("领取账户不存在");
         String bizId = Long.toString(snapshotId);
-        MemberPointRecordDO previous = records.selectOne(new LambdaQueryWrapper<MemberPointRecordDO>()
-                .eq(MemberPointRecordDO::getBizType, RECOVERED_POINT_TYPE).eq(MemberPointRecordDO::getBizId, bizId)
-                .eq(MemberPointRecordDO::getUserId, userId).last("FOR UPDATE"));
-        if (previous != null) {
-            if (!Objects.equals(previous.getPoint(), amount)) throw new IllegalStateException("领取流水金额不一致");
-            return 0;
+        if (records.lockHistoricalSource(user.getTenantId(), RECOVERED_POINT_TYPE, bizId) != null) {
+            throw new IllegalStateException("待领快照已有恢复积分流水");
         }
         if (amount == 0) return 0;
         int before = Objects.requireNonNullElse(user.getPoint(), 0);

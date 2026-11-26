@@ -112,6 +112,60 @@ class YouzanClaimFlowTest extends BaseDbUnitTest {
         assertEquals(1,scalar("select count(*) from member_youzan_point_snapshot where restore_status=1 and claimed_user_id=11 and claimed_at is not null"));
     }
 
+    private void addHistory(long owner, long tenant, int type, int amount, String sourceId) {
+        jdbc.update("insert into member_point_record(user_id,tenant_id,biz_type,biz_id,point,total_point,title) values(?,?,?,?,?,?,?)",
+                owner, tenant, type, sourceId, amount, 30 + amount, "fixture");
+    }
+
+    private String snapshotId() {
+        return Long.toString(jdbc.queryForObject("select id from member_youzan_point_snapshot", Long.class));
+    }
+
+    private void assertConflictWithoutChanges() {
+        var history = jdbc.queryForList("select * from member_point_record order by id");
+        var accounts = jdbc.queryForList("select * from member_user order by id");
+        var snapshot = jdbc.queryForList("select * from member_youzan_point_snapshot");
+        var error = assertThrows(IllegalStateException.class, () -> claims.recover(11L, MOBILE));
+        assertEquals("待领快照已有恢复积分流水", error.getMessage());
+        assertEquals(history, jdbc.queryForList("select * from member_point_record order by id"));
+        assertEquals(accounts, jdbc.queryForList("select * from member_user order by id"));
+        assertEquals(snapshot, jdbc.queryForList("select * from member_youzan_point_snapshot"));
+        assertEquals(0, scalar("select count(*) from member_point_batch"));
+        assertEquals(0, scalar("select count(*) from member_level_record"));
+    }
+
+    @Test void otherAccountsHistoricalCreditBlocksPendingReceipt() {
+        jdbc.update("insert into member_user(id,mobile,status,register_ip,point,tenant_id) values(12,'13800000002',0,'test',130,1)");
+        addHistory(12, 1, 3, 100, snapshotId());
+        assertConflictWithoutChanges();
+    }
+
+    @Test void ownZeroHistoryBlocksPendingZeroPointSnapshot() {
+        jdbc.update("update member_youzan_point_snapshot set legacy_points=0");
+        addHistory(11, 1, 3, 0, snapshotId());
+        assertConflictWithoutChanges();
+    }
+
+    @Test void cleanZeroPointSnapshotRestoresOnlyLevelAndRetriesReadOnly() {
+        jdbc.update("update member_youzan_point_snapshot set legacy_points=0");
+        assertEquals(new YouzanAssetClaimService.Result("RESTORED", 0), claims.recover(11L, MOBILE));
+        var receipt = jdbc.queryForList("select * from member_youzan_point_snapshot");
+        assertEquals(new YouzanAssetClaimService.Result("ALREADY_RESTORED", 0), claims.recover(11L, MOBILE));
+        assertEquals(receipt, jdbc.queryForList("select * from member_youzan_point_snapshot"));
+        assertEquals(1, scalar("select count(*) from member_user where id=11 and point=30 and experience=120 and level_id=103 and recovered_floor_level_id=103"));
+        assertEquals(1, scalar("select count(*) from member_level_record"));
+        assertEquals(0, scalar("select count(*) from member_point_record"));
+        assertEquals(0, scalar("select count(*) from member_point_batch"));
+    }
+
+    @Test void unrelatedHistoryDoesNotBlockClaim() {
+        addHistory(12, 2, 3, 100, snapshotId());
+        addHistory(12, 1, 2, 100, snapshotId());
+        addHistory(12, 1, 3, 100, "unrelated");
+        assertEquals(new YouzanAssetClaimService.Result("RESTORED", 100), claims.recover(11L, MOBILE));
+        assertPaid();
+    }
+
     @Test void authorizedEndpointPaysOnce() {
         var request = new AppMemberUserUpdateMobileByWeixinReqVO(); request.setCode("synthetic-code");
         when(weixin.verifiedMobile(request.getCode())).thenReturn(MOBILE);

@@ -50,6 +50,7 @@ public class YouzanAssetClaimService {
         if (snapshot.status() != 0 || snapshot.dated() || snapshot.claimant() != null || snapshot.points() < 0) {
             throw exception(FORBIDDEN);
         }
+        int addedPoint = points.credit(userId, snapshot.id(), snapshot.points());
         if (!StringUtils.hasText(user.getMobile())) {
             if (users.selectByMobile(mobile) != null) throw exception(FORBIDDEN);
             try {
@@ -58,11 +59,8 @@ public class YouzanAssetClaimService {
                 throw exception(FORBIDDEN);
             }
         }
-        if (points.credit(userId, snapshot.id(), snapshot.points()) != snapshot.points()) {
-            throw new IllegalStateException("快照与已有积分流水不一致");
-        }
         levels.restoreHigherLevel(userId, snapshot.levelId());
         snapshots.markClaimed(snapshot.id(), source, hash, userId);
-        return new Result("RESTORED", snapshot.points());
+        return new Result("RESTORED", addedPoint);
     }
 }
