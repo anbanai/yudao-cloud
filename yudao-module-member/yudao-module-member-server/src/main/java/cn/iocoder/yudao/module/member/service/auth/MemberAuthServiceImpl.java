@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
+import java.util.UUID;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
@@ -59,6 +60,8 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     private SocialClientApi socialClientApi;
     @Resource
     private OAuth2TokenCommonApi oauth2TokenApi;
+    @Resource
+    private WeixinClaimSession claimSession;
 
     @Override
     public AppAuthLoginRespVO login(AppAuthLoginReqVO reqVO) {
@@ -104,9 +107,11 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     @Override
     @Transactional
     public AppAuthLoginRespVO socialLogin(AppAuthSocialLoginReqVO reqVO) {
+        boolean miniApp = SocialTypeEnum.WECHAT_MINI_PROGRAM.getType().equals(reqVO.getType());
+        String state = miniApp ? UUID.randomUUID().toString() : reqVO.getState();
         // 使用 code 授权码，进行登录。然后，获得到绑定的用户编号
         SocialUserRespDTO socialUser = socialUserApi.getSocialUserByCode(UserTypeEnum.MEMBER.getValue(), reqVO.getType(),
-                reqVO.getCode(), reqVO.getState()).getCheckedData();
+                reqVO.getCode(), state).getCheckedData();
         if (socialUser == null) {
             throw exception(AUTH_SOCIAL_USER_NOT_FOUND);
         }
@@ -119,7 +124,7 @@ public class MemberAuthServiceImpl implements MemberAuthService {
         } else {
             user = userService.createUser(socialUser.getNickname(), socialUser.getAvatar(), getClientIP(), getTerminal());
             socialUserApi.bindSocialUser(new SocialUserBindReqDTO(user.getId(), getUserType().getValue(),
-                    reqVO.getType(), reqVO.getCode(), reqVO.getState())).checkError();
+                    reqVO.getType(), reqVO.getCode(), state)).checkError();
         }
         if (user == null) {
             throw exception(USER_NOT_EXISTS);
@@ -129,13 +134,17 @@ public class MemberAuthServiceImpl implements MemberAuthService {
         validateUserStatus(user, user.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL);
 
         // 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user, user.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL, socialUser.getOpenid());
+        AppAuthLoginRespVO login = createTokenAfterLoginSuccess(user, user.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL, socialUser.getOpenid());
+        if (miniApp) {
+            claimSession.record(login);
+        }
+        return login;
     }
 
     @Override
     public AppAuthLoginRespVO weixinMiniAppLogin(AppAuthWeixinMiniAppLoginReqVO reqVO) {
         // 获得对应的手机号信息
-        SocialWxPhoneNumberInfoRespDTO phoneNumberInfo = socialClientApi.getWxMaPhoneNumberInfo(
+        SocialWxPhoneNumberInfoRespDTO phoneNumberInfo = socialClientApi.exchangeWxMaPhoneNumber(
                 UserTypeEnum.MEMBER.getValue(), reqVO.getPhoneCode()).getCheckedData();
         Assert.notNull(phoneNumberInfo, "获得手机信息失败，结果为空");
 
@@ -147,10 +156,12 @@ public class MemberAuthServiceImpl implements MemberAuthService {
 
         // 绑定社交用户
         String openid = socialUserApi.bindSocialUser(new SocialUserBindReqDTO(user.getId(), getUserType().getValue(),
-                SocialTypeEnum.WECHAT_MINI_PROGRAM.getType(), reqVO.getLoginCode(), reqVO.getState())).getCheckedData();
+                SocialTypeEnum.WECHAT_MINI_PROGRAM.getType(), reqVO.getLoginCode(), UUID.randomUUID().toString())).getCheckedData();
 
         // 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user, user.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL, openid);
+        AppAuthLoginRespVO login = createTokenAfterLoginSuccess(user, user.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL, openid);
+        claimSession.record(login);
+        return login;
     }
 
     private AppAuthLoginRespVO createTokenAfterLoginSuccess(MemberUserDO user, String mobile,

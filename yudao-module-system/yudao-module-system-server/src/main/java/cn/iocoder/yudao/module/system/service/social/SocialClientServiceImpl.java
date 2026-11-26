@@ -99,7 +99,6 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.common.util.collection.MapUtils.findAndThen;
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.UTC_MS_WITH_XXX_OFFSET_FORMATTER;
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.toEpochSecond;
-import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
 import static java.util.Collections.singletonList;
 
@@ -212,10 +211,8 @@ public class SocialClientServiceImpl implements SocialClientService {
         AuthCallback authCallback = AuthCallback.builder().code(code).auth_code(code).state(state).build();
         // 执行请求
         AuthResponse<?> authResponse = authRequest.login(authCallback);
-        log.info("[getAuthUser][请求社交平台 type({}) request({}) response({})]", socialType,
-                toJsonString(authCallback), toJsonString(authResponse));
         if (!authResponse.ok()) {
-            throw exception(SOCIAL_USER_AUTH_FAILURE, authResponse.getMsg());
+            throw exception(SOCIAL_USER_AUTH_FAILURE, "第三方登录未通过");
         }
         return (AuthUser) authResponse.getData();
     }
@@ -311,7 +308,6 @@ public class SocialClientServiceImpl implements SocialClientService {
         try {
             return service.getUserService().getPhoneNumber(phoneCode);
         } catch (WxErrorException e) {
-            log.error("[getPhoneNumber][userType({}) phoneCode({}) 获得手机号失败]", userType, phoneCode, e);
             throw exception(SOCIAL_CLIENT_WEIXIN_MINI_APP_PHONE_CODE_ERROR);
         }
     }
