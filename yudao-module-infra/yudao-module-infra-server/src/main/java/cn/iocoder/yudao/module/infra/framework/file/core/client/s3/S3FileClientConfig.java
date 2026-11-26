@@ -132,12 +132,13 @@ public class S3FileClientConfig implements FileClientConfig {
             return false;
         }
         S3FileClientConfig that = (S3FileClientConfig) other;
+        // domain 和 region 未填写时，空字符串与 null 都会使用自动推导值
         return Objects.equals(endpoint, that.endpoint)
-                && Objects.equals(domain, that.domain)
+                && Objects.equals(StrUtil.emptyToDefault(domain, ""), StrUtil.emptyToDefault(that.domain, ""))
                 && Objects.equals(bucket, that.bucket)
                 && Objects.equals(enablePathStyleAccess, that.enablePathStyleAccess)
                 && Objects.equals(enablePublicAccess, that.enablePublicAccess)
-                && Objects.equals(region, that.region);
+                && Objects.equals(StrUtil.emptyToDefault(region, ""), StrUtil.emptyToDefault(that.region, ""));
     }
 
     private String buildEffectiveDomain() {
