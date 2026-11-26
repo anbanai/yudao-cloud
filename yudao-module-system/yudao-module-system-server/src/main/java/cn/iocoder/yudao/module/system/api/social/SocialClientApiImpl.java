@@ -4,6 +4,7 @@ import cn.binarywang.wx.miniapp.bean.WxMaPhoneNumberInfo;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.social.dto.*;
@@ -51,9 +52,16 @@ public class SocialClientApiImpl implements SocialClientApi {
     }
 
     @Override
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<SocialWxPhoneNumberInfoRespDTO> getWxMaPhoneNumberInfo(Integer userType, String phoneCode) {
         WxMaPhoneNumberInfo info = socialClientService.getWxMaPhoneNumberInfo(userType, phoneCode);
         return success(BeanUtils.toBean(info, SocialWxPhoneNumberInfoRespDTO.class));
+    }
+
+    @Override
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<SocialWxPhoneNumberInfoRespDTO> exchangeWxMaPhoneNumber(Integer userType, String phoneCode) {
+        return getWxMaPhoneNumberInfo(userType, phoneCode);
     }
 
     @Override

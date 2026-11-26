@@ -45,6 +45,9 @@ public class AppMemberUserInfoRespVO {
     @Data
     public static class Level {
 
+        @Schema(description = "享受折扣，百分比")
+        private Integer discountPercent;
+
         @Schema(description = "等级编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
         private Long id;
 

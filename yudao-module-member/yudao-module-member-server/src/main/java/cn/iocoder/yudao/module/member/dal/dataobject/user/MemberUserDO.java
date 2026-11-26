@@ -135,6 +135,7 @@ public class MemberUserDO extends TenantBaseDO {
      * 关联 {@link MemberLevelDO#getId()} 字段
      */
     private Long levelId;
+    private Long recoveredFloorLevelId;
     /**
      * 会员经验
      */

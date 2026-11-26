@@ -132,11 +132,15 @@ public class MemberPointBatchServiceImpl implements MemberPointBatchService {
         LocalDateTime now = LocalDateTime.now();
         List<MemberPointBatchDO> batches = batchMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MemberPointBatchDO>()
                 .eq(MemberPointBatchDO::getStatus, 0).le(MemberPointBatchDO::getExpireTime, now)
-                .gt(MemberPointBatchDO::getRemainingPoint, 0));
-        for (MemberPointBatchDO batch : batches) {
+                .gt(MemberPointBatchDO::getRemainingPoint, 0)
+                .orderByAsc(MemberPointBatchDO::getUserId, MemberPointBatchDO::getId));
+        for (MemberPointBatchDO candidate : batches) {
+            userService.getUserForUpdate(candidate.getUserId());
+            MemberPointBatchDO batch = batchMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MemberPointBatchDO>()
+                    .eq(MemberPointBatchDO::getId, candidate.getId()).last("FOR UPDATE"));
+            if (batch == null) continue;
             int remaining = Objects.requireNonNullElse(batch.getRemainingPoint(), 0);
             if (remaining <= 0 || batchMapper.expire(batch.getId(), now) != 1) continue;
-            userService.getUserForUpdate(batch.getUserId());
             if (!userService.updateUserPoint(batch.getUserId(), -remaining)) {
                 throw new IllegalStateException("积分余额与批次不一致");
             }
