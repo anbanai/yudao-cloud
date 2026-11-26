@@ -372,7 +372,7 @@ public class GlobalExceptionHandler {
         Assert.notEmpty(stackTraceElements, "异常 stackTraceElements 不能为空");
         StackTraceElement stackTraceElement = stackTraceElements[0];
         errorLog.setExceptionClassName(stackTraceElement.getClassName());
-        errorLog.setExceptionFileName(stackTraceElement.getFileName());
+        errorLog.setExceptionFileName(StrUtil.nullToDefault(stackTraceElement.getFileName(), "Unknown Source"));
         errorLog.setExceptionMethodName(stackTraceElement.getMethodName());
         errorLog.setExceptionLineNumber(stackTraceElement.getLineNumber());
         // 设置其它字段
