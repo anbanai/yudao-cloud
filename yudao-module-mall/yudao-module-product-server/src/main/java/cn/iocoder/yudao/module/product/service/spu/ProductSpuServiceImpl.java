@@ -323,11 +323,6 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         }
     }
 
-    /**
-     * 校验商品分类是否合法
-     *
-     * @param id 商品分类编号
-     */
     private void validateMerchantAndBrand(Long merchantId, Long brandId) {
         merchantService.validateMerchantForManagement(merchantId);
         brandService.validateProductBrand(brandId);
