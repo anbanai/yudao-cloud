@@ -212,6 +212,77 @@ class YouzanClaimFlowTest extends BaseDbUnitTest {
         assertPaid();
     }
 
+    private void secondAccount() {
+        jdbc.update("insert into member_user(id,mobile,status,register_ip,experience,level_id,point,tenant_id) values(12,CHAR(9),0,'test',120,102,40,1)");
+    }
+
+    private YouzanAssetClaimService.Result inTenant(long id, String mobile) {
+        TenantContextHolder.setTenantId(1L);
+        try { return claims.recover(id, mobile); }
+        finally { TenantContextHolder.clear(); }
+    }
+
+    @Test void differentAccountsCannotBothClaimSameSnapshot() throws Exception {
+        secondAccount();
+        var pool = Executors.newFixedThreadPool(2);
+        var ready = new CountDownLatch(2);
+        var fire = new CountDownLatch(1);
+        java.util.function.LongFunction<Future<Boolean>> submit = id -> pool.submit(() -> {
+            ready.countDown();
+            if (!fire.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timed out");
+            try { return inTenant(id, MOBILE).equals(new YouzanAssetClaimService.Result("RESTORED", 100)); }
+            catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
+                assertEquals(403, e.getCode());
+                return false;
+            }
+        });
+        try {
+            var a = submit.apply(11L); var b = submit.apply(12L);
+            assertTrue(ready.await(5, TimeUnit.SECONDS)); fire.countDown();
+            boolean first = a.get(15, TimeUnit.SECONDS), second = b.get(15, TimeUnit.SECONDS);
+            assertNotEquals(first, second);
+            long winner = first ? 11 : 12, loser = first ? 12 : 11;
+            assertEquals(winner, scalar("select claimed_user_id from member_youzan_point_snapshot where restore_status=1 and claimed_at is not null"));
+            assertEquals(first ? 130 : 140, scalar("select point from member_user where id=" + winner));
+            assertEquals(first ? 40 : 30, scalar("select point from member_user where id=" + loser));
+            assertFalse(org.springframework.util.StringUtils.hasText(jdbc.queryForObject("select mobile from member_user where id=?", String.class, loser)));
+            assertEquals(1, scalar("select count(*) from member_user where id=" + loser + " and experience=120 and level_id=102 and recovered_floor_level_id is null"));
+            for (String table : List.of("member_point_record", "member_point_batch", "member_level_record")) {
+                assertEquals(1, scalar("select count(*) from " + table));
+                assertEquals(1, scalar("select count(*) from " + table + " where user_id=" + winner));
+            }
+        } finally { fire.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test void differentSnapshotsCompleteWithoutDuplicateAccounting() throws Exception {
+        Assumptions.assumeTrue(PORT != null);
+        secondAccount();
+        String other = "13800000002";
+        String hash = YouzanCustomerImportRules.keyedHash(other, "synthetic-key-01");
+        String encrypted = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.encrypt(other);
+        jdbc.update("insert into member_youzan_point_snapshot (batch_id,merchant_id,mobile_hash,encrypted_mobile,snapshot_hash,legacy_points,mapped_level_id,restore_status,tenant_id) select batch_id,merchant_id,?,?,'fixture-2',70,103,0,tenant_id from member_youzan_point_snapshot", hash, encrypted);
+        var pool = Executors.newFixedThreadPool(2);
+        var ready = new CountDownLatch(2); var fire = new CountDownLatch(1);
+        java.util.function.LongFunction<Future<YouzanAssetClaimService.Result>> submit = id -> pool.submit(() -> {
+            ready.countDown();
+            if (!fire.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timed out");
+            return inTenant(id, id == 11L ? MOBILE : other);
+        });
+        try {
+            var a = submit.apply(11L); var b = submit.apply(12L);
+            assertTrue(ready.await(5, TimeUnit.SECONDS)); fire.countDown();
+            assertEquals(new YouzanAssetClaimService.Result("RESTORED", 100), a.get(15, TimeUnit.SECONDS));
+            assertEquals(new YouzanAssetClaimService.Result("RESTORED", 70), b.get(15, TimeUnit.SECONDS));
+            assertEquals(130, scalar("select point from member_user where id=11"));
+            assertEquals(110, scalar("select point from member_user where id=12"));
+            assertEquals(2, scalar("select count(distinct claimed_user_id) from member_youzan_point_snapshot where restore_status=1 and claimed_at is not null"));
+            for (String table : List.of("member_point_record", "member_point_batch", "member_level_record")) {
+                assertEquals(2, scalar("select count(*) from " + table));
+                assertEquals(2, scalar("select count(distinct user_id) from " + table));
+            }
+        } finally { fire.countDown(); pool.shutdownNow(); }
+    }
+
     @Test void deniedAndWrongSourceCannotBindOrPay() {
         var request = new AppMemberUserUpdateMobileByWeixinReqVO(); request.setCode("refused");
         when(weixin.verifiedMobile("refused")).thenThrow(new IllegalStateException("synthetic refusal"));
