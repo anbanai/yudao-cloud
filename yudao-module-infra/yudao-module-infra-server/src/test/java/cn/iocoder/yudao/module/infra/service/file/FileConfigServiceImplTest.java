@@ -23,6 +23,8 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Validator;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -297,8 +299,14 @@ public class FileConfigServiceImplTest extends BaseDbUnitTest {
                 FILE_CONFIG_PRIVATE_MASTER_UNSUPPORTED);
     }
 
-    @Test
-    public void testUpdateFileConfig_rejectsChangingReferencedPrivateStorageLocation() {
+    @ParameterizedTest
+    @CsvSource({
+            "bucket, another-private-bucket",
+            "domain, https://other-files.example.com",
+            "region, us-west-2"
+    })
+    public void testUpdateFileConfig_rejectsChangingReferencedPrivateStorageLocation(
+            String changedField, String changedValue) {
         S3FileClientConfig oldConfig = new S3FileClientConfig().setEndpoint("https://s3.example.com")
                 .setDomain("https://files.example.com").setBucket("private-files")
                 .setAccessKey("old-access-key").setAccessSecret("old-access-secret")
@@ -310,12 +318,13 @@ public class FileConfigServiceImplTest extends BaseDbUnitTest {
         Map<String, Object> changedLocation = MapUtil.<String, Object>builder()
                 .put("endpoint", "https://s3.example.com")
                 .put("domain", "https://files.example.com")
-                .put("bucket", "another-private-bucket")
+                .put("bucket", "private-files")
                 .put("accessKey", "new-access-key")
                 .put("accessSecret", "new-access-secret")
                 .put("enablePathStyleAccess", false)
                 .put("enablePublicAccess", false)
                 .put("region", "us-east-1")
+                .put(changedField, changedValue)
                 .build();
         FileConfigSaveReqVO reqVO = randomPojo(FileConfigSaveReqVO.class,
                 o -> o.setId(fileConfig.getId()).setStorage(FileStorageEnum.S3.getStorage())
@@ -325,25 +334,32 @@ public class FileConfigServiceImplTest extends BaseDbUnitTest {
                 FILE_CONFIG_UPDATE_FAIL_PRIVATE_FILE_REFERENCED);
     }
 
-    @Test
-    public void testUpdateFileConfig_allowsRotatingReferencedPrivateCredentials() {
-        S3FileClientConfig oldConfig = new S3FileClientConfig().setEndpoint("https://s3.example.com")
-                .setDomain("https://files.example.com").setBucket("private-files")
+    @ParameterizedTest
+    @CsvSource({
+            "https://files.example.com, https://files.example.com, us-east-1, us-east-1",
+            "https://files.example.com, https://files.example.com, , ''",
+            ", '', us-east-1, us-east-1",
+            "'', , '', "
+    })
+    public void testUpdateFileConfig_allowsRotatingReferencedPrivateCredentials(
+            String oldDomain, String newDomain, String oldRegion, String newRegion) {
+        S3FileClientConfig oldConfig = new S3FileClientConfig().setEndpoint("oss-cn-hangzhou.aliyuncs.com")
+                .setDomain(oldDomain).setBucket("private-files")
                 .setAccessKey("old-access-key").setAccessSecret("old-access-secret")
-                .setEnablePathStyleAccess(false).setEnablePublicAccess(false).setRegion("us-east-1");
+                .setEnablePathStyleAccess(false).setEnablePublicAccess(false).setRegion(oldRegion);
         FileConfigDO fileConfig = randomPojo(FileConfigDO.class, o -> o.setStorage(FileStorageEnum.S3.getStorage())
                 .setConfig(oldConfig).setMaster(false).setPrivateStorage(true));
         fileConfigMapper.insert(fileConfig);
         fileMapper.insert(randomPojo(FileDO.class, o -> o.setConfigId(fileConfig.getId())));
         Map<String, Object> rotatedCredentials = MapUtil.<String, Object>builder()
-                .put("endpoint", "https://s3.example.com")
-                .put("domain", "https://files.example.com")
+                .put("endpoint", "oss-cn-hangzhou.aliyuncs.com")
+                .put("domain", newDomain)
                 .put("bucket", "private-files")
                 .put("accessKey", "new-access-key")
                 .put("accessSecret", "new-access-secret")
                 .put("enablePathStyleAccess", false)
                 .put("enablePublicAccess", false)
-                .put("region", "us-east-1")
+                .put("region", newRegion)
                 .build();
         FileConfigSaveReqVO reqVO = randomPojo(FileConfigSaveReqVO.class,
                 o -> o.setId(fileConfig.getId()).setStorage(FileStorageEnum.S3.getStorage())
