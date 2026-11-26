@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.controller.merchant;
 
+import cn.iocoder.yudao.module.product.controller.app.category.vo.AppCategoryRespVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
 import cn.iocoder.yudao.module.product.framework.merchant.MerchantSecurityService;
@@ -28,17 +29,15 @@ class ProductMerchantSpuCategoryTest {
     private ProductMerchantSpuController controller;
 
     @Test
-    void getCategoryList_returnsOnlyCategoriesUsableForProducts() {
+    void getCategoryList_includesTopLevelCategoriesAndSortsThem() {
         when(merchantSecurityService.requireMerchantAccountId()).thenReturn(100L);
         ProductCategoryDO root = category(1L, "根分类");
-        ProductCategoryDO leaf = category(2L, "茶叶");
-        when(categoryService.getEnableCategoryList()).thenReturn(List.of(root, leaf));
-        when(categoryService.getCategoryLevel(1L)).thenReturn(1);
-        when(categoryService.getCategoryLevel(2L)).thenReturn(2);
+        ProductCategoryDO leaf = category(2L, "茶叶").setParentId(root.getId());
+        when(categoryService.getEnableCategoryList()).thenReturn(List.of(leaf, root));
 
-        List<?> result = controller.getCategoryList().getData();
+        List<AppCategoryRespVO> result = controller.getCategoryList().getData();
 
-        assertEquals(1, result.size());
+        assertEquals(List.of(1L, 2L), result.stream().map(AppCategoryRespVO::getId).toList());
         verify(merchantSecurityService).requireMerchantAccountId();
     }
 

@@ -45,7 +45,6 @@ import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
-import static cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO.CATEGORY_LEVEL;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.*;
 
 /**
@@ -84,7 +83,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     @Transactional(rollbackFor = Exception.class)
     public Long createSpu(ProductSpuSaveReqVO createReqVO) {
         // 校验分类、品牌
-        validateCategory(createReqVO.getCategoryId());
+        categoryService.validateCategory(createReqVO.getCategoryId());
         brandService.validateProductBrand(createReqVO.getBrandId());
         validateMerchantAndBrand(createReqVO.getMerchantId(), createReqVO.getBrandId());
         validateProductRules(createReqVO);
@@ -113,13 +112,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         ProductSpuDO spu = validateSpuExists(updateReqVO.getId());
         // 校验分类、品牌
         Long categoryId = updateReqVO.getCategoryId();
-        boolean categoryChanged = !Objects.equals(categoryId, spu.getCategoryId());
-        if (categoryChanged) {
-            validateCategory(categoryId);
-        } else {
-            // 历史商品可保留原分类，仍需确认分类存在并且启用。
-            categoryService.validateCategory(categoryId);
-        }
+        categoryService.validateCategory(categoryId);
         brandService.validateProductBrand(updateReqVO.getBrandId());
         validateMerchantAndBrand(updateReqVO.getMerchantId(), updateReqVO.getBrandId());
         validateProductRules(updateReqVO);
@@ -130,7 +123,9 @@ public class ProductSpuServiceImpl implements ProductSpuService {
 
         // 更新 SPU
         ProductSpuDO updateObj = BeanUtils.toBean(updateReqVO, ProductSpuDO.class).setStatus(spu.getStatus());
-        if (!categoryChanged) updateObj.setCategoryId(null);
+        if (Objects.equals(categoryId, spu.getCategoryId())) {
+            updateObj.setCategoryId(null);
+        }
         if (updateReqVO.getIsPreSale() == null) updateObj.setIsPreSale(spu.getIsPreSale());
         if (updateReqVO.getDeliveryDays() == null) updateObj.setDeliveryDays(spu.getDeliveryDays());
         if (updateReqVO.getBuyLimit() == null) updateObj.setBuyLimit(spu.getBuyLimit());
@@ -333,14 +328,6 @@ public class ProductSpuServiceImpl implements ProductSpuService {
      *
      * @param id 商品分类编号
      */
-    private void validateCategory(Long id) {
-        categoryService.validateCategory(id);
-        // 校验层级
-        if (categoryService.getCategoryLevel(id) < CATEGORY_LEVEL) {
-            throw exception(SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR);
-        }
-    }
-
     private void validateMerchantAndBrand(Long merchantId, Long brandId) {
         merchantService.validateMerchantForManagement(merchantId);
         brandService.validateProductBrand(brandId);
@@ -576,7 +563,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     }
 
     private PageResult<ProductSpuDO> selectAppSpuPage(AppProductSpuPageReqVO pageReqVO) {
-        // 查找时，如果查找某个分类编号，则包含它的子分类。因为顶级分类不包含商品
+        // 查询选中分类及其子分类下的商品
         Set<Long> categoryIds = new HashSet<>();
         if (pageReqVO.getCategoryId() != null && pageReqVO.getCategoryId() > 0) {
             categoryIds.add(pageReqVO.getCategoryId());

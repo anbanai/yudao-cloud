@@ -64,8 +64,6 @@ public class ProductMerchantSpuController {
     public CommonResult<List<AppCategoryRespVO>> getCategoryList() {
         merchantSecurityService.requireMerchantAccountId();
         List<ProductCategoryDO> categories = productCategoryService.getEnableCategoryList().stream()
-                .filter(category -> productCategoryService.getCategoryLevel(category.getId())
-                        >= ProductCategoryDO.CATEGORY_LEVEL)
                 .sorted(Comparator.comparing(ProductCategoryDO::getSort))
                 .toList();
         return success(BeanUtils.toBean(categories, AppCategoryRespVO.class));

@@ -29,11 +29,6 @@ public class ProductCategoryDO extends BaseDO {
      */
     public static final Long PARENT_ID_NULL = 0L;
     /**
-     * 限定分类层级
-     */
-    public static final int CATEGORY_LEVEL = 2;
-
-    /**
      * 分类编号
      */
     @TableId

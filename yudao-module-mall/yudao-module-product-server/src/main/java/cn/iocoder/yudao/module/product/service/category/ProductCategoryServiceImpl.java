@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO.CATEGORY_LEVEL;
 import static cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO.PARENT_ID_NULL;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.*;
 
@@ -135,10 +134,6 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
             if (!CommonStatusEnum.ENABLE.getStatus().equals(category.getStatus())) {
                 throw exception(CATEGORY_DISABLED, category.getName());
             }
-            // 商品分类层级校验，必须使用第二级的商品分类
-            if (getCategoryLevel(id) < CATEGORY_LEVEL) {
-                throw exception(SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR);
-            }
         });
     }
 
@@ -158,27 +153,6 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
         if (Objects.equals(category.getStatus(), CommonStatusEnum.DISABLE.getStatus())) {
             throw exception(CATEGORY_DISABLED, category.getName());
         }
-    }
-
-    @Override
-    public Integer getCategoryLevel(Long id) {
-        if (Objects.equals(id, PARENT_ID_NULL)) {
-            return 0;
-        }
-        int level = 1;
-        // for 的原因，是因为避免脏数据，导致可能的死循环。一般不会超过 100 层哈
-        for (int i = 0; i < Byte.MAX_VALUE; i++) {
-            // 如果没有父节点，break 结束
-            ProductCategoryDO category = productCategoryMapper.selectById(id);
-            if (category == null
-                    || Objects.equals(category.getParentId(), PARENT_ID_NULL)) {
-                break;
-            }
-            // 继续递归父节点
-            level++;
-            id = category.getParentId();
-        }
-        return level;
     }
 
     @Override
