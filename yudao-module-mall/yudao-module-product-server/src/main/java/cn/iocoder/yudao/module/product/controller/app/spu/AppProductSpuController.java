@@ -59,8 +59,10 @@ public class AppProductSpuController {
     @Parameter(name = "ids", description = "编号列表", required = true)
     @PermitAll
     public CommonResult<List<AppProductSpuRespVO>> getSpuList(@RequestParam("ids") Set<Long> ids) {
-        List<ProductSpuDO> list = productSpuService.getAvailableSpuList(ids);
-        list.removeIf(spu -> !Boolean.TRUE.equals(productSpuService.checkAccess(spu.getId(), getLoginUserId(), 1).getVisible()));
+        Long userId = getLoginUserId();
+        List<ProductSpuDO> list = productSpuService.getAvailableSpuList(ids).stream()
+                .filter(spu -> Boolean.TRUE.equals(productSpuService.checkAccess(spu.getId(), userId, 1).getVisible()))
+                .toList();
         if (CollUtil.isNotEmpty(ids) && list.size() < ids.size()) {
             Set<Long> returnedIds = list.stream().map(ProductSpuDO::getId).collect(Collectors.toSet());
             Set<Long> missingIds = ids.stream().filter(id -> !returnedIds.contains(id)).collect(Collectors.toSet());
