@@ -218,6 +218,7 @@ class YouzanClaimFlowTest extends BaseDbUnitTest {
 
     private void secondAccount() {
         jdbc.update("insert into member_user(id,mobile,status,register_ip,experience,level_id,point,tenant_id) values(12,CHAR(9),0,'test',120,102,40,1)");
+        when(profiles.getUserForUpdate(12L)).thenAnswer(call -> users.selectByIdForUpdate(12L));
     }
 
     private YouzanAssetClaimService.Result inTenant(long id, String mobile) {
