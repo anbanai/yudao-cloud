@@ -31,6 +31,7 @@ import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomPojo;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomString;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 
@@ -283,6 +284,25 @@ public class SocialUserServiceImplTest extends BaseDbUnitTest {
         assertEquals(1, pageResult.getTotal());
         assertEquals(1, pageResult.getList().size());
         assertPojoEquals(dbSocialUser, pageResult.getList().get(0));
+    }
+
+    @Test
+    public void testGetBoundWeixinMember_readsExistingBindingOnly() {
+        int type = SocialTypeEnum.WECHAT_MINI_PROGRAM.getType();
+        int member = UserTypeEnum.MEMBER.getValue();
+        String openid = "visitor-openid";
+        when(socialClientService.getAuthUser(type, member, "fresh", "default"))
+                .thenReturn(AuthUser.builder().uuid(openid).build());
+        assertNull(socialUserService.getBoundWeixinMember("fresh"));
+        assertEquals(0L, socialUserMapper.selectCount(null));
+
+        SocialUserDO socialUser = randomPojo(SocialUserDO.class).setType(type).setOpenid(openid);
+        socialUserMapper.insert(socialUser);
+        assertNull(socialUserService.getBoundWeixinMember("fresh"));
+        socialUserBindMapper.insert(randomPojo(SocialUserBindDO.class).setUserType(member)
+                .setSocialType(type).setSocialUserId(socialUser.getId()).setUserId(7L));
+        assertEquals(7L, socialUserService.getBoundWeixinMember("fresh"));
+        assertEquals(socialUser.getCode(), socialUserMapper.selectById(socialUser.getId()).getCode());
     }
 
 }

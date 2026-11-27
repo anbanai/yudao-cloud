@@ -41,4 +41,9 @@ public class SocialUserApiImpl implements SocialUserApi {
         return success(socialUserService.getSocialUserByCode(userType, socialType, code, state));
     }
 
+    @Override
+    public CommonResult<Long> getBoundWeixinMember(String code) {
+        return success(socialUserService.getBoundWeixinMember(code));
+    }
+
 }

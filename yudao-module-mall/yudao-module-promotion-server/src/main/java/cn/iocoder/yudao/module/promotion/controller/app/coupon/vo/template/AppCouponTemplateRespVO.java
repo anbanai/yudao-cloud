@@ -13,6 +13,8 @@ public class AppCouponTemplateRespVO {
 
     @Schema(description = "优惠劵模板编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Long id;
+    @Schema(description = "是否首页新人券")
+    private Boolean newcomerOnly;
     private Integer couponType;
     private Long exchangeSpuId;
     private Long exchangeSkuId;

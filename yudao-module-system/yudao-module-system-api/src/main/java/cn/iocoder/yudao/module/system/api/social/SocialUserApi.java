@@ -53,4 +53,8 @@ public interface SocialUserApi {
                                                         @RequestParam("code") String code,
                                                         @RequestParam("state") String state);
 
+    @PostMapping(PREFIX + "/weixin-member-by-code")
+    @Operation(summary = "核验微信小程序登录码并查询已绑定的会员")
+    CommonResult<Long> getBoundWeixinMember(@RequestBody String code);
+
 }

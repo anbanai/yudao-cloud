@@ -19,9 +19,53 @@ class CouponNewcomerServiceTest {
  ReflectionTestUtils.setField(service,"couponTemplateService",templates);ReflectionTestUtils.setField(service,"couponService",coupons);ReflectionTestUtils.setField(service,"memberUserApi",users);ReflectionTestUtils.setField(service,"memberLevelApi",levels);ReflectionTestUtils.setField(service,"tradeOrderApi",orders);
  template=new CouponTemplateDO().setId(1L).setStatus(0).setNewcomerOnly(true).setTakeType(CouponTakeTypeEnum.USER.getType()).setTotalCount(100).setTakeCount(0).setValidityType(2);
  when(templates.getCouponTemplate(1L)).thenReturn(template);when(users.getUser(9L)).thenReturn(CommonResult.success(new MemberUserRespDTO().setId(9L).setLevelId(10L)));when(levels.getMemberLevel(10L)).thenReturn(CommonResult.success(new MemberLevelRespDTO().setLevel(0)));when(orders.hasOrderHistory(9L)).thenReturn(CommonResult.success(false));when(coupons.getTakeCount(1L,9L)).thenReturn(0);when(coupons.getUserCanCanTakeMap(eq(9L),anyList())).thenReturn(Collections.singletonMap(1L,true));}
- @Test void visitorCanSeeButMustLogin(){assertTrue(service.qualification(1L,null).getShowEntry());assertEquals("LOGIN_REQUIRED",service.qualification(1L,null).getReasonCode());}
- @Test void onlyL0WithNoHistoricalOrdersCanTake(){assertTrue(service.qualification(1L,9L).getCanTake());when(orders.hasOrderHistory(9L)).thenReturn(CommonResult.success(true));assertEquals("ORDER_HISTORY_EXISTS",service.qualification(1L,9L).getReasonCode());}
- @Test void upgradeHidesEntryAndUnknownLevelFailsClosed(){when(levels.getMemberLevel(10L)).thenReturn(CommonResult.success(new MemberLevelRespDTO().setLevel(1)));assertFalse(service.qualification(1L,9L).getShowEntry());when(levels.getMemberLevel(10L)).thenReturn(CommonResult.success(null));assertFalse(service.qualification(1L,9L).getCanTake());}
+
+    @Test
+    void unidentifiedVisitorCannotSeeEntry() {
+        var qualification = service.qualification(1L, null);
+        assertFalse(qualification.getShowEntry());
+        assertEquals("LOGIN_REQUIRED", qualification.getReasonCode());
+    }
+
+    @Test
+    void firstOrderHidesEntryEvenForAutomaticTemplates() {
+        assertTrue(service.qualification(1L, 9L).getShowEntry());
+        assertTrue(service.qualification(1L, 9L).getCanTake());
+        when(orders.hasOrderHistory(9L)).thenReturn(CommonResult.success(true));
+        for (var type : List.of(CouponTakeTypeEnum.USER, CouponTakeTypeEnum.REGISTER)) {
+            template.setTakeType(type.getType());
+            var qualification = service.qualification(1L, 9L);
+            assertFalse(qualification.getShowEntry());
+            assertFalse(qualification.getCanTake());
+            assertEquals("ORDER_HISTORY_EXISTS", qualification.getReasonCode());
+        }
+    }
+
+    @Test
+    void unknownOrderHistoryHidesEntry() {
+        when(orders.hasOrderHistory(9L)).thenReturn(CommonResult.success(null));
+        assertFalse(service.qualification(1L, 9L).getShowEntry());
+    }
+
+    @Test
+    void upgradedMemberWithNoOrdersCanSeeButCannotClaim() {
+        when(levels.getMemberLevel(10L)).thenReturn(CommonResult.success(new MemberLevelRespDTO().setLevel(1)));
+        var qualification = service.qualification(1L, 9L);
+        assertTrue(qualification.getShowEntry());
+        assertFalse(qualification.getCanTake());
+        when(levels.getMemberLevel(10L)).thenReturn(CommonResult.success(null));
+        assertFalse(service.qualification(1L, 9L).getCanTake());
+    }
  @Test void alreadyTakenAndUnavailableTemplatesCannotTake(){when(coupons.getTakeCount(1L,9L)).thenReturn(1);assertEquals("ALREADY_TAKEN",service.qualification(1L,9L).getReasonCode());template.setStatus(1);assertNull(service.qualification(1L,9L));}
  @Test void ordinaryTemplatesCannotBeClaimedAsNewcomer(){template.setNewcomerOnly(false);assertNull(service.qualification(1L,9L));}
+
+    @Test
+    void guestPreviewRequiresAnExistingMemberWithoutOrders() {
+        assertTrue(service.canShowVisitorEntry(9L));
+        when(orders.hasOrderHistory(9L)).thenReturn(CommonResult.success(true));
+        assertFalse(service.canShowVisitorEntry(9L));
+        when(users.getUser(9L)).thenReturn(CommonResult.success(null));
+        assertFalse(service.canShowVisitorEntry(9L));
+    }
+
 }

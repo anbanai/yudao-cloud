@@ -86,4 +86,7 @@ public interface SocialUserService {
      */
     PageResult<SocialUserDO> getSocialUserPage(SocialUserPageReqVO pageReqVO);
 
+    /** 用微信实时验证登录码，只查询已有的会员绑定。 */
+    Long getBoundWeixinMember(String code);
+
 }

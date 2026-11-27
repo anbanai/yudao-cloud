@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.system.service.social;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import org.springframework.util.StringUtils;
 import cn.hutool.core.lang.Assert;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -169,6 +171,22 @@ public class SocialUserServiceImpl implements SocialUserService {
     @Override
     public PageResult<SocialUserDO> getSocialUserPage(SocialUserPageReqVO pageReqVO) {
         return socialUserMapper.selectPage(pageReqVO);
+    }
+
+    @Override
+    public Long getBoundWeixinMember(String code) {
+        int socialType = SocialTypeEnum.WECHAT_MINI_PROGRAM.getType();
+        int userType = UserTypeEnum.MEMBER.getValue();
+        AuthUser identity = socialClientService.getAuthUser(socialType, userType, code, "default");
+        if (identity == null || !StringUtils.hasText(identity.getUuid())) {
+            return null;
+        }
+        SocialUserDO socialUser = socialUserMapper.selectByTypeAndOpenid(socialType, identity.getUuid());
+        if (socialUser == null) {
+            return null;
+        }
+        SocialUserBindDO binding = socialUserBindMapper.selectByUserTypeAndSocialUserId(userType, socialUser.getId());
+        return binding == null ? null : binding.getUserId();
     }
 
 }

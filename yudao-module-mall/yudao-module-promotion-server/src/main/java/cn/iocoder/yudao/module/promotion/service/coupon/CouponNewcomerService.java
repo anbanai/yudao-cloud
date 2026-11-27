@@ -29,26 +29,27 @@ public class CouponNewcomerService {
             return null;
         }
         AppNewcomerCouponRespVO result = BeanUtils.toBean(template, AppNewcomerCouponRespVO.class)
-                .setTemplateId(template.getId()).setShowEntry(true);
+                .setTemplateId(template.getId()).setShowEntry(false);
         if (userId == null) {
             return result.setCanTake(false).setReasonCode("LOGIN_REQUIRED").setReason("登录后可领取");
         }
-        if (!Objects.equals(template.getTakeType(), CouponTakeTypeEnum.USER.getType())) {
-            return result.setCanTake(false).setReasonCode("REGISTER_AUTO_ISSUE")
-                    .setReason("该模板用于注册自动发放，请使用已发放的优惠券");
+        if (!hasNoOrders(userId)) {
+            return result.setCanTake(false).setReasonCode("ORDER_HISTORY_EXISTS").setReason("已有历史订单");
         }
         MemberUserRespDTO user = memberUserApi.getUser(userId).getCheckedData();
         if (user == null) {
             return result.setCanTake(false).setReasonCode("USER_NOT_FOUND").setReason("会员信息不存在");
         }
+        result.setShowEntry(true);
+        if (!Objects.equals(template.getTakeType(), CouponTakeTypeEnum.USER.getType())) {
+            return result.setCanTake(false).setReasonCode("REGISTER_AUTO_ISSUE")
+                    .setReason("该模板用于注册自动发放，请使用已发放的优惠券");
+        }
         MemberLevelRespDTO level = user.getLevelId() == null || user.getLevelId() == 0
                 ? null : memberLevelApi.getMemberLevel(user.getLevelId()).getCheckedData();
         if (user.getLevelId() != null && user.getLevelId() != 0 && (level == null || !Integer.valueOf(0).equals(level.getLevel()))) {
-            return result.setShowEntry(false).setCanTake(false).setReasonCode("LEVEL_UPGRADED")
+            return result.setCanTake(false).setReasonCode("LEVEL_UPGRADED")
                     .setReason("会员等级已升级");
-        }
-        if (Boolean.TRUE.equals(tradeOrderApi.hasOrderHistory(userId).getCheckedData())) {
-            return result.setCanTake(false).setReasonCode("ORDER_HISTORY_EXISTS").setReason("已有历史订单");
         }
         Integer takeCount = couponService.getTakeCount(id, userId);
         if (takeCount > 0) {
@@ -65,5 +66,12 @@ public class CouponNewcomerService {
         return result.setCanTake(true).setReasonCode(null).setReason(null);
     }
 
+    public boolean canShowVisitorEntry(Long userId) {
+        MemberUserRespDTO member = memberUserApi.getUser(userId).getCheckedData();
+        return member != null && Objects.equals(member.getId(), userId) && hasNoOrders(userId);
+    }
 
+    private boolean hasNoOrders(Long userId) {
+        return Boolean.FALSE.equals(tradeOrderApi.hasOrderHistory(userId).getCheckedData());
+    }
 }

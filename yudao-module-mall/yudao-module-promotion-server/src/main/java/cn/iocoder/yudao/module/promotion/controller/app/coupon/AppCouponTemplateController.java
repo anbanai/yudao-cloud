@@ -1,5 +1,12 @@
 package cn.iocoder.yudao.module.promotion.controller.app.coupon;
 
+import cn.iocoder.yudao.module.system.api.social.SocialUserApi;
+import cn.iocoder.yudao.module.promotion.service.coupon.CouponNewcomerService;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -13,11 +20,6 @@ import cn.iocoder.yudao.module.promotion.convert.coupon.CouponTemplateConvert;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.coupon.CouponTemplateDO;
 import cn.iocoder.yudao.module.promotion.enums.common.PromotionProductScopeEnum;
 import cn.iocoder.yudao.module.promotion.enums.coupon.CouponTakeTypeEnum;
-import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
-import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
-import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
-import cn.iocoder.yudao.module.member.api.level.dto.MemberLevelRespDTO;
-import cn.iocoder.yudao.module.trade.api.order.TradeOrderApi;
 import cn.iocoder.yudao.module.promotion.service.coupon.CouponService;
 import cn.iocoder.yudao.module.promotion.service.coupon.CouponTemplateService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,16 +51,12 @@ public class AppCouponTemplateController {
     @Resource
     private CouponService couponService;
     @Resource
-    private cn.iocoder.yudao.module.promotion.service.coupon.CouponNewcomerService newcomerService;
+    private CouponNewcomerService newcomerService;
+    @Resource
+    private SocialUserApi socialUserApi;
 
     @Resource
     private ProductSpuApi productSpuApi;
-    @Resource
-    private MemberUserApi memberUserApi;
-    @Resource
-    private MemberLevelApi memberLevelApi;
-    @Resource
-    private TradeOrderApi tradeOrderApi;
 
     @GetMapping("/get")
     @Operation(summary = "获得优惠劵模版")
@@ -73,6 +71,16 @@ public class AppCouponTemplateController {
         Map<Long, Boolean> canCanTakeMap = couponService.getUserCanCanTakeMap(getLoginUserId(), singletonList(template));
         return success(BeanUtils.toBean(template, AppCouponTemplateRespVO.class)
                 .setCanTake(canCanTakeMap.get(template.getId())));
+    }
+
+    public record WeixinVisitorReqVO(@NotBlank @Size(max = 512) String code) {}
+
+    @PostMapping("/newcomer-weixin-visitor")
+    @PermitAll
+    @Operation(summary = "验证微信访客身份并判断新人专区是否可见")
+    public CommonResult<Boolean> canShowWeixinVisitorEntry(@Valid @RequestBody WeixinVisitorReqVO visitor) {
+        Long memberId = socialUserApi.getBoundWeixinMember(visitor.code()).getCheckedData();
+        return success(memberId != null && newcomerService.canShowVisitorEntry(memberId));
     }
 
     @GetMapping("/newcomer")
