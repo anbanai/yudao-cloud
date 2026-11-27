@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.promotion.controller.app;
 
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -9,6 +10,7 @@ import cn.iocoder.yudao.module.promotion.controller.app.bargain.AppBargainActivi
 import cn.iocoder.yudao.module.promotion.controller.app.combination.AppCombinationActivityController;
 import cn.iocoder.yudao.module.promotion.controller.app.seckill.AppSeckillActivityController;
 import cn.iocoder.yudao.module.promotion.controller.app.point.AppPointActivityController;
+import cn.iocoder.yudao.module.promotion.controller.app.point.vo.AppPointActivityPageReqVO;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.bargain.BargainActivityDO;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.combination.CombinationActivityDO;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.point.PointActivityDO;
@@ -27,6 +29,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PromotionMerchantVisibilityTest extends BaseMockitoUnitTest {
@@ -61,6 +65,15 @@ class PromotionMerchantVisibilityTest extends BaseMockitoUnitTest {
         when(bargainActivityService.getBargainActivityPage(any(PageParam.class))).thenReturn(new PageResult<>(List.of(activity), 1L));
         assertThat(bargainController.getBargainActivityList(6).getCheckedData()).isEmpty();
         assertThat(bargainController.getBargainActivityPage(new PageParam()).getCheckedData().getList()).isEmpty();
+    }
+
+    @Test
+    void pointActivityPageQueriesOnlyEnabledActivities() {
+        when(pointActivityService.getPointActivityPage(any())).thenReturn(PageResult.empty());
+
+        pointController.getPointActivityPage(new AppPointActivityPageReqVO());
+
+        verify(pointActivityService).getPointActivityPage(argThat(req -> CommonStatusEnum.isEnable(req.getStatus())));
     }
 
     @Test

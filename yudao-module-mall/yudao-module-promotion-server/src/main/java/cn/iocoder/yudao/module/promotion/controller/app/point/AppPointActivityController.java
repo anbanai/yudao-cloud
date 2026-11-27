@@ -50,9 +50,9 @@ public class AppPointActivityController {
     @Operation(summary = "获得积分商城活动分页")
     @PermitAll
     public CommonResult<PageResult<AppPointActivityRespVO>> getPointActivityPage(AppPointActivityPageReqVO pageReqVO) {
-        // 1. 查询满足当前阶段的活动
+        // 1. 分页查询已开启的活动
         PageResult<PointActivityDO> pageResult = pointActivityService.getPointActivityPage(
-                BeanUtils.toBean(pageReqVO, PointActivityPageReqVO.class));
+                BeanUtils.toBean(pageReqVO, PointActivityPageReqVO.class).setStatus(CommonStatusEnum.ENABLE.getStatus()));
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(PageResult.empty(pageResult.getTotal()));
         }
