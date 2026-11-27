@@ -123,47 +123,60 @@ class MerchantUserServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
-    void registerUserRejectsUsernameAlreadyUsedByAdmin() {
+    void registerUserAllowsUsernameAlreadyUsedByAdmin() {
         when(adminUserService.getUserByUsername("seller100"))
                 .thenReturn(new AdminUserDO().setId(10L).setUsername("seller100"));
+        when(passwordEncoder.encode("secret123")).thenReturn("encoded-secret");
         MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
         reqVO.setUsername("seller100");
         reqVO.setNickname("Tea Seller");
         reqVO.setPassword("secret123");
         reqVO.setMobile("15601691300");
 
-        assertServiceException(() -> merchantUserService.registerUser(reqVO), USER_USERNAME_EXISTS);
+        MerchantUserDO created = merchantUserService.registerUser(reqVO);
+
+        assertEquals("seller100", merchantUserMapper.selectById(created.getId()).getUsername());
     }
 
     @Test
-    void registerUserRejectsUsernameAlreadyUsedByMemberPhone() {
+    void registerUserAllowsMemberPhoneAsUsernameAndContactMobile() {
         when(memberService.isMemberMobileExists("15601691300")).thenReturn(true);
         when(passwordEncoder.encode("secret123")).thenReturn("encoded-secret");
         MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
         reqVO.setUsername("15601691300");
         reqVO.setNickname("Tea Seller");
         reqVO.setPassword("secret123");
-        reqVO.setMobile("15601691301");
+        reqVO.setMobile("15601691300");
 
-        assertServiceException(() -> merchantUserService.registerUser(reqVO), USER_USERNAME_EXISTS);
+        MerchantUserDO created = merchantUserService.registerUser(reqVO);
+
+        MerchantUserDO persisted = merchantUserMapper.selectById(created.getId());
+        assertEquals("15601691300", persisted.getUsername());
+        assertEquals("15601691300", persisted.getMobile());
     }
 
     @Test
-    void registerUserRejectsUsernameAlreadyUsedByAdminPhone() {
+    void registerUserAllowsAdminPhoneAsUsernameAndContactMobile() {
         when(adminUserService.getUserByMobile("15601691300"))
                 .thenReturn(new AdminUserDO().setId(10L).setMobile("15601691300"));
+        when(passwordEncoder.encode("secret123")).thenReturn("encoded-secret");
         MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
         reqVO.setUsername("15601691300");
         reqVO.setNickname("Tea Seller");
         reqVO.setPassword("secret123");
-        reqVO.setMobile("15601691301");
+        reqVO.setMobile("15601691300");
 
-        assertServiceException(() -> merchantUserService.registerUser(reqVO), USER_USERNAME_EXISTS);
+        MerchantUserDO created = merchantUserService.registerUser(reqVO);
+
+        MerchantUserDO persisted = merchantUserMapper.selectById(created.getId());
+        assertEquals("15601691300", persisted.getUsername());
+        assertEquals("15601691300", persisted.getMobile());
     }
 
     @Test
-    void registerUserRejectsMobileAlreadyUsedByMember() {
-        when(memberService.isMemberMobileExists("15601691300")).thenReturn(true);
+    void registerUserRejectsMobileAlreadyUsedByMerchant() {
+        merchantUserMapper.insert(new MerchantUserDO().setUsername("seller200").setPassword("hash")
+                .setNickname("Existing seller").setMobile("15601691300"));
         MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
         reqVO.setUsername("seller100");
         reqVO.setNickname("Tea Seller");

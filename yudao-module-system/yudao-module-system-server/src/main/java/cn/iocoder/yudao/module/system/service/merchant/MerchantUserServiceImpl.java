@@ -11,9 +11,7 @@ import cn.iocoder.yudao.module.system.controller.merchant.auth.vo.MerchantAuthRe
 import cn.iocoder.yudao.module.system.controller.merchant.auth.vo.MerchantUserProfileUpdateReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.MerchantUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.user.MerchantUserMapper;
-import cn.iocoder.yudao.module.system.service.member.MemberService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
-import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
@@ -35,12 +33,6 @@ public class MerchantUserServiceImpl implements MerchantUserService {
     private TenantService tenantService;
     @Resource
     private PasswordEncoder passwordEncoder;
-    @Resource
-    @Lazy
-    private AdminUserService adminUserService;
-    @Resource
-    @Lazy
-    private MemberService memberService;
     @Resource
     @Lazy
     private OAuth2TokenService oauth2TokenService;
@@ -192,10 +184,7 @@ public class MerchantUserServiceImpl implements MerchantUserService {
     }
 
     private void validateUsernameUnique(String username) {
-        if (adminUserService.getUserByUsername(username) != null
-                || adminUserService.getUserByMobile(username) != null
-                || merchantUserMapper.selectByUsername(username) != null
-                || memberService.isMemberMobileExists(username)) {
+        if (merchantUserMapper.selectByUsername(username) != null) {
             throw exception(USER_USERNAME_EXISTS);
         }
     }
@@ -206,9 +195,6 @@ public class MerchantUserServiceImpl implements MerchantUserService {
         }
         MerchantUserDO user = merchantUserMapper.selectByMobile(mobile);
         if (user != null && !user.getId().equals(id)) {
-            throw exception(USER_MOBILE_EXISTS);
-        }
-        if (adminUserService.getUserByMobile(mobile) != null || memberService.isMemberMobileExists(mobile)) {
             throw exception(USER_MOBILE_EXISTS);
         }
     }
