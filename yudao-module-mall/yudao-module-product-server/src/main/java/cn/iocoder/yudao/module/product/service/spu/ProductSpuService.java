@@ -30,6 +30,8 @@ public interface ProductSpuService {
      */
     Long createSpu(@Valid ProductSpuSaveReqVO createReqVO);
 
+    Long createUnlistedSpu(@Valid ProductSpuSaveReqVO createReqVO);
+
     /**
      * 更新商品 SPU
      *

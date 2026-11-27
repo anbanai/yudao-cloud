@@ -29,6 +29,8 @@ public class ProductBrandDO extends TenantBaseDO {
     private Long id;
     /** 品牌默认归属商家编号 */
     private Long merchantId;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NOT_NULL)
+    private Boolean showInDetail;
     /**
      * 品牌名称
      */

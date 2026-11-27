@@ -89,6 +89,8 @@ public interface MemberLevelService {
      */
     void updateUserLevel(MemberUserUpdateLevelReqVO updateReqVO);
 
+    void restoreHigherLevel(Long userId, Long snapshotLevelId);
+
     /**
      * 增加会员经验
      *

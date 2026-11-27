@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS "member_user"
     "login_date"  datetime     NULL     DEFAULT NULL COMMENT '最后登录时间',
     "tag_ids"     varchar(255) NULL     DEFAULT NULL COMMENT '用户标签编号列表,以逗号分隔',
     "level_id"    bigint       NULL     DEFAULT NULL COMMENT '等级编号',
+    "recovered_floor_level_id" bigint NULL,
     "experience"  bigint       NULL     DEFAULT NULL COMMENT '经验',
     "group_id"    bigint       NULL     DEFAULT NULL COMMENT '用户分组编号',
     "creator"     varchar(64)  NULL     DEFAULT '' COMMENT '创建者',

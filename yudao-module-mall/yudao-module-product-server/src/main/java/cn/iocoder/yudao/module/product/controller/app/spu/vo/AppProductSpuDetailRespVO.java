@@ -11,6 +11,10 @@ import java.math.BigDecimal;
 @Data
 public class AppProductSpuDetailRespVO {
 
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @Schema(description = "仅在所属品牌启用详情展示时返回品牌名称")
+    private String brandName;
+
     @Schema(description = "商品 SPU 编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Long id;
 

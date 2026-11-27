@@ -223,4 +223,32 @@ class ProductSpuServiceImplTest {
         verify(merchantService).validateMerchantAvailable(9L);
     }
 
+    @Test
+    void brandPresentationIsNotConsultedForPurchaseEligibility() {
+        var spu = new ProductSpuDO().setId(7L).setBrandId(9L).setMerchantId(2L).setStatus(1);
+        when(productSpuMapper.selectById(7L)).thenReturn(spu);
+        assertEquals(true, productSpuService.checkAccess(7L, null, 1).getPurchasable());
+        spu.setBuyLimit(1);
+        assertEquals(false, productSpuService.checkAccess(7L, null, 2).getPurchasable());
+        spu.setStatus(0);
+        assertEquals(false, productSpuService.checkAccess(7L, null, 1).getPurchasable());
+        org.mockito.Mockito.verifyNoInteractions(brandService);
+    }
+
+    @Test
+    void supplementedProductKeepsRealBrandAndIsInsertedUnlisted() {
+        var sku = new ProductSkuSaveReqVO().setMarketPrice(120).setCostPrice(80).setPrice(100).setStock(0);
+        var form = new ProductSpuSaveReqVO().setMerchantId(1L).setCategoryId(9L).setBrandId(8L)
+                .setPicUrl("/synthetic/cover.png").setSpecType(false).setSkus(List.of(sku));
+        when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
+        when(fileApi.validateImageUrl("/synthetic/cover.png", "product")).thenReturn(CommonResult.success(true));
+        productSpuService.createUnlistedSpu(form);
+        verify(categoryService).validateCategory(9L);
+        var inserted = ArgumentCaptor.forClass(ProductSpuDO.class);
+        verify(productSpuMapper).insert(inserted.capture());
+        assertEquals(ProductSpuStatusEnum.DISABLE.getStatus(), inserted.getValue().getStatus());
+        assertEquals(8L, inserted.getValue().getBrandId());
+        assertEquals(0, inserted.getValue().getSalesCount());
+    }
+
 }
