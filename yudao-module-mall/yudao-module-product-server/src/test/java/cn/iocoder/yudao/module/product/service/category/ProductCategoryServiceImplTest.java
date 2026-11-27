@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.service.category;
 
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategorySaveReqVO;
@@ -12,8 +13,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_IMAGE_INVALID;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,11 +55,20 @@ class ProductCategoryServiceImplTest {
     }
 
     @Test
+    void validateCategoryList_acceptsEnabledTopLevelCategory() {
+        List<Long> ids = List.of(1L);
+        when(productCategoryMapper.selectByIds(ids)).thenReturn(List.of(new ProductCategoryDO()
+                .setId(1L).setParentId(ProductCategoryDO.PARENT_ID_NULL).setStatus(CommonStatusEnum.ENABLE.getStatus())));
+
+        assertDoesNotThrow(() -> productCategoryService.validateCategoryList(ids));
+    }
+
+    @Test
     void getEnableCategoryList_defaultsMissingDisplayProductCountForLegacyCategories() {
         ProductCategoryDO legacyCategory = new ProductCategoryDO()
                 .setId(1L)
                 .setDisplayProductCount(null);
-        when(productCategoryMapper.selectListByStatus(anyInt())).thenReturn(java.util.List.of(legacyCategory));
+        when(productCategoryMapper.selectListByStatus(anyInt())).thenReturn(List.of(legacyCategory));
 
         ProductCategoryDO result = productCategoryService.getEnableCategoryList().get(0);
 

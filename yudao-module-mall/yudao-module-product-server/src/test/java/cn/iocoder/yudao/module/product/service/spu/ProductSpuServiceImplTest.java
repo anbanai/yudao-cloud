@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.service.spu;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategoryListReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
@@ -29,13 +30,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.CATEGORY_DISABLED;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_IMAGE_INVALID;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,11 +68,29 @@ class ProductSpuServiceImplTest {
     private FileApi fileApi;
 
     @Test
+    void testGetAppSpuPageIncludesTopLevelCategoryAndEnabledChildren() {
+        AppProductSpuPageReqVO reqVO = new AppProductSpuPageReqVO().setCategoryId(10L);
+        when(categoryService.getCategoryList(any())).thenReturn(List.of(
+                new ProductCategoryDO().setId(11L).setParentId(10L)));
+        when(productSpuMapper.selectPage(reqVO, Set.of(10L, 11L))).thenReturn(PageResult.empty());
+
+        productSpuService.getSpuPage(reqVO);
+
+        ArgumentCaptor<ProductCategoryListReqVO> categoryReqCaptor =
+                ArgumentCaptor.forClass(ProductCategoryListReqVO.class);
+        verify(categoryService).getCategoryList(categoryReqCaptor.capture());
+        assertEquals(10L, categoryReqCaptor.getValue().getParentId());
+        assertEquals(CommonStatusEnum.ENABLE.getStatus(), categoryReqCaptor.getValue().getStatus());
+        verify(productSpuMapper).selectPage(reqVO, Set.of(10L, 11L));
+    }
+
+    @Test
     void testGetAppSpuPageExpandsAllSelectedCategoryChildren() {
         AppProductSpuPageReqVO reqVO = new AppProductSpuPageReqVO().setCategoryIds(List.of(10L, 20L));
         when(categoryService.getCategoryList(any())).thenReturn(List.of(
                 new ProductCategoryDO().setId(11L).setParentId(10L),
                 new ProductCategoryDO().setId(21L).setParentId(20L)));
+        when(productSpuMapper.selectPage(same(reqVO), anySet())).thenReturn(PageResult.empty());
 
         productSpuService.getSpuPage(reqVO);
 
@@ -82,14 +107,32 @@ class ProductSpuServiceImplTest {
     }
 
     @Test
-    void testUpdateSpuKeepsCategoryAndSynchronizesOptionalGroups() {
+    void testUpdateSpuKeepsExistingCategoryAndSynchronizesOptionalGroups() {
         ProductSkuSaveReqVO sku = new ProductSkuSaveReqVO()
                 .setPrice(100).setMarketPrice(120).setCostPrice(80).setStock(5);
         ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L)
                 .setCategoryId(9L).setBrandId(8L).setMerchantId(1L).setSpecType(false)
                 .setSkus(List.of(sku)).setGroupIds(null);
-        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setStatus(1));
-        when(categoryService.getCategoryLevel(9L)).thenReturn(2);
+        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setCategoryId(9L).setStatus(1));
+        when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
+
+        productSpuService.updateSpu(reqVO);
+
+        ArgumentCaptor<ProductSpuDO> spuCaptor = ArgumentCaptor.forClass(ProductSpuDO.class);
+        verify(productSpuMapper).updateById(spuCaptor.capture());
+        assertNull(spuCaptor.getValue().getCategoryId());
+        verify(categoryService).validateCategory(9L);
+        verify(productGroupService).syncSpuGroups(100L, null);
+    }
+
+    @Test
+    void testUpdateSpuWritesChangedTopLevelCategory() {
+        ProductSkuSaveReqVO sku = new ProductSkuSaveReqVO()
+                .setPrice(100).setMarketPrice(120).setCostPrice(80).setStock(5);
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L)
+                .setCategoryId(9L).setBrandId(8L).setMerchantId(1L).setSpecType(false)
+                .setSkus(List.of(sku));
+        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setCategoryId(10L).setStatus(1));
         when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
 
         productSpuService.updateSpu(reqVO);
@@ -98,7 +141,37 @@ class ProductSpuServiceImplTest {
         verify(productSpuMapper).updateById(spuCaptor.capture());
         assertEquals(9L, spuCaptor.getValue().getCategoryId());
         verify(categoryService).validateCategory(9L);
-        verify(productGroupService).syncSpuGroups(100L, null);
+    }
+
+    @Test
+    void testUpdateSpuRejectsDisabledCategory() {
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setId(100L).setCategoryId(9L);
+        when(productSpuMapper.selectById(100L)).thenReturn(new ProductSpuDO().setId(100L).setCategoryId(9L));
+        doThrow(exception(CATEGORY_DISABLED, "茶器"))
+                .when(categoryService).validateCategory(9L);
+
+        assertServiceException(() -> productSpuService.updateSpu(reqVO), CATEGORY_DISABLED, "茶器");
+        verify(productSpuMapper, never()).updateById(any(ProductSpuDO.class));
+    }
+
+    @Test
+    void testCreateSpuAcceptsEnabledTopLevelCategory() {
+        ProductSkuSaveReqVO sku = new ProductSkuSaveReqVO()
+                .setPrice(100).setMarketPrice(120).setCostPrice(80).setStock(5);
+        ProductSpuSaveReqVO reqVO = new ProductSpuSaveReqVO().setCategoryId(9L)
+                .setBrandId(8L).setMerchantId(1L).setSpecType(false).setSkus(List.of(sku));
+        when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
+        when(productSpuMapper.insert(any(ProductSpuDO.class))).thenAnswer(invocation -> {
+            invocation.<ProductSpuDO>getArgument(0).setId(100L);
+            return 1;
+        });
+
+        assertEquals(100L, productSpuService.createSpu(reqVO));
+
+        ArgumentCaptor<ProductSpuDO> spuCaptor = ArgumentCaptor.forClass(ProductSpuDO.class);
+        verify(productSpuMapper).insert(spuCaptor.capture());
+        assertEquals(9L, spuCaptor.getValue().getCategoryId());
+        verify(categoryService).validateCategory(9L);
     }
 
     @ParameterizedTest
@@ -128,7 +201,6 @@ class ProductSpuServiceImplTest {
                 .setPicUrl(null).setSpecType(false)
                 .setSkus(List.of(new ProductSkuSaveReqVO().setPicUrl(null)
                         .setPrice(100).setStock(1)));
-        when(categoryService.getCategoryLevel(9L)).thenReturn(2);
         when(brandService.getBrand(8L)).thenReturn(new ProductBrandDO().setId(8L).setMerchantId(1L));
         if (description.contains("large.gif") && !description.contains("style=")) {
             when(fileApi.validateImageUrl(anyString(), eq("product"))).thenAnswer(invocation ->
