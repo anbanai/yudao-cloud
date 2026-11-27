@@ -146,7 +146,7 @@ public class SocialClientServiceImplTest extends BaseDbUnitTest {
         // 调用并断言
         assertServiceException(
                 () -> socialClientService.getAuthUser(socialType, userType, code, state),
-                SOCIAL_USER_AUTH_FAILURE, "模拟失败");
+                SOCIAL_USER_AUTH_FAILURE, "第三方登录未通过");
     }
 
     @Test
