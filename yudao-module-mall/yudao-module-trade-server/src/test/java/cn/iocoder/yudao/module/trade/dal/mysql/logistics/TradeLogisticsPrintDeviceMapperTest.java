@@ -30,7 +30,7 @@ class TradeLogisticsPrintDeviceMapperTest {
         TradeLogisticsPrintDeviceMapper mapper = mock(TradeLogisticsPrintDeviceMapper.class, CALLS_REAL_METHODS);
         doReturn(1).when(mapper).update(any(), any(Wrapper.class));
 
-        mapper.bindPendingDevice(9L, "existing-printbridge-id", "仓库电脑");
+        mapper.bindPendingDevice(9L, "token-hash", "existing-printbridge-id", "仓库电脑");
 
         ArgumentCaptor<Wrapper> wrapper = ArgumentCaptor.forClass(Wrapper.class);
         verify(mapper).update(any(), wrapper.capture());

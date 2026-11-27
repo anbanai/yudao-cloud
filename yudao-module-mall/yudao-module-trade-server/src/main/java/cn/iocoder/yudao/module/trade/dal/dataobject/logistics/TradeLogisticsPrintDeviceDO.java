@@ -17,6 +17,7 @@ public class TradeLogisticsPrintDeviceDO extends TenantBaseDO {
 
     @TableId
     private Long id;
+    private Long merchantId;
     private String deviceCode;
     private String deviceName;
     private String printerName;

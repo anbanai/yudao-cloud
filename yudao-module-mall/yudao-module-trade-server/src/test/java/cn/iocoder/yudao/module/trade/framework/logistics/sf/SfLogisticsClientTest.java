@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.framework.logistics.sf;
 
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsAccountDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeMerchantLogisticsConfigDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -46,7 +47,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(first, second), skus);
+        client.createWaybill(new TradeLogisticsAccountDO(), SfLogisticsClient.buildCreateRequest(config(), "ORDER-1", order(), List.of(first, second), skus));
 
         assertThat(payload.getValue().path("monthlyCard").asText()).isEqualTo("CARD-1");
         assertThat(payload.getValue().path("totalWeight").decimalValue())
@@ -61,7 +62,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(item), Map.of());
+        client.createWaybill(new TradeLogisticsAccountDO(), SfLogisticsClient.buildCreateRequest(config(), "ORDER-1", order(), List.of(item), Map.of()));
 
         JsonNode cargo = payload.getValue().path("cargoDetails").get(0);
         assertThat(cargo.path("name").asText()).isEqualTo("茶叶 35700 * 2");
@@ -77,7 +78,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(item), Map.of());
+        client.createWaybill(new TradeLogisticsAccountDO(), SfLogisticsClient.buildCreateRequest(config(), "ORDER-1", order(), List.of(item), Map.of()));
 
         String cargoName = payload.getValue().path("cargoDetails").get(0).path("name").asText();
         assertThat(cargoName).hasSize(100)
@@ -92,7 +93,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), payload.capture()))
                 .thenReturn(JsonNodeFactory.instance.objectNode().put("waybillNo", "SF001"));
 
-        client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(item), Map.of());
+        client.createWaybill(new TradeLogisticsAccountDO(), SfLogisticsClient.buildCreateRequest(config(), "ORDER-1", order(), List.of(item), Map.of()));
 
         assertThat(payload.getValue().path("totalWeight").decimalValue())
                 .isEqualByComparingTo(new BigDecimal("0.80"));
@@ -103,7 +104,7 @@ class SfLogisticsClientTest {
         when(openApiClient.invoke(any(), eq(SfLogisticsClient.CREATE_ORDER), any()))
                 .thenReturn(JsonNodeFactory.instance.objectNode());
 
-        assertThatThrownBy(() -> client.createWaybill(account(), "CARD-1", "ORDER-1", order(), List.of(), Map.of()))
+        assertThatThrownBy(() -> client.createWaybill(new TradeLogisticsAccountDO(), SfLogisticsClient.buildCreateRequest(config(), "ORDER-1", order(), List.of(), Map.of())))
                 .isInstanceOfSatisfying(SfApiException.class,
                         exception -> assertThat(exception.isUnknownResult()).isTrue());
     }
@@ -126,7 +127,7 @@ class SfLogisticsClientTest {
                         .put("url", "https://download.sf-express.com/label.pdf")
                         .put("token", "download-token"));
 
-        byte[] actual = testClient.getLabel(account().setTemplateCode("fm_verified"), "SF001");
+        byte[] actual = testClient.getLabel(new TradeLogisticsAccountDO(), "SF001", "fm_verified");
 
         assertThat(actual).isEqualTo(expected);
         assertThat(payload.getValue().path("sync").asBoolean()).isTrue();
@@ -172,8 +173,8 @@ class SfLogisticsClientTest {
                         exception -> assertThat(exception.getCode()).isEqualTo("LABEL_TOO_LARGE"));
     }
 
-    private static TradeLogisticsAccountDO account() {
-        return new TradeLogisticsAccountDO().setServiceCode("1")
+    private static TradeMerchantLogisticsConfigDO config() {
+        return new TradeMerchantLogisticsConfigDO().setMonthlyCard("CARD-1").setServiceCode("1")
                 .setDefaultWeightKg(new BigDecimal("0.80")).setSenderName("仓库")
                 .setSenderPhone("13800138000").setSenderProvince("四川省").setSenderCity("成都市")
                 .setSenderDistrict("高新区").setSenderAddress("天府大道 1 号");

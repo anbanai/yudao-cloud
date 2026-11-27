@@ -80,7 +80,7 @@ public class MerchantAuthController {
 
     @GetMapping("/profile")
     @Operation(summary = "获取商家账号资料")
-    @PreAuthorize("denyAll()")
+    @PreAuthorize("isAuthenticated()")
     public CommonResult<MerchantUserProfileRespVO> getProfile() {
         return success(merchantAuthService.getProfile(getCurrentMerchantUserId()));
     }

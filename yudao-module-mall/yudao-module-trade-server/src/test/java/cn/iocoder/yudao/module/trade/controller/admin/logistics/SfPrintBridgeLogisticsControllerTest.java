@@ -11,7 +11,6 @@ import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsManagementService;
 import cn.iocoder.yudao.module.trade.service.logistics.LogisticsWaybillService;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -26,20 +25,6 @@ import static org.mockito.Mockito.when;
 class SfPrintBridgeLogisticsControllerTest {
 
     @Test
-    void enrollDevicePreventsCredentialResponseCaching() {
-        LogisticsManagementService managementService = mock(LogisticsManagementService.class);
-        SfPrintBridgeLogisticsController controller = new SfPrintBridgeLogisticsController();
-        ReflectionTestUtils.setField(controller, "managementService", managementService);
-        ReflectionTestUtils.setField(controller, "waybillService", mock(LogisticsWaybillService.class));
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        controller.enrollDevice(response);
-
-        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
-        verify(managementService).enrollDevice();
-    }
-
-    @Test
     void batchCreateWaybillContinuesAfterSingleBusinessFailure() {
         LogisticsWaybillService waybillService = mock(LogisticsWaybillService.class);
         SfPrintBridgeLogisticsController controller = new SfPrintBridgeLogisticsController();
@@ -50,15 +35,15 @@ class SfPrintBridgeLogisticsControllerTest {
         when(orderSubMapper.selectListByOrderId(1L)).thenReturn(List.of(subOrder(11L, 1L, 101L)));
         when(orderSubMapper.selectListByOrderId(2L)).thenReturn(List.of(subOrder(22L, 2L, 202L)));
         when(waybillService.createWaybill(new LogisticsWaybillCreateReqVO()
-                .setOrderId(1L).setSubOrderId(11L).setAccountId(10L).setDeviceId(20L)))
+                .setOrderId(1L).setSubOrderId(11L).setAccountId(10L)))
                 .thenThrow(new ServiceException(LOGISTICS_ACCOUNT_NOT_EXISTS));
         when(waybillService.createWaybill(new LogisticsWaybillCreateReqVO()
-                .setOrderId(2L).setSubOrderId(22L).setAccountId(10L).setDeviceId(20L)))
+                .setOrderId(2L).setSubOrderId(22L).setAccountId(10L)))
                 .thenReturn(new LogisticsWaybillRespVO().setOrderId(2L).setSubOrderId(22L).setPrintStatus("PENDING"));
 
         List<LogisticsWaybillRespVO> results = controller.batchCreateWaybill(
                 new LogisticsWaybillBatchCreateReqVO().setOrderIds(List.of(1L, 2L))
-                        .setAccountId(10L).setDeviceId(20L)).getData();
+                        .setAccountId(10L)).getData();
 
         assertThat(results).hasSize(2);
         assertThat(results.get(0).getOrderId()).isEqualTo(1L);

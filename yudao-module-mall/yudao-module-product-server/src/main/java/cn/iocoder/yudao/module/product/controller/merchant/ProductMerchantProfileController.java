@@ -34,6 +34,7 @@ public class ProductMerchantProfileController {
     private MerchantSecurityService merchantSecurityService;
 
     @GetMapping("/get")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "获取店铺展示资料")
     public CommonResult<ProductMerchantStoreProfileRespVO> getProfile() {
         ProductMerchantDO merchant = merchantSecurityService.requireBoundMerchant();

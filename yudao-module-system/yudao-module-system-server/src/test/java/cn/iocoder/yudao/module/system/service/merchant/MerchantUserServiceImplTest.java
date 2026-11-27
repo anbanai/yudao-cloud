@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.member.MemberService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.module.system.controller.admin.merchant.vo.MerchantUserPageReqVO;
 import jakarta.annotation.Resource;
@@ -33,6 +34,8 @@ class MerchantUserServiceImplTest extends BaseDbUnitTest {
 
     @Resource
     private MerchantUserServiceImpl merchantUserService;
+    @MockitoBean
+    private TenantService tenantService;
     @Resource
     private MerchantUserMapper merchantUserMapper;
 
@@ -169,6 +172,46 @@ class MerchantUserServiceImplTest extends BaseDbUnitTest {
 
         assertServiceException(() -> merchantUserService.registerUser(reqVO),
                 ErrorCodeConstants.USER_MOBILE_EXISTS);
+    }
+
+    @Test
+    void approvedBindingAssignsTenantOnceAndRevokesPriorSessions() {
+        MerchantUserDO user = new MerchantUserDO().setUsername("approved-seller").setPassword("hash")
+                .setNickname("seller").setMerchantId(10L);
+        merchantUserMapper.insert(user);
+
+        merchantUserService.bindApprovedMerchant(user.getId(), 10L, 71L);
+        merchantUserService.bindApprovedMerchant(user.getId(), 10L, 71L);
+
+        assertEquals(71L, merchantUserMapper.selectById(user.getId()).getTenantId());
+        verify(oauth2TokenService).removeAccessToken(user.getId(), UserTypeEnum.MERCHANT.getValue());
+    }
+
+    @Test
+    void approvedBindingRejectsDifferentTenantOrMerchant() {
+        MerchantUserDO user = new MerchantUserDO().setUsername("bound-seller").setPassword("hash")
+                .setNickname("seller").setMerchantId(10L);
+        user.setTenantId(71L);
+        merchantUserMapper.insert(user);
+
+        assertServiceException(() -> merchantUserService.bindApprovedMerchant(user.getId(), 10L, 72L),
+                ErrorCodeConstants.SYSTEM_MERCHANT_USER_ALREADY_BOUND);
+        assertServiceException(() -> merchantUserService.bindApprovedMerchant(user.getId(), 11L, 71L),
+                ErrorCodeConstants.SYSTEM_MERCHANT_USER_ALREADY_BOUND);
+        assertEquals(71L, merchantUserMapper.selectById(user.getId()).getTenantId());
+        assertEquals(10L, merchantUserMapper.selectById(user.getId()).getMerchantId());
+    }
+
+    @Test
+    void approvedBindingRejectsInvalidTenantBeforeChangingAccount() {
+        MerchantUserDO user = new MerchantUserDO().setUsername("unassigned").setPassword("hash").setNickname("seller");
+        merchantUserMapper.insert(user);
+        org.mockito.Mockito.doThrow(cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
+                .exception(ErrorCodeConstants.TENANT_NOT_EXISTS)).when(tenantService).validTenant(71L);
+
+        assertServiceException(() -> merchantUserService.bindApprovedMerchant(user.getId(), 10L, 71L),
+                ErrorCodeConstants.TENANT_NOT_EXISTS);
+        assertEquals(0L, merchantUserMapper.selectById(user.getId()).getTenantId());
     }
 
     @Test

@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.trade.controller.merchant.order;
 
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
 import cn.iocoder.yudao.module.trade.framework.merchant.MerchantSecurityService;
@@ -23,7 +25,12 @@ import static org.mockito.Mockito.when;
 class MerchantTradeOrderControllerTest {
 
     @Test
-    void merchantOrderEndpointsAreDisabledUntilMerchantOperationsAreReleased() {
+    void authenticatedMerchantsCanReadOrdersAndOtherOperationsStayRestricted() throws Exception {
+        for (var method : MerchantTradeOrderController.class.getDeclaredMethods()) {
+            if (method.isAnnotationPresent(org.springframework.web.bind.annotation.GetMapping.class)) {
+                org.junit.jupiter.api.Assertions.assertEquals("isAuthenticated()", method.getAnnotation(PreAuthorize.class).value());
+            }
+        }
         org.junit.jupiter.api.Assertions.assertEquals("denyAll()",
                 MerchantTradeOrderController.class.getAnnotation(PreAuthorize.class).value());
     }
@@ -50,6 +57,19 @@ class MerchantTradeOrderControllerTest {
         assertThrows(AccessDeniedException.class, () -> controller.getDetail(22L));
         verify(orderQueryService, never()).getOrder(org.mockito.ArgumentMatchers.anyLong());
         verify(orderItemMapper, never()).selectListBySubOrderId(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void getDetail_mapsTheAuthorizedOrdersReceiver() {
+        when(merchantSecurityService.requireOperatingMerchantId()).thenReturn(11L);
+        when(orderSubMapper.selectByIdAndMerchantId(22L, 11L))
+                .thenReturn(new TradeOrderSubDO().setId(22L).setOrderId(33L).setMerchantId(11L));
+        when(orderQueryService.getOrder(33L)).thenReturn(new TradeOrderDO().setReceiverName("收件人")
+                .setReceiverMobile("13800000000").setReceiverAreaId(330110).setReceiverDetailAddress("仓前路一号"));
+
+        var receiver = controller.getDetail(22L).getCheckedData().getReceiver();
+        org.assertj.core.api.Assertions.assertThat(receiver).extracting("name", "mobile", "areaId", "detailAddress")
+                .containsExactly("收件人", "13800000000", 330110, "仓前路一号");
     }
 
     @Test

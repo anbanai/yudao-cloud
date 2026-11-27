@@ -10,5 +10,6 @@ public class TradeMerchantLogisticsConfigRespVO {
     private Long id;
     private Long merchantId;
     private String monthlyCardMasked;
+    private boolean configured;
     private LocalDateTime updateTime;
 }

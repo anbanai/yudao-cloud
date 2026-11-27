@@ -22,7 +22,8 @@ import cn.iocoder.yudao.module.trade.dal.mysql.aftersale.AfterSaleMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.aftersale.AfterSaleReturnShipmentMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.aftersale.AfterSaleReturnTraceMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsAccountMapper;
-import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeMerchantLogisticsConfigMapper;
+import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeMerchantLogisticsConfigDO;
+import cn.iocoder.yudao.module.trade.service.logistics.TradeMerchantLogisticsConfigService;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
 import cn.iocoder.yudao.module.trade.enums.aftersale.AfterSaleStatusEnum;
@@ -60,7 +61,7 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
     @Resource private AfterSaleReturnShipmentMapper shipmentMapper;
     @Resource private AfterSaleReturnTraceMapper traceMapper;
     @Resource private TradeLogisticsAccountMapper accountMapper;
-    @Resource private TradeMerchantLogisticsConfigMapper merchantLogisticsConfigMapper;
+    @Resource private TradeMerchantLogisticsConfigService merchantLogisticsConfigService;
     @Resource private TradeOrderItemMapper orderItemMapper;
     @Resource private TradeOrderSubMapper orderSubMapper;
     @Resource private DeliveryExpressService deliveryExpressService;
@@ -78,7 +79,7 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
         TradeLogisticsAccountDO account = accountMapper.selectDefaultEnabled();
         if (account == null) throw exception(LOGISTICS_ACCOUNT_NOT_EXISTS);
         Long merchantId = resolveMerchantId(afterSale);
-        requireMonthlyCard(merchantId);
+        TradeMerchantLogisticsConfigDO config = merchantLogisticsConfigService.getRequiredReturnConfig(merchantId);
         MemberAddressRespDTO address = memberAddressApi.getDefaultAddress(userId).getCheckedData();
         String pickupName = address == null ? null : address.getName();
         String pickupMobile = address == null ? null : address.getMobile();
@@ -97,7 +98,8 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
             pickupAddress = order.getReceiverDetailAddress();
         }
         ReceiverArea pickupArea = resolveArea(pickupAreaId);
-        return new AfterSaleReturnShipmentDO().setAfterSaleId(afterSaleId).setMerchantId(merchantId).setProvider("SF")
+        return applyReturnSettings(new AfterSaleReturnShipmentDO(), config)
+                .setAfterSaleId(afterSaleId).setMerchantId(merchantId).setProvider("SF")
                 .setStatus(ReturnShipmentStatusEnum.CREATING.name())
                 .setAddressId(address == null ? null : address.getId())
                 .setPickupName(pickupName)
@@ -106,11 +108,8 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
                 .setPickupAddress(pickupAddress)
                 .setPickupProvince(pickupArea.province()).setPickupCity(pickupArea.city())
                 .setPickupDistrict(pickupArea.district())
-                .setPackageWeight(account.getDefaultWeightKg()).setEstimatedFee(estimateFee(account.getDefaultWeightKg()))
-                .setFeePayer(defaultFeePayer(afterSale).name())
-                .setWarehouseName(account.getSenderName()).setWarehousePhone(account.getSenderPhone())
-                .setWarehouseProvince(account.getSenderProvince()).setWarehouseCity(account.getSenderCity())
-                .setWarehouseDistrict(account.getSenderDistrict()).setWarehouseAddress(account.getSenderAddress());
+                .setPackageWeight(config.getDefaultWeightKg()).setEstimatedFee(estimateFee(config.getDefaultWeightKg()))
+                .setFeePayer(defaultFeePayer(afterSale).name());
     }
 
     @Override
@@ -141,7 +140,7 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
         TradeLogisticsAccountDO account = accountMapper.selectDefaultEnabled();
         if (account == null) throw exception(LOGISTICS_ACCOUNT_NOT_EXISTS);
         Long merchantId = resolveMerchantId(afterSale);
-        requireMonthlyCard(merchantId);
+        TradeMerchantLogisticsConfigDO config = merchantLogisticsConfigService.getRequiredReturnConfig(merchantId);
         if (request.getPackageWeight().compareTo(new java.math.BigDecimal("50")) > 0) {
             throw exception(RETURN_SHIPMENT_WEIGHT_INVALID);
         }
@@ -151,7 +150,8 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
         ReceiverArea pickupArea = resolveArea(address.getAreaId());
         String providerOrderNo = "YD-RET-" + TenantContextHolder.getTenantId() + "-" + afterSaleId
                 + "-" + IdUtil.fastSimpleUUID().substring(0, 12);
-        AfterSaleReturnShipmentDO shipment = new AfterSaleReturnShipmentDO().setAfterSaleId(afterSaleId).setMerchantId(merchantId)
+        AfterSaleReturnShipmentDO shipment = applyReturnSettings(new AfterSaleReturnShipmentDO(), config)
+                .setAfterSaleId(afterSaleId).setMerchantId(merchantId)
                 .setAccountId(account.getId()).setProvider("SF").setProviderOrderNo(providerOrderNo)
                 .setStatus(ReturnShipmentStatusEnum.CREATING.name()).setIdempotencyKey(idempotencyKey)
                 .setAddressId(address.getId()).setPickupName(pickupName)
@@ -159,9 +159,6 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
                 .setPickupAreaId(address.getAreaId()).setPickupProvince(pickupArea.province())
                 .setPickupCity(pickupArea.city()).setPickupDistrict(pickupArea.district())
                 .setPickupAddress(address.getDetailAddress())
-                .setWarehouseName(account.getSenderName()).setWarehousePhone(account.getSenderPhone())
-                .setWarehouseProvince(account.getSenderProvince()).setWarehouseCity(account.getSenderCity())
-                .setWarehouseDistrict(account.getSenderDistrict()).setWarehouseAddress(account.getSenderAddress())
                 .setAppointmentTime(request.getAppointmentTime()).setPackageWeight(request.getPackageWeight())
                 .setFeePayer(defaultFeePayer(afterSale).name());
         if (existing != null) {
@@ -171,7 +168,10 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
                 if (current == null || !ReturnShipmentStateMachine.canUseManualFallback(current.statusEnum())) {
                     throw exception(RETURN_SHIPMENT_ALREADY_EXISTS);
                 }
-                shipmentMapper.update(null, new LambdaUpdateWrapper<AfterSaleReturnShipmentDO>()
+                AfterSaleReturnShipmentDO billing = new AfterSaleReturnShipmentDO()
+                        .setMerchantId(requestedShipment.getMerchantId()).setServiceCode(requestedShipment.getServiceCode())
+                        .setMonthlyCard(requestedShipment.getMonthlyCard());
+                shipmentMapper.update(billing, new LambdaUpdateWrapper<AfterSaleReturnShipmentDO>()
                         .eq(AfterSaleReturnShipmentDO::getId, current.getId())
                         .set(AfterSaleReturnShipmentDO::getAccountId, requestedShipment.getAccountId())
                         .set(AfterSaleReturnShipmentDO::getProvider, requestedShipment.getProvider())
@@ -554,11 +554,17 @@ public class AfterSaleReturnShipmentServiceImpl implements AfterSaleReturnShipme
         return subOrder.getMerchantId();
     }
 
-    private void requireMonthlyCard(Long merchantId) {
-        var config = merchantLogisticsConfigMapper.selectByMerchantId(merchantId);
-        if (config == null || StrUtil.isBlank(config.getMonthlyCard())) {
-            throw exception(TRADE_MERCHANT_MONTHLY_CARD_NOT_CONFIGURED, merchantId);
+    static AfterSaleReturnShipmentDO applyReturnSettings(AfterSaleReturnShipmentDO shipment,
+                                                         TradeMerchantLogisticsConfigDO config) {
+        shipment.setServiceCode(config.getServiceCode()).setMonthlyCard(config.getMonthlyCard());
+        if (Boolean.FALSE.equals(config.getReturnSameAsSender())) {
+            return shipment.setWarehouseName(config.getReturnName()).setWarehousePhone(config.getReturnPhone())
+                    .setWarehouseProvince(config.getReturnProvince()).setWarehouseCity(config.getReturnCity())
+                    .setWarehouseDistrict(config.getReturnDistrict()).setWarehouseAddress(config.getReturnAddress());
         }
+        return shipment.setWarehouseName(config.getSenderName()).setWarehousePhone(config.getSenderPhone())
+                .setWarehouseProvince(config.getSenderProvince()).setWarehouseCity(config.getSenderCity())
+                .setWarehouseDistrict(config.getSenderDistrict()).setWarehouseAddress(config.getSenderAddress());
     }
 
     private Integer estimateFee(java.math.BigDecimal weight) {

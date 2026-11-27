@@ -20,6 +20,8 @@ import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnu
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -60,6 +63,8 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     @Resource
     private TradeOrderMapper orderMapper;
     @Resource
+    private TradeOrderSubMapper subOrderMapper;
+    @Resource
     private PlatformTransactionManager transactionManager;
 
     @Override
@@ -69,7 +74,8 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
         if (StrUtil.isBlank(token) || token.length() > 512 || (deviceCode != null && deviceCode.length() > 128)) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
-        TradeLogisticsPrintDeviceDO device = deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash(token));
+        String tokenHash = LogisticsTokenUtils.hash(token);
+        TradeLogisticsPrintDeviceDO device = deviceMapper.selectByTokenHashIgnoreTenant(tokenHash);
         if (device == null || device.getStatus() == null || device.getStatus() != 0) {
             throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
         }
@@ -84,10 +90,13 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             }
             String adoptedName = StrUtil.blankToDefault(sanitizeHeaderDeviceName(deviceName), "PrintBridge 设备");
             try {
-                if (deviceMapper.bindPendingDevice(device.getId(), adoptedDeviceCode, adoptedName) > 0) {
+                if (deviceMapper.bindPendingDevice(device.getId(), tokenHash, adoptedDeviceCode, adoptedName) > 0) {
                     device.setDeviceCode(adoptedDeviceCode).setDeviceName(adoptedName);
                 } else {
-                    device = deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash(token));
+                    device = deviceMapper.selectByTokenHashIgnoreTenant(tokenHash);
+                    if (device == null || !Integer.valueOf(0).equals(device.getStatus()) || isPending(device)) {
+                        throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
+                    }
                 }
             } catch (DuplicateKeyException exception) {
                 throw exception(LOGISTICS_DEVICE_AUTH_FAILED);
@@ -110,7 +119,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
         deviceMapper.updateById(new TradeLogisticsPrintDeviceDO().setId(device.getId())
                 .setDeviceName(StrUtil.blankToDefault(sanitizeHeaderDeviceName(deviceName), device.getDeviceName()))
                 .setLastPollTime(now));
-        TradeLogisticsPrintTaskDO task = taskMapper.selectClaimable(device.getId(), now);
+        TradeLogisticsPrintTaskDO task = taskMapper.selectClaimable(device.getId(), device.getMerchantId(), now);
         if (task == null) {
             return null;
         }
@@ -164,7 +173,9 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
             }
             try {
                 inTransaction(() -> {
-                    deliver(task);
+                    // 同一主订单的商家可能同时完成打印。串行推进子单，确保最后一单能更新主订单。
+                    orderMapper.selectByIdForUpdate(task.getOrderId());
+                    deliver(waybillMapper.selectByIdForUpdate(task.getWaybillId()));
                     return null;
                 });
             } catch (RuntimeException exception) {
@@ -179,12 +190,13 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
         if (StrUtil.isBlank(request.getJobId())) {
             throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
         }
+        TradeLogisticsPrintTaskDO task = taskMapper.selectByJobIdForUpdate(request.getJobId());
+        if (task == null || !device.getId().equals(task.getDeviceId())
+                || !Objects.equals(task.getMerchantId(), device.getMerchantId())) {
+            throw exception(LOGISTICS_PRINT_TASK_NOT_EXISTS);
+        }
         if (eventMapper.selectByEventId(request.getEventId()) != null) {
             return null;
-        }
-        TradeLogisticsPrintTaskDO task = taskMapper.selectByJobIdForUpdate(request.getJobId());
-        if (task == null || !device.getId().equals(task.getDeviceId())) {
-            throw exception(LOGISTICS_PRINT_TASK_NOT_EXISTS);
         }
         LogisticsPrintTaskStatusEnum next = parseRemoteStatus(request.getStatus());
         LogisticsPrintTaskStatusEnum current = LogisticsPrintTaskStatusEnum.valueOf(task.getStatus());
@@ -213,8 +225,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
         return task;
     }
 
-    private void deliver(TradeLogisticsPrintTaskDO task) {
-        TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(task.getWaybillId());
+    private void deliver(TradeLogisticsWaybillDO waybill) {
         if (waybill == null) {
             throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
         }
@@ -245,15 +256,30 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
     }
 
     private boolean compensateDeliveredOrder(TradeLogisticsPrintTaskDO task) {
-        TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(task.getWaybillId());
-        if (waybill == null || "DELIVERED".equals(waybill.getDeliveryStatus()) || Boolean.TRUE.equals(task.getTestFlag())) {
+        if (Boolean.TRUE.equals(task.getTestFlag())) {
             return false;
         }
-        TradeOrderDO order = orderMapper.selectByIdForUpdate(waybill.getOrderId());
-        if (order != null && TradeOrderStatusEnum.isDelivered(order.getStatus())) {
-            if (waybill.getWaybillNo().equals(order.getLogisticsNo())) {
+        TradeOrderDO order = orderMapper.selectByIdForUpdate(task.getOrderId());
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByIdForUpdate(task.getWaybillId());
+        if (waybill == null || "DELIVERED".equals(waybill.getDeliveryStatus())) {
+            return false;
+        }
+        Integer status = order == null ? null : order.getStatus();
+        String logisticsNo = order == null ? null : order.getLogisticsNo();
+        LocalDateTime deliveredAt = order == null ? null : order.getDeliveryTime();
+        if (waybill.getSubOrderId() != null) {
+            TradeOrderSubDO subOrder = subOrderMapper.selectByIdAndMerchantId(waybill.getSubOrderId(), waybill.getMerchantId());
+            if (subOrder == null || !Objects.equals(subOrder.getOrderId(), waybill.getOrderId())) {
+                throw exception(LOGISTICS_WAYBILL_NOT_EXISTS);
+            }
+            status = subOrder.getStatus();
+            logisticsNo = subOrder.getLogisticsNo();
+            deliveredAt = subOrder.getDeliveryTime();
+        }
+        if (TradeOrderStatusEnum.isDelivered(status) || deliveredAt != null) {
+            if (waybill.getWaybillNo().equals(logisticsNo)) {
                 waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
-                        .setDeliveryStatus("DELIVERED").setDeliveredTime(order.getDeliveryTime()));
+                        .setDeliveryStatus("DELIVERED").setDeliveredTime(deliveredAt));
                 return true;
             }
             waybillMapper.updateById(new TradeLogisticsWaybillDO().setId(waybill.getId())
@@ -261,7 +287,7 @@ public class LogisticsPrintBridgeServiceImpl implements LogisticsPrintBridgeServ
                     .setErrorMessage("订单已使用其他运单号发货，需人工处理"));
             return false;
         }
-        deliver(task);
+        deliver(waybill);
         return true;
     }
 

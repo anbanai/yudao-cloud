@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.admin.logistics;
 
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.*;
@@ -11,9 +12,7 @@ import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +37,7 @@ public class SfPrintBridgeLogisticsController {
     }
 
     @PostMapping("/accounts")
+    @ApiAccessLog(requestEnable = false)
     @PreAuthorize("@ss.hasPermission('trade:logistics:sf-account:update')")
     public CommonResult<Long> saveAccount(@Valid @RequestBody SfLogisticsAccountSaveReqVO request) {
         return success(managementService.saveAccount(request));
@@ -47,30 +47,6 @@ public class SfPrintBridgeLogisticsController {
     @PreAuthorize("@ss.hasPermission('trade:logistics:device:query')")
     public CommonResult<List<LogisticsPrintDeviceRespVO>> getDevices() {
         return success(managementService.getDevices());
-    }
-
-    @PostMapping("/devices")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:device:update')")
-    public CommonResult<LogisticsPrintDeviceRespVO> saveDevice(
-            @Valid @RequestBody LogisticsPrintDeviceSaveReqVO request) {
-        return success(managementService.saveDevice(request));
-    }
-
-    @PostMapping("/devices/enroll")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:device:update')")
-    public CommonResult<LogisticsPrintDeviceRespVO> enrollDevice(HttpServletResponse response) {
-        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        return success(managementService.enrollDevice());
-    }
-
-    @PostMapping("/diagnostics/test-payload")
-    @Operation(summary = "创建只用于浏览器 JSSDK 测试打印的短时效标签")
-    @PreAuthorize("@ss.hasPermission('trade:logistics:diagnostics')")
-    public CommonResult<String> createDiagnosticPayload(
-            @Valid @RequestBody(required = false) LogisticsDiagnosticPayloadReqVO request) {
-        LogisticsDiagnosticPayloadReqVO effective = request == null ? new LogisticsDiagnosticPayloadReqVO() : request;
-        return success(managementService.createDiagnosticPayload(effective.getPaperWidthMm(),
-                effective.getPaperHeightMm()));
     }
 
     @PostMapping("/waybills/create")
@@ -102,7 +78,7 @@ public class SfPrintBridgeLogisticsController {
             for (TradeOrderSubDO subOrder : undeliveredSubOrders) {
                 try {
                     result.add(waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(orderId)
-                            .setSubOrderId(subOrder.getId()).setAccountId(request.getAccountId()).setDeviceId(request.getDeviceId())));
+                            .setSubOrderId(subOrder.getId()).setAccountId(request.getAccountId())));
                 } catch (ServiceException exception) {
                     result.add(new LogisticsWaybillRespVO().setOrderId(orderId).setSubOrderId(subOrder.getId())
                             .setMerchantId(subOrder.getMerchantId()).setMerchantName(subOrder.getMerchantName())

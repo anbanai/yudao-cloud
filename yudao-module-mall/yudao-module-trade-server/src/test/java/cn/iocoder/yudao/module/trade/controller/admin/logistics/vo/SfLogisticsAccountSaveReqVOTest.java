@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.admin.logistics.vo;
 
+import cn.iocoder.yudao.module.trade.controller.merchant.logistics.vo.MerchantSfLogisticsConfigSaveReqVO;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -40,27 +41,16 @@ class SfLogisticsAccountSaveReqVOTest {
     }
 
     @Test
-    void validateRejectsUnsupportedPaperOrDpi() {
-        assertThat(validator.validate(validRequest().setPaperWidthMm(80))).isNotEmpty();
-        assertThat(validator.validate(validRequest().setPaperHeightMm(100))).isNotEmpty();
-        assertThat(validator.validate(validRequest().setPaperWidthMm(76).setPaperHeightMm(150))).isNotEmpty();
-        assertThat(validator.validate(validRequest().setPaperWidthMm(100).setPaperHeightMm(130))).isNotEmpty();
-        assertHasViolation(validRequest().setDpi(300), "dpi");
+    void platformAccountCanBeCreatedWithCredentialsOnly() {
+        assertThat(validator.validate(new SfLogisticsAccountSaveReqVO()
+                .setPartnerId("sf-partner").setCheckWord("secret"))).isEmpty();
     }
 
-    @Test
-    void validateAcceptsSupportedPrintSpecifications() {
-        assertThat(validator.validate(validRequest().setPaperWidthMm(76).setPaperHeightMm(130))).isEmpty();
-        assertThat(validator.validate(validRequest().setPaperWidthMm(100).setPaperHeightMm(150))).isEmpty();
-    }
-
-    private static SfLogisticsAccountSaveReqVO validRequest() {
-        return new SfLogisticsAccountSaveReqVO().setName("顺丰月结账号").setServiceCode("1")
+    private static MerchantSfLogisticsConfigSaveReqVO validRequest() {
+        return new MerchantSfLogisticsConfigSaveReqVO().setServiceCode("1").setDefaultWeightKg(BigDecimal.ONE)
                 .setSenderName("仓库").setSenderPhone("13800138000")
-                .setSenderProvince("四川省").setSenderCity("成都市").setSenderAddress("高新区 1 号")
-                .setDefaultWeightKg(BigDecimal.ONE).setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203);
+                .setSenderProvince("四川省").setSenderCity("成都市").setSenderAddress("高新区 1 号");
     }
-
     private static void assertHasViolation(Object target, String field) {
         Set<? extends ConstraintViolation<?>> violations = validator.validate(target);
         assertThat(violations).anyMatch(violation -> violation.getPropertyPath().toString().equals(field));

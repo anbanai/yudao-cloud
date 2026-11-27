@@ -30,9 +30,18 @@ public class SystemMerchantUserApiImpl implements SystemMerchantUserApi {
 
     @Override
     @TenantIgnore
-    public CommonResult<Boolean> canBindMerchant(Long userId, Long merchantId) {
+    public CommonResult<Boolean> bindApprovedMerchant(Long userId, Long merchantId, Long merchantTenantId) {
+        merchantUserService.bindApprovedMerchant(userId, merchantId, merchantTenantId);
+        return success(true);
+    }
+
+    @Override
+    @TenantIgnore
+    public CommonResult<Boolean> canBindMerchant(Long userId, Long merchantId, Long merchantTenantId) {
         var user = merchantUserService.getUser(userId);
         return success(user != null && cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.isEnable(user.getStatus())
+                && (merchantTenantId == null || Long.valueOf(0).equals(user.getTenantId())
+                || merchantTenantId.equals(user.getTenantId()))
                 && merchantId != null && (user.getMerchantId() == null || merchantId.equals(user.getMerchantId())));
     }
 

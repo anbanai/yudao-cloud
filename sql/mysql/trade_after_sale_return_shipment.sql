@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS `trade_after_sale_return_shipment` (
   `after_sale_id` bigint NOT NULL COMMENT '售后单编号',
   `merchant_id` bigint DEFAULT NULL COMMENT '商家编号',
   `account_id` bigint DEFAULT NULL COMMENT '物流账号编号',
+  `service_code` varchar(32) DEFAULT NULL,
+  `monthly_card` varchar(512) DEFAULT NULL,
   `provider` varchar(32) NOT NULL COMMENT '服务商',
   `provider_order_no` varchar(64) DEFAULT NULL COMMENT '服务商订单号',
   `waybill_no` varchar(64) DEFAULT NULL COMMENT '运单号',
@@ -22,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `trade_after_sale_return_shipment` (
   `warehouse_province` varchar(64) DEFAULT NULL COMMENT '退货仓省份快照',
   `warehouse_city` varchar(64) DEFAULT NULL COMMENT '退货仓城市快照',
   `warehouse_district` varchar(64) DEFAULT NULL COMMENT '退货仓区县快照',
-  `warehouse_address` varchar(255) DEFAULT NULL COMMENT '退货仓地址快照',
+  `warehouse_address` varchar(512) DEFAULT NULL COMMENT '退货仓地址快照',
   `appointment_time` datetime DEFAULT NULL,
   `package_weight` decimal(10,2) DEFAULT NULL,
   `fee_payer` varchar(32) DEFAULT NULL,
@@ -90,3 +92,44 @@ SET @return_shipment_add_tenant_idempotency_sql := IF(@return_shipment_tenant_id
 PREPARE return_shipment_add_tenant_idempotency_stmt FROM @return_shipment_add_tenant_idempotency_sql;
 EXECUTE return_shipment_add_tenant_idempotency_stmt;
 DEALLOCATE PREPARE return_shipment_add_tenant_idempotency_stmt;
+
+-- 为历史预约保留原收件地址，新预约同时保存产品和加密月结卡。
+SET @sf_ddl = IF(EXISTS (SELECT 1 FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'trade_after_sale_return_shipment' AND column_name = 'merchant_id'),
+  'SELECT 1', 'ALTER TABLE `trade_after_sale_return_shipment` ADD COLUMN `merchant_id` bigint DEFAULT NULL');
+PREPARE sf_stmt FROM @sf_ddl;
+EXECUTE sf_stmt;
+DEALLOCATE PREPARE sf_stmt;
+SET @sf_ddl = IF(EXISTS (SELECT 1 FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'trade_after_sale_return_shipment' AND column_name = 'service_code'),
+  'SELECT 1', 'ALTER TABLE `trade_after_sale_return_shipment` ADD COLUMN `service_code` varchar(32) DEFAULT NULL');
+PREPARE sf_stmt FROM @sf_ddl;
+EXECUTE sf_stmt;
+DEALLOCATE PREPARE sf_stmt;
+SET @sf_ddl = IF(EXISTS (SELECT 1 FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'trade_after_sale_return_shipment' AND column_name = 'monthly_card'),
+  'SELECT 1', 'ALTER TABLE `trade_after_sale_return_shipment` ADD COLUMN `monthly_card` varchar(512) DEFAULT NULL');
+PREPARE sf_stmt FROM @sf_ddl;
+EXECUTE sf_stmt;
+DEALLOCATE PREPARE sf_stmt;
+ALTER TABLE `trade_after_sale_return_shipment` MODIFY COLUMN `warehouse_address` varchar(512) DEFAULT NULL COMMENT '退货仓地址快照';
+
+-- 多商家拆单脚本可能稍后才安装。再次执行时按已落库的订单关系补回旧预约的商家。
+SET @sf_return_owner_sql = IF(
+  EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'trade_after_sale')
+  AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'trade_order_sub')
+  AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()
+       AND table_name = 'trade_order_item' AND column_name IN ('sub_order_id', 'merchant_id')) = 2,
+  'UPDATE trade_after_sale_return_shipment r
+   JOIN trade_after_sale a ON a.id = r.after_sale_id AND a.tenant_id = r.tenant_id AND a.deleted = 0
+   JOIN trade_order_item i ON i.id = a.order_item_id AND i.order_id = a.order_id
+                          AND i.tenant_id = r.tenant_id AND i.deleted = 0
+   JOIN trade_order_sub s ON s.id = i.sub_order_id AND s.order_id = a.order_id
+                         AND s.tenant_id = r.tenant_id AND s.deleted = 0
+   SET r.merchant_id = s.merchant_id
+   WHERE r.merchant_id IS NULL AND r.deleted = 0 AND s.merchant_id > 0
+     AND (i.merchant_id IS NULL OR i.merchant_id = s.merchant_id)',
+  'SELECT 1');
+PREPARE sf_return_owner_stmt FROM @sf_return_owner_sql;
+EXECUTE sf_return_owner_stmt;
+DEALLOCATE PREPARE sf_return_owner_stmt;

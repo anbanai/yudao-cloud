@@ -2,9 +2,11 @@ package cn.iocoder.yudao.module.system.service.merchant;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
 import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.logger.dto.LoginLogCreateReqDTO;
 import cn.iocoder.yudao.module.system.controller.merchant.auth.vo.MerchantAuthLoginReqVO;
 import cn.iocoder.yudao.module.system.controller.merchant.auth.vo.MerchantAuthLoginRespVO;
@@ -19,8 +21,11 @@ import cn.iocoder.yudao.module.system.enums.oauth2.OAuth2ClientConstants;
 import cn.iocoder.yudao.module.system.service.logger.LoginLogService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.AUTH_LOGIN_BAD_CREDENTIALS;
@@ -28,6 +33,9 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.AUTH_LOGIN
 
 @Service
 public class MerchantAuthServiceImpl implements MerchantAuthService {
+
+    @Value("${yudao.tenant.enable:true}")
+    private boolean tenantEnabled = true;
 
     @Resource
     private MerchantUserService merchantUserService;
@@ -40,7 +48,7 @@ public class MerchantAuthServiceImpl implements MerchantAuthService {
     @Transactional(rollbackFor = Exception.class)
     public MerchantAuthLoginRespVO register(MerchantAuthRegisterReqVO reqVO) {
         MerchantUserDO user = merchantUserService.registerUser(reqVO);
-        return createTokenAfterLoginSuccess(user, reqVO.getUsername());
+        return createTokenAfterLoginSuccess(merchantUserService.getUser(user.getId()), reqVO.getUsername());
     }
 
     @Override
@@ -62,6 +70,11 @@ public class MerchantAuthServiceImpl implements MerchantAuthService {
         OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.refreshAccessToken(refreshToken,
                 OAuth2ClientConstants.CLIENT_ID_DEFAULT, UserTypeEnum.MERCHANT.getValue());
         MerchantUserDO user = merchantUserService.getUser(accessTokenDO.getUserId());
+        if (tenantEnabled && user != null && !Objects.equals(
+                assignedTenant(user.getTenantId()), assignedTenant(accessTokenDO.getTenantId()))) {
+            oauth2TokenService.removeAccessToken(accessTokenDO.getAccessToken());
+            throw exception(GlobalErrorCodeConstants.UNAUTHORIZED);
+        }
         return toLoginResp(accessTokenDO, user);
     }
 
@@ -93,10 +106,31 @@ public class MerchantAuthServiceImpl implements MerchantAuthService {
     }
 
     private MerchantAuthLoginRespVO createTokenAfterLoginSuccess(MerchantUserDO user, String username) {
+        if (!tenantEnabled) {
+            return issueLoginToken(user, username);
+        }
+        // 商家登录入口忽略租户，签发令牌时按账号归属写入访问令牌与刷新令牌。
+        Long previousTenant = TenantContextHolder.getTenantId();
+        boolean previousIgnore = TenantContextHolder.isIgnore();
+        try {
+            Long tenantId = assignedTenant(user.getTenantId());
+            TenantContextHolder.setTenantId(tenantId);
+            TenantContextHolder.setIgnore(tenantId == null);
+            return issueLoginToken(user, username);
+        } finally {
+            TenantContextHolder.setTenantId(previousTenant);
+            TenantContextHolder.setIgnore(previousIgnore);
+        }
+    }
+
+    private static Long assignedTenant(Long tenantId) {
+        return tenantId != null && tenantId > 0 ? tenantId : null;
+    }
+
+    private MerchantAuthLoginRespVO issueLoginToken(MerchantUserDO user, String username) {
         createLoginLog(user, username, LoginResultEnum.SUCCESS);
         OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.createAccessToken(user.getId(),
                 UserTypeEnum.MERCHANT.getValue(), OAuth2ClientConstants.CLIENT_ID_DEFAULT, null);
-        user = merchantUserService.getUser(user.getId());
         return toLoginResp(accessTokenDO, user);
     }
 

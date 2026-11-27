@@ -116,7 +116,7 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
     private ObjectNode buildRequest(TradeLogisticsAccountDO account, AfterSaleReturnShipmentDO shipment) {
         ObjectNode request = JsonNodeFactory.instance.objectNode().put("language", "zh-CN")
                 .put("orderId", shipment.getProviderOrderNo()).put("monthlyCard", resolveMonthlyCard(shipment))
-                .put("expressTypeId", resolveExpressTypeId(account)).put("payMethod", 1)
+                .put("expressTypeId", resolveExpressTypeId(shipment, account)).put("payMethod", 1)
                 .put("parcelQty", 1).put("totalWeight", shipment.getPackageWeight().doubleValue());
         ArrayNode contacts = request.putArray("contactInfoList");
         contacts.add(contact(1, shipment.getPickupName(), shipment.getPickupMobile(), shipment.getPickupProvince(),
@@ -131,6 +131,8 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
     }
 
     private String resolveMonthlyCard(AfterSaleReturnShipmentDO shipment) {
+        if (StrUtil.isNotBlank(shipment.getMonthlyCard())) return shipment.getMonthlyCard();
+        // 历史预约单没有结算卡快照，沿用预约所属商家的卡号。
         var config = shipment.getMerchantId() == null ? null
                 : merchantLogisticsConfigMapper.selectByMerchantId(shipment.getMerchantId());
         if (config == null || StrUtil.isBlank(config.getMonthlyCard())) {
@@ -146,8 +148,9 @@ public class SfReturnShipmentProvider implements ReturnShipmentProvider {
                 .put("county", district).put("address", address);
     }
 
-    private int resolveExpressTypeId(TradeLogisticsAccountDO account) {
-        String value = StrUtil.blankToDefault(returnShipmentExpressTypeId, account.getServiceCode());
+    private int resolveExpressTypeId(AfterSaleReturnShipmentDO shipment, TradeLogisticsAccountDO account) {
+        String value = StrUtil.blankToDefault(shipment.getServiceCode(),
+                StrUtil.blankToDefault(returnShipmentExpressTypeId, account.getServiceCode()));
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException exception) {

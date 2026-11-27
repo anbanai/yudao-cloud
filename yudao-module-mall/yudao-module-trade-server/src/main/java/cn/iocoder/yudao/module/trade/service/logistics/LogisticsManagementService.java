@@ -8,7 +8,8 @@ public interface LogisticsManagementService {
     List<SfLogisticsAccountRespVO> getAccounts();
     Long saveAccount(SfLogisticsAccountSaveReqVO request);
     List<LogisticsPrintDeviceRespVO> getDevices();
-    LogisticsPrintDeviceRespVO saveDevice(LogisticsPrintDeviceSaveReqVO request);
-    LogisticsPrintDeviceRespVO enrollDevice();
-    String createDiagnosticPayload(int paperWidthMm, int paperHeightMm);
+    LogisticsPrintDeviceRespVO saveDevice(Long merchantId, LogisticsPrintDeviceSaveReqVO request);
+    List<LogisticsPrintDeviceRespVO> getMerchantDevices(Long merchantId);
+    LogisticsPrintDeviceRespVO enrollDevice(Long merchantId);
+    LogisticsPrintTaskRespVO createTestPrint(Long merchantId, Long deviceId, int paperWidthMm, int paperHeightMm);
 }

@@ -510,7 +510,7 @@ class ProductMerchantApplicationServiceImplTest extends BaseDbUnitTest {
         var legacy = createApplication(merchant, "LEGACY", "历史待审", "LEGACY", 10);
         assertThatThrownBy(() -> applicationService.approve(legacy.getId(), 9001L))
                 .extracting("code").isEqualTo(MERCHANT_APPLICATION_STATUS_ERROR.getCode());
-        when(systemMerchantUserApi.canBindMerchant(2016L, merchant.getId())).thenReturn(CommonResult.success(true));
+        when(systemMerchantUserApi.canBindMerchant(2016L, merchant.getId(), null)).thenReturn(CommonResult.success(true));
         when(systemMerchantUserApi.bindMerchantId(2016L, merchant.getId())).thenReturn(CommonResult.success(true));
         applicationService.bindLegacyAccount(merchant.getId(), 2016L, 9001L);
         assertThat(merchantMapper.selectById(merchant.getId()).getStatus()).isEqualTo(30);
@@ -529,7 +529,7 @@ class ProductMerchantApplicationServiceImplTest extends BaseDbUnitTest {
     void legacy_bindingRejectsUnavailableOrAlreadyBoundAccount() {
         var merchant = createMerchant(null, 0);
         createApplication(merchant, "LEGACY", "历史草稿", "LEGACY", 0);
-        when(systemMerchantUserApi.canBindMerchant(2017L, merchant.getId())).thenReturn(CommonResult.success(false));
+        when(systemMerchantUserApi.canBindMerchant(2017L, merchant.getId(), null)).thenReturn(CommonResult.success(false));
         assertThatThrownBy(() -> applicationService.bindLegacyAccount(merchant.getId(), 2017L, 9001L)).isInstanceOf(RuntimeException.class);
         assertThat(merchantMapper.selectById(merchant.getId()).getOwnerAccountId()).isNull();
         assertThat(reviewRecordMapper.selectListByMerchantId(merchant.getId())).isEmpty();
@@ -555,6 +555,40 @@ class ProductMerchantApplicationServiceImplTest extends BaseDbUnitTest {
                 .doesNotContain("legacy.example.test");
         applicationService.reject(application.getId(), "请重新上传可核验的证件", 9001L);
         assertThat(merchantMapper.selectById(merchant.getId()).getStatus()).isEqualTo(30);
+    }
+
+    @Test
+    void approveAssignsPersistedMerchantTenantAndRollsBackFailure() {
+        ProductMerchantDO merchant = createMerchant(2022L, ProductMerchantStatusEnum.PENDING.getStatus());
+        merchant.setTenantId(71L);
+        merchantMapper.updateById(merchant);
+        var application = createApplication(merchant, "RETAIL", "租户归属", "INITIAL", 10);
+        when(systemMerchantUserApi.bindApprovedMerchant(2022L, merchant.getId(), 71L))
+                .thenReturn(CommonResult.success(false), CommonResult.success(true));
+
+        assertThatThrownBy(() -> applicationService.approve(application.getId(), 9001L))
+                .extracting("code").isEqualTo(cn.iocoder.yudao.module.product.enums.ErrorCodeConstants
+                        .MERCHANT_IDENTITY_BIND_FAILED.getCode());
+        assertThat(merchantMapper.selectById(merchant.getId()).getStatus()).isEqualTo(10);
+        applicationService.approve(application.getId(), 9001L);
+        assertThat(merchantMapper.selectById(merchant.getId()).getStatus()).isEqualTo(20);
+    }
+
+    @Test
+    void linkApprovedLegacyMerchantAssignsItsPersistedTenant() {
+        ProductMerchantDO merchant = createMerchant(null, ProductMerchantStatusEnum.APPROVED.getStatus());
+        merchant.setTenantId(71L);
+        merchantMapper.updateById(merchant);
+        createApplication(merchant, "LEGACY", "已审核历史商家", "LEGACY", 20);
+        when(systemMerchantUserApi.canBindMerchant(2022L, merchant.getId(), 71L))
+                .thenReturn(CommonResult.success(true));
+        when(systemMerchantUserApi.bindApprovedMerchant(2022L, merchant.getId(), 71L))
+                .thenReturn(CommonResult.success(true));
+
+        applicationService.bindLegacyAccount(merchant.getId(), 2022L, 9001L);
+
+        assertThat(merchantMapper.selectById(merchant.getId()).getOwnerAccountId()).isEqualTo(2022L);
+        verify(systemMerchantUserApi).bindApprovedMerchant(2022L, merchant.getId(), 71L);
     }
 
     private ProductMerchantDO createMerchant(Long ownerAccountId, Integer status) {

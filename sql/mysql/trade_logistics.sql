@@ -9,18 +9,18 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_account` (
   `endpoint` varchar(255) NOT NULL,
   `partner_id` varchar(512) NOT NULL COMMENT '加密保存',
   `check_word` varchar(512) NOT NULL COMMENT '加密保存',
-  `service_code` varchar(32) NOT NULL COMMENT '顺丰产品类型编号',
-  `template_code` varchar(64) NOT NULL COMMENT '顺丰云打印模板代码（必须与纸张规格匹配）',
-  `sender_name` varchar(64) NOT NULL,
-  `sender_phone` varchar(32) NOT NULL,
-  `sender_province` varchar(64) NOT NULL,
-  `sender_city` varchar(64) NOT NULL,
+  `service_code` varchar(32) DEFAULT NULL,
+  `template_code` varchar(64) DEFAULT NULL,
+  `sender_name` varchar(64) DEFAULT NULL,
+  `sender_phone` varchar(32) DEFAULT NULL,
+  `sender_province` varchar(64) DEFAULT NULL,
+  `sender_city` varchar(64) DEFAULT NULL,
   `sender_district` varchar(64) DEFAULT NULL,
-  `sender_address` varchar(512) NOT NULL,
-  `default_weight_kg` decimal(10,3) NOT NULL,
-  `paper_width_mm` int NOT NULL DEFAULT 76,
-  `paper_height_mm` int NOT NULL DEFAULT 130,
-  `dpi` int NOT NULL DEFAULT 203,
+  `sender_address` varchar(512) DEFAULT NULL,
+  `default_weight_kg` decimal(10,3) DEFAULT NULL,
+  `paper_width_mm` int DEFAULT NULL,
+  `paper_height_mm` int DEFAULT NULL,
+  `dpi` int DEFAULT NULL,
   `default_flag` bit(1) NOT NULL DEFAULT b'0',
   `status` tinyint NOT NULL DEFAULT 0,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -35,6 +35,24 @@ CREATE TABLE IF NOT EXISTS `trade_merchant_logistics_config` (
   `tenant_id` bigint NOT NULL DEFAULT 0,
   `merchant_id` bigint NOT NULL COMMENT '商家编号',
   `monthly_card` varchar(512) NOT NULL COMMENT '顺丰月结卡，加密保存',
+  `service_code` varchar(32) DEFAULT NULL,
+  `default_weight_kg` decimal(10,3) DEFAULT NULL,
+  `paper_width_mm` int DEFAULT NULL,
+  `paper_height_mm` int DEFAULT NULL,
+  `dpi` int DEFAULT NULL,
+  `sender_name` varchar(64) DEFAULT NULL,
+  `sender_phone` varchar(32) DEFAULT NULL,
+  `sender_province` varchar(64) DEFAULT NULL,
+  `sender_city` varchar(64) DEFAULT NULL,
+  `sender_district` varchar(64) DEFAULT NULL,
+  `sender_address` varchar(512) DEFAULT NULL,
+  `return_same_as_sender` bit(1) NOT NULL DEFAULT b'1',
+  `return_name` varchar(64) DEFAULT NULL,
+  `return_phone` varchar(32) DEFAULT NULL,
+  `return_province` varchar(64) DEFAULT NULL,
+  `return_city` varchar(64) DEFAULT NULL,
+  `return_district` varchar(64) DEFAULT NULL,
+  `return_address` varchar(512) DEFAULT NULL,
   `creator` varchar(64) DEFAULT '',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '',
@@ -74,6 +92,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `last_sync_time` datetime DEFAULT NULL,
   `delivered_time` datetime DEFAULT NULL,
   `cancelled_time` datetime DEFAULT NULL,
+  `create_request_snapshot` mediumtext DEFAULT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
@@ -98,13 +117,14 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_device` (
   `last_poll_time` datetime DEFAULT NULL,
   `token_created_time` datetime NOT NULL,
   `disabled_time` datetime DEFAULT NULL,
+  `merchant_id` bigint DEFAULT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_logistics_device_code` (`tenant_id`,`device_code`,`deleted`),
+  UNIQUE KEY `uk_logistics_device_code` (`tenant_id`,`merchant_id`,`device_code`,`deleted`),
   UNIQUE KEY `uk_logistics_device_token` (`token_hash`),
-  UNIQUE KEY `uk_logistics_device_enrollment` (`tenant_id`,`enrollment_key`)
+  UNIQUE KEY `uk_logistics_device_enrollment` (`tenant_id`,`merchant_id`,`enrollment_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='PrintBridge 设备';
 
 -- 兼容已执行旧版脚本的数据库。
@@ -138,21 +158,6 @@ PREPARE logistics_enrollment_key_stmt FROM @logistics_enrollment_key_sql;
 EXECUTE logistics_enrollment_key_stmt;
 DEALLOCATE PREPARE logistics_enrollment_key_stmt;
 
-SET @logistics_enrollment_index_count = (
-  SELECT COUNT(*) FROM `information_schema`.`statistics`
-  WHERE `table_schema` = DATABASE()
-    AND `table_name` = 'trade_logistics_print_device'
-    AND `index_name` = 'uk_logistics_device_enrollment'
-);
-SET @logistics_enrollment_index_sql = IF(
-  @logistics_enrollment_index_count = 0,
-  'ALTER TABLE `trade_logistics_print_device` ADD UNIQUE KEY `uk_logistics_device_enrollment` (`tenant_id`,`enrollment_key`)',
-  'SELECT 1'
-);
-PREPARE logistics_enrollment_index_stmt FROM @logistics_enrollment_index_sql;
-EXECUTE logistics_enrollment_index_stmt;
-DEALLOCATE PREPARE logistics_enrollment_index_stmt;
-
 CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `tenant_id` bigint NOT NULL DEFAULT 0,
@@ -176,6 +181,7 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   `accepted_time` datetime DEFAULT NULL,
   `completed_time` datetime DEFAULT NULL,
   `last_error` varchar(1024) DEFAULT NULL,
+  `merchant_id` bigint DEFAULT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0',
@@ -185,6 +191,79 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_print_task` (
   KEY `idx_logistics_task_pull` (`tenant_id`,`device_id`,`status`,`lease_expire_time`),
   KEY `idx_logistics_task_waybill` (`tenant_id`,`waybill_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='持久化打印任务';
+
+-- 已有接入凭证、月结卡与打印任务保留原归属。旧设备不自动分给商家。
+DROP PROCEDURE IF EXISTS `tmp_sf_add_column`;
+DELIMITER $$
+CREATE PROCEDURE `tmp_sf_add_column`(IN tbl varchar(64), IN col varchar(64), IN definition varchar(128))
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = tbl AND column_name = col) THEN
+    SET @sf_ddl = CONCAT('ALTER TABLE `', tbl, '` ADD COLUMN `', col, '` ', definition);
+    PREPARE sf_stmt FROM @sf_ddl;
+    EXECUTE sf_stmt;
+    DEALLOCATE PREPARE sf_stmt;
+  END IF;
+END$$
+DELIMITER ;
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'service_code', 'varchar(32)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'default_weight_kg', 'decimal(10,3)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'paper_width_mm', 'int');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'paper_height_mm', 'int');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'dpi', 'int');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'sender_name', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'sender_phone', 'varchar(32)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'sender_province', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'sender_city', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'sender_district', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'sender_address', 'varchar(512)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_same_as_sender', 'bit(1) NOT NULL DEFAULT b''1''');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_name', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_phone', 'varchar(32)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_province', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_city', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_district', 'varchar(64)');
+CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_address', 'varchar(512)');
+CALL `tmp_sf_add_column`('trade_logistics_waybill', 'create_request_snapshot', 'mediumtext');
+CALL `tmp_sf_add_column`('trade_logistics_print_device', 'merchant_id', 'bigint');
+CALL `tmp_sf_add_column`('trade_logistics_print_task', 'merchant_id', 'bigint');
+DROP PROCEDURE `tmp_sf_add_column`;
+
+ALTER TABLE `trade_logistics_account`
+  MODIFY COLUMN `service_code` varchar(32) DEFAULT NULL,
+  MODIFY COLUMN `template_code` varchar(64) DEFAULT NULL,
+  MODIFY COLUMN `sender_name` varchar(64) DEFAULT NULL,
+  MODIFY COLUMN `sender_phone` varchar(32) DEFAULT NULL,
+  MODIFY COLUMN `sender_province` varchar(64) DEFAULT NULL,
+  MODIFY COLUMN `sender_city` varchar(64) DEFAULT NULL,
+  MODIFY COLUMN `sender_district` varchar(64) DEFAULT NULL,
+  MODIFY COLUMN `sender_address` varchar(512) DEFAULT NULL,
+  MODIFY COLUMN `default_weight_kg` decimal(10,3) DEFAULT NULL,
+  MODIFY COLUMN `paper_width_mm` int DEFAULT NULL,
+  MODIFY COLUMN `paper_height_mm` int DEFAULT NULL,
+  MODIFY COLUMN `dpi` int DEFAULT NULL;
+
+SET @sf_index_cols = (
+  SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) FROM information_schema.statistics
+  WHERE table_schema = DATABASE() AND table_name = 'trade_logistics_print_device' AND index_name = 'uk_logistics_device_code'
+);
+SET @sf_ddl = IF(@sf_index_cols = 'tenant_id,merchant_id,device_code,deleted', 'SELECT 1',
+  CONCAT('ALTER TABLE `trade_logistics_print_device` ', IF(@sf_index_cols IS NULL, '', 'DROP INDEX `uk_logistics_device_code`, '),
+         'ADD UNIQUE KEY `uk_logistics_device_code` (`tenant_id`,`merchant_id`,`device_code`,`deleted`)'));
+PREPARE sf_stmt FROM @sf_ddl;
+EXECUTE sf_stmt;
+DEALLOCATE PREPARE sf_stmt;
+
+SET @sf_index_cols = (
+  SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) FROM information_schema.statistics
+  WHERE table_schema = DATABASE() AND table_name = 'trade_logistics_print_device' AND index_name = 'uk_logistics_device_enrollment'
+);
+SET @sf_ddl = IF(@sf_index_cols = 'tenant_id,merchant_id,enrollment_key', 'SELECT 1',
+  CONCAT('ALTER TABLE `trade_logistics_print_device` ', IF(@sf_index_cols IS NULL, '', 'DROP INDEX `uk_logistics_device_enrollment`, '),
+         'ADD UNIQUE KEY `uk_logistics_device_enrollment` (`tenant_id`,`merchant_id`,`enrollment_key`)'));
+PREPARE sf_stmt FROM @sf_ddl;
+EXECUTE sf_stmt;
+DEALLOCATE PREPARE sf_stmt;
 
 -- 兼容已经执行过旧版脚本的数据库：保存文件编号后可始终按原存储配置签名。
 SET @logistics_waybill_label_file_id_count = (
@@ -290,11 +369,6 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_trace` (
   KEY `idx_logistics_trace_waybill` (`tenant_id`,`waybill_id`,`operate_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顺丰物流轨迹';
 
--- 兼容已经执行过旧版脚本的数据库：只修改新记录默认值，不更新已有账号和打印任务。
-ALTER TABLE `trade_logistics_account`
-  MODIFY COLUMN `template_code` varchar(64) NOT NULL COMMENT '顺丰云打印模板代码（必须与纸张规格匹配）',
-  MODIFY COLUMN `paper_width_mm` int NOT NULL DEFAULT 76,
-  MODIFY COLUMN `paper_height_mm` int NOT NULL DEFAULT 130;
 ALTER TABLE `trade_logistics_print_task`
   MODIFY COLUMN `paper_width_mm` int NOT NULL DEFAULT 76,
   MODIFY COLUMN `paper_height_mm` int NOT NULL DEFAULT 130;
@@ -354,13 +428,16 @@ WHERE `name`='顺丰轨迹同步' AND `permission`='trade:logistics:trace:sync' 
 
 INSERT INTO `system_menu` (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT p.name,'',2,p.sort,m.id,p.path,p.icon,p.component,p.component_name,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'
-FROM (SELECT '顺丰账号' name,1 sort,'accounts' path,'ep:key' icon,'mall/trade/logistics/sf/accounts/index' component,'TradeSfLogisticsAccounts' component_name
+FROM (SELECT '顺丰开放平台' name,1 sort,'accounts' path,'ep:key' icon,'mall/trade/logistics/sf/accounts/index' component,'TradeSfLogisticsAccounts' component_name
       UNION ALL SELECT '打印设备',2,'devices','ep:monitor','mall/trade/logistics/sf/devices/index','TradeSfLogisticsDevices'
       UNION ALL SELECT '运单管理',3,'waybills','ep:tickets','mall/trade/logistics/sf/waybills/index','TradeSfLogisticsWaybills'
       UNION ALL SELECT '打印任务',4,'tasks','ep:list','mall/trade/logistics/sf/tasks/index','TradeSfLogisticsTasks'
       UNION ALL SELECT '微信物流历史',5,'wechat-history','ep:clock','mall/trade/logistics/wechat/index','TradeWechatLogistics') p
 JOIN `system_menu` m ON m.name='物流打单' AND m.path='logistics' AND m.deleted=b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` x WHERE x.component=p.component AND x.deleted=b'0');
+
+UPDATE `system_menu` SET `name`='顺丰开放平台'
+WHERE `component`='mall/trade/logistics/sf/accounts/index' AND `name`='顺丰账号' AND `deleted`=b'0';
 
 -- 将旧工作台角色迁移到订单列表，只补充查看和顺丰打单所需的最小访问路径。
 INSERT INTO `system_role_menu`
@@ -395,7 +472,6 @@ SELECT p.name,p.permission,3,p.sort,m.id,'','','',NULL,0,b'1',b'1',b'1','1',NOW(
 FROM (SELECT '顺丰账号查询' name,'trade:logistics:sf-account:query' permission,1 sort
       UNION ALL SELECT '顺丰账号维护','trade:logistics:sf-account:update',2
       UNION ALL SELECT '商家顺丰月结卡查询','trade:logistics:merchant-config:query',3
-      UNION ALL SELECT '商家顺丰月结卡维护','trade:logistics:merchant-config:update',4
       UNION ALL SELECT '打印设备查询','trade:logistics:device:query',5
       UNION ALL SELECT '打印设备维护','trade:logistics:device:update',6
       UNION ALL SELECT '本机打印诊断','trade:logistics:diagnostics',7

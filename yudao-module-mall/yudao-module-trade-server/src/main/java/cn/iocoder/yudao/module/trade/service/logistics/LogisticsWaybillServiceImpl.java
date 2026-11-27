@@ -64,6 +64,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     @Resource private TradeLogisticsPrintTaskMapper taskMapper;
     @Resource private TradeLogisticsTraceMapper traceMapper;
     @Resource private SfLogisticsClient sfClient;
+    @Resource private SfLabelTemplateResolver templateResolver;
     @Resource private LogisticsLabelNormalizer labelNormalizer;
     @Resource private FileApi fileApi;
     @Resource private ProductSkuApi productSkuApi;
@@ -80,7 +81,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         }
         TradeLogisticsAccountDO account = preparation.account();
         if (preparation.newRecord() || LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus())) {
-            createRemoteWaybill(waybill, account, preparation.monthlyCard(), preparation.order());
+            createRemoteWaybill(waybill, account);
         } else if (List.of(LogisticsWaybillStatusEnum.CREATING.name(),
                 LogisticsWaybillStatusEnum.UNKNOWN.name()).contains(waybill.getStatus())) {
             queryRemoteWaybill(waybill, account);
@@ -96,61 +97,76 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         validateOrder(order);
         TradeOrderSubDO subOrder = validateSubOrder(order, request.getSubOrderId());
         Long merchantId = subOrder.getMerchantId();
-        String monthlyCard = merchantLogisticsConfigService.getRequiredMonthlyCard(merchantId);
         TradeWechatLogisticsWaybillDO wechatWaybill = wechatWaybillMapper.selectByOrderIdForUpdate(order.getId());
         if (wechatWaybill != null && List.of("CREATING", "CREATED", "UNKNOWN")
                 .contains(wechatWaybill.getStatus())) {
             throw exception(WECHAT_LOGISTICS_WAYBILL_ALREADY_EXISTS);
         }
-        TradeLogisticsAccountDO account = getAccount(request.getAccountId());
-        TradeLogisticsPrintDeviceDO device = getDevice(request.getDeviceId());
-        TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId(), request.getSubOrderId());
-        boolean newRecord = false;
-        if (waybill == null) {
-            String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId() + "-" + request.getSubOrderId();
-            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setMerchantId(merchantId).setOrderNo(order.getNo())
-                    .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
-                    .setRequestedDeviceId(device.getId())
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId(), subOrder.getId());
+        boolean newRecord = waybill == null || LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus());
+        if (newRecord) {
+            TradeLogisticsAccountDO account = getAccount(request.getAccountId());
+            TradeMerchantLogisticsConfigDO config = merchantLogisticsConfigService.getRequiredShippingConfig(merchantId);
+            TradeLogisticsPrintDeviceDO device = getDevice(merchantId, request.getDeviceId());
+            String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId() + "-"
+                    + (waybill == null ? subOrder.getId().toString() : IdUtil.fastSimpleUUID());
+            waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(subOrder.getId())
+                    .setMerchantId(merchantId).setOrderNo(order.getNo()).setAccountId(account.getId())
+                    .setLogisticsId(account.getLogisticsId()).setRequestedDeviceId(device.getId())
                     .setProviderOrderNo(providerOrderNo).setStatus(LogisticsWaybillStatusEnum.CREATING.name())
-                    .setDeliveryStatus("PENDING");
+                    .setDeliveryStatus("PENDING").setPaperWidthMm(config.getPaperWidthMm())
+                    .setPaperHeightMm(config.getPaperHeightMm()).setDpi(config.getDpi())
+                    .setTemplateCode(templateResolver.requireTemplate(account, config.getPaperWidthMm(),
+                            config.getPaperHeightMm(), config.getDpi()))
+                    .setCreateRequestSnapshot(buildCreateSnapshot(config, providerOrderNo, order, subOrder.getId()));
             waybillMapper.insert(waybill);
-            newRecord = true;
-        } else {
-            if (LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus())) {
-                String providerOrderNo = "YD-" + TenantContextHolder.getTenantId() + "-" + order.getId()
-                        + "-" + IdUtil.fastSimpleUUID();
-                waybill = new TradeLogisticsWaybillDO().setOrderId(order.getId()).setSubOrderId(request.getSubOrderId()).setMerchantId(merchantId).setOrderNo(order.getNo())
-                        .setAccountId(account.getId()).setLogisticsId(account.getLogisticsId())
-                        .setRequestedDeviceId(device.getId()).setProviderOrderNo(providerOrderNo)
-                        .setStatus(LogisticsWaybillStatusEnum.CREATING.name()).setDeliveryStatus("PENDING");
-                waybillMapper.insert(waybill);
-                newRecord = true;
-            } else {
-                TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillIdForUpdate(waybill.getId());
-                if (task != null) {
-                    if (LogisticsPrintTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
-                        TradeLogisticsPrintTaskDO retryTask = newTask(waybill, device);
-                        taskMapper.insert(retryTask);
-                        return new CreationPreparation(order, account, device, waybill, retryTask, false, false, monthlyCard);
-                    }
-                    return new CreationPreparation(order, account, device, waybill, task, false, true, monthlyCard);
-                }
-                account = getAccount(waybill.getAccountId());
-                monthlyCard = merchantLogisticsConfigService.getRequiredMonthlyCard(waybill.getMerchantId());
-            }
+            return new CreationPreparation(account, device, waybill, null, true, false);
         }
-        return new CreationPreparation(order, account, device, waybill, null, newRecord, false, monthlyCard);
+
+        TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillIdForUpdate(waybill.getId());
+        if (task != null && !LogisticsPrintTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
+            return new CreationPreparation(null, null, waybill, task, false, true);
+        }
+        boolean rebuildLegacyRequest = waybill.getCreateRequestSnapshot() == null
+                && LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus()) && task == null;
+        TradeLogisticsPrintDeviceDO device = rebuildLegacyRequest ? getDevice(merchantId, request.getDeviceId())
+                : getRetryDevice(waybill, merchantId, request.getDeviceId());
+        if (task != null) {
+            TradeLogisticsPrintTaskDO retryTask = newTask(waybill, device);
+            taskMapper.insert(retryTask);
+            return new CreationPreparation(null, device, waybill, retryTask, false, false);
+        }
+        TradeLogisticsAccountDO account = getAccount(waybill.getAccountId());
+        // 旧版本在面单生成成功后才保存纸张。只为已存在的运单补齐其原接入账号上的规格。
+        if (waybill.getPaperWidthMm() == null) {
+            waybill.setPaperWidthMm(account.getPaperWidthMm()).setPaperHeightMm(account.getPaperHeightMm())
+                    .setTemplateCode(account.getTemplateCode()).setDpi(account.getDpi());
+            waybillMapper.updateById(waybill);
+        }
+        if (rebuildLegacyRequest) {
+            // 已明确失败的旧运单没有请求快照。使用当前商家确认的完整设置重新准备请求。
+            TradeMerchantLogisticsConfigDO config = merchantLogisticsConfigService.getRequiredShippingConfig(merchantId);
+            waybill.setRequestedDeviceId(device.getId())
+                    .setCreateRequestSnapshot(buildCreateSnapshot(config, waybill.getProviderOrderNo(), order, subOrder.getId()))
+                    .setPaperWidthMm(config.getPaperWidthMm()).setPaperHeightMm(config.getPaperHeightMm())
+                    .setDpi(config.getDpi()).setTemplateCode(templateResolver.requireTemplate(account,
+                            config.getPaperWidthMm(), config.getPaperHeightMm(), config.getDpi()));
+            waybillMapper.updateById(waybill);
+        }
+        return new CreationPreparation(account, device, waybill, null, false, false);
     }
 
-    private void createRemoteWaybill(TradeLogisticsWaybillDO waybill, TradeLogisticsAccountDO account,
-                                     String monthlyCard,
-                                     TradeOrderDO order) {
+    private String buildCreateSnapshot(TradeMerchantLogisticsConfigDO config, String providerOrderNo,
+                                       TradeOrderDO order, Long subOrderId) {
+        List<TradeOrderItemDO> items = orderItemMapper.selectListBySubOrderId(subOrderId);
+        Map<Long, ProductSkuRespDTO> skus = items.isEmpty() ? Map.of()
+                : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId).collect(Collectors.toSet()));
+        return SfLogisticsClient.buildCreateRequest(config, providerOrderNo, order, items, skus).toString();
+    }
+
+    private void createRemoteWaybill(TradeLogisticsWaybillDO waybill, TradeLogisticsAccountDO account) {
         try {
-            List<TradeOrderItemDO> items = orderItemMapper.selectListBySubOrderId(waybill.getSubOrderId());
-            Map<Long, ProductSkuRespDTO> skuMap = items.isEmpty() ? Map.of()
-                    : productSkuApi.getSkuMap(items.stream().map(TradeOrderItemDO::getSkuId)
-                            .collect(Collectors.toSet()));
-            markCreated(waybill, sfClient.createWaybill(account, monthlyCard, waybill.getProviderOrderNo(), order, items, skuMap));
+            markCreated(waybill, sfClient.createWaybill(account, JsonUtils.parseTree(waybill.getCreateRequestSnapshot())));
         } catch (SfApiException exception) {
             updateFailure(waybill, exception);
         }
@@ -172,14 +188,14 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             if (privateStorage == null || !Boolean.TRUE.equals(privateStorage.getData())) {
                 throw exception(LOGISTICS_PRIVATE_STORAGE_REQUIRED);
             }
-            byte[] pdf = sfClient.getLabel(account, waybill.getWaybillNo());
-            byte[] png = labelNormalizer.normalizePdf(pdf, account.getPaperWidthMm(), account.getPaperHeightMm(),
-                    account.getDpi());
+            byte[] pdf = sfClient.getLabel(account, waybill.getWaybillNo(), waybill.getTemplateCode());
+            byte[] png = labelNormalizer.normalizePdf(pdf, waybill.getPaperWidthMm(), waybill.getPaperHeightMm(),
+                    waybill.getDpi());
             String checksum = DigestUtil.sha256Hex(png);
             Long tenantId = TenantContextHolder.getRequiredTenantId();
             FileCreateRespDTO labelFile = fileApi.createPrivateFile(png, waybill.getWaybillNo() + ".png",
                     "trade/logistics/" + tenantId + "/labels", "image/png");
-            return inTransaction(() -> persistLabelAndTask(waybill, account, device, labelFile,
+            return inTransaction(() -> persistLabelAndTask(waybill, device, labelFile,
                     checksum, png.length));
         } catch (RuntimeException exception) {
             inTransaction(() -> {
@@ -195,8 +211,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
     }
 
     private LogisticsWaybillRespVO persistLabelAndTask(TradeLogisticsWaybillDO waybill,
-                                                        TradeLogisticsAccountDO account,
-                                                        TradeLogisticsPrintDeviceDO device,
+                                                       TradeLogisticsPrintDeviceDO device,
                                                         FileCreateRespDTO labelFile, String checksum, int labelSize) {
         TradeLogisticsWaybillDO current = waybillMapper.selectByIdForUpdate(waybill.getId());
         if (current == null) current = waybill;
@@ -206,9 +221,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         }
         current.setLabelFileId(labelFile.getId()).setLabelUrl(labelFile.getUrl())
                 .setLabelContentType("image/png").setLabelChecksum(checksum)
-                .setLabelSize((long) labelSize).setTemplateCode(account.getTemplateCode())
-                .setPaperWidthMm(account.getPaperWidthMm()).setPaperHeightMm(account.getPaperHeightMm())
-                .setDpi(account.getDpi()).setErrorCode(null).setErrorMessage(null);
+                .setLabelSize((long) labelSize).setErrorCode(null).setErrorMessage(null);
         waybillMapper.updateById(current);
         TradeLogisticsPrintTaskDO task = newTask(current, device);
         taskMapper.insert(task);
@@ -248,7 +261,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                                                TradeLogisticsPrintDeviceDO device) {
         return new TradeLogisticsPrintTaskDO().setRequestId("REQ-" + IdUtil.fastSimpleUUID())
                 .setJobId("JOB-" + IdUtil.fastSimpleUUID()).setOrderId(waybill.getOrderId())
-                .setWaybillId(waybill.getId()).setDeviceId(device.getId())
+                .setWaybillId(waybill.getId()).setMerchantId(device.getMerchantId()).setDeviceId(device.getId())
                 .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name()).setFormat("image")
                 .setLabelFileId(waybill.getLabelFileId()).setLabelUrl(waybill.getLabelUrl())
                 .setChecksum(waybill.getLabelChecksum())
@@ -286,7 +299,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                 LogisticsPrintTaskStatusEnum.UNKNOWN.name()).contains(previous.getStatus())) {
             throw exception(LOGISTICS_PRINT_TASK_INVALID_STATE);
         }
-        TradeLogisticsPrintTaskDO task = newTask(waybill, getDevice(deviceId));
+        TradeLogisticsPrintTaskDO task = newTask(waybill, getRetryDevice(waybill, waybill.getMerchantId(), deviceId));
         taskMapper.insert(task);
         return toResp(waybill, task);
     }
@@ -422,22 +435,54 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         return account;
     }
 
-    private TradeLogisticsPrintDeviceDO getDevice(Long id) {
-        TradeLogisticsPrintDeviceDO device = id == null ? deviceMapper.selectDefaultEnabled() : deviceMapper.selectById(id);
+    private TradeLogisticsPrintDeviceDO getRetryDevice(TradeLogisticsWaybillDO waybill, Long merchantId, Long deviceId) {
+        Long originalId = waybill.getRequestedDeviceId();
+        if (originalId != null && (deviceId == null || originalId.equals(deviceId))) {
+            TradeLogisticsPrintDeviceDO original = deviceMapper.selectById(originalId);
+            if (original != null && (merchantId != null && merchantId.equals(original.getMerchantId())
+                    || waybill.getCreateRequestSnapshot() == null && original.getMerchantId() == null)) {
+                if (deviceId != null || merchantId == null || isReadyDevice(original)) {
+                    return requireReadyDevice(original);
+                }
+            }
+        }
+        return getDevice(merchantId, deviceId);
+    }
+
+    private TradeLogisticsPrintDeviceDO getDevice(Long merchantId, Long deviceId) {
+        if (merchantId == null) throw exception(LOGISTICS_DEVICE_NOT_EXISTS);
+        TradeLogisticsPrintDeviceDO device = deviceId == null ? deviceMapper.selectDefaultEnabled(merchantId)
+                : deviceMapper.selectByIdAndMerchantId(deviceId, merchantId);
+        if (deviceId == null && device == null) {
+            throw exception(LOGISTICS_CONFIGURATION_INVALID, "请在商家顺丰发货设置中绑定默认打印设备");
+        }
+        return requireReadyDevice(device);
+    }
+
+    private TradeLogisticsPrintDeviceDO requireReadyDevice(TradeLogisticsPrintDeviceDO device) {
         if (device == null || device.getStatus() == null || device.getStatus() != 0) {
             throw exception(LOGISTICS_DEVICE_NOT_EXISTS);
         }
-        if (StrUtil.isNotBlank(device.getEnrollmentKey())
-                || StrUtil.startWith(device.getDeviceCode(), "pending-") || StrUtil.isBlank(device.getPrinterName())) {
+        if (!isReadyDevice(device)) {
             throw exception(LOGISTICS_DEVICE_NOT_READY);
         }
         return device;
     }
 
+    private boolean isReadyDevice(TradeLogisticsPrintDeviceDO device) {
+        return Integer.valueOf(0).equals(device.getStatus()) && StrUtil.isBlank(device.getEnrollmentKey())
+                && !StrUtil.startWith(device.getDeviceCode(), "pending-") && StrUtil.isNotBlank(device.getPrinterName());
+    }
+
     private LogisticsWaybillRespVO toResp(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task) {
         TradeOrderSubDO subOrder = waybill.getSubOrderId() == null ? null : orderSubMapper.selectById(waybill.getSubOrderId());
-        String monthlyCardMasked = waybill.getMerchantId() == null ? null
-                : merchantLogisticsConfigService.get(waybill.getMerchantId()).getMonthlyCardMasked();
+        String monthlyCardMasked = null;
+        if (waybill.getCreateRequestSnapshot() != null) {
+            String card = JsonUtils.parseTree(waybill.getCreateRequestSnapshot()).path("monthlyCard").textValue();
+            if (StrUtil.isNotBlank(card)) {
+                monthlyCardMasked = card.length() > 4 ? "****" + StrUtil.subSuf(card, card.length() - 4) : "****";
+            }
+        }
         return new LogisticsWaybillRespVO().setId(waybill.getId()).setOrderId(waybill.getOrderId())
                 .setSubOrderId(waybill.getSubOrderId()).setMerchantId(waybill.getMerchantId())
                 .setMerchantName(subOrder == null ? null : subOrder.getMerchantName())
@@ -518,10 +563,9 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         return new TransactionTemplate(transactionManager).execute(status -> supplier.get());
     }
 
-    private record CreationPreparation(TradeOrderDO order, TradeLogisticsAccountDO account,
+    private record CreationPreparation(TradeLogisticsAccountDO account,
                                        TradeLogisticsPrintDeviceDO device, TradeLogisticsWaybillDO waybill,
-                                       TradeLogisticsPrintTaskDO task, boolean newRecord, boolean taskReused,
-                                       String monthlyCard) {
+                                       TradeLogisticsPrintTaskDO task, boolean newRecord, boolean taskReused) {
     }
 
     private record CancellationPreparation(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task,

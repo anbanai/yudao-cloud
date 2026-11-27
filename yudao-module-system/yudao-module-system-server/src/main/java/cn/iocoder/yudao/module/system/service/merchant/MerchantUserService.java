@@ -26,6 +26,8 @@ public interface MerchantUserService {
     void updateUserProfile(Long id, @Valid MerchantUserProfileUpdateReqVO reqVO);
 
     void bindMerchantId(Long userId, Long merchantId);
+    void bindApprovedMerchant(Long userId, Long merchantId, Long merchantTenantId);
+
     boolean isMerchantBindingValid(Long userId, Long merchantId);
 
     boolean isPasswordMatch(String rawPassword, String encodedPassword);

@@ -17,6 +17,7 @@ public class TradeLogisticsPrintTaskDO extends TenantBaseDO {
 
     @TableId
     private Long id;
+    private Long merchantId;
     private String requestId;
     private String jobId;
     private Long orderId;

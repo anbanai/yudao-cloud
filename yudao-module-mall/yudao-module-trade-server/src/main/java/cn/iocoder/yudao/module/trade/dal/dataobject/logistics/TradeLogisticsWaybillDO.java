@@ -1,17 +1,20 @@
 package cn.iocoder.yudao.module.trade.dal.dataobject.logistics;
 
+import cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import lombok.ToString;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
 
-@TableName("trade_logistics_waybill")
+@TableName(value = "trade_logistics_waybill", autoResultMap = true)
 @KeySequence("trade_logistics_waybill_seq")
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -36,6 +39,11 @@ public class TradeLogisticsWaybillDO extends TenantBaseDO {
     private String labelContentType;
     private String labelChecksum;
     private Long labelSize;
+    /** 首次建单使用的完整顺丰请求，含月结卡与寄收件信息，加密保存供重试使用。 */
+    @TableField(typeHandler = EncryptTypeHandler.class)
+    @ToString.Exclude
+    @JsonIgnore
+    private String createRequestSnapshot;
     private String templateCode;
     private Integer paperWidthMm;
     private Integer paperHeightMm;

@@ -19,8 +19,19 @@ public interface TradeLogisticsPrintDeviceMapper extends BaseMapperX<TradeLogist
                 .last("LIMIT 1"));
     }
 
-    default TradeLogisticsPrintDeviceDO selectDefaultEnabled() {
+    default TradeLogisticsPrintDeviceDO selectByIdAndMerchantId(Long id, Long merchantId) {
+        return selectOne(TradeLogisticsPrintDeviceDO::getId, id, TradeLogisticsPrintDeviceDO::getMerchantId, merchantId);
+    }
+
+    default List<TradeLogisticsPrintDeviceDO> selectListByMerchantId(Long merchantId) {
+        return selectList(new LambdaQueryWrapperX<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getMerchantId, merchantId)
+                .orderByDesc(TradeLogisticsPrintDeviceDO::getId));
+    }
+
+    default TradeLogisticsPrintDeviceDO selectDefaultEnabled(Long merchantId) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getMerchantId, merchantId)
                 .eq(TradeLogisticsPrintDeviceDO::getStatus, 0)
                 .eq(TradeLogisticsPrintDeviceDO::getDefaultFlag, true)
                 .last("LIMIT 1"));
@@ -30,22 +41,35 @@ public interface TradeLogisticsPrintDeviceMapper extends BaseMapperX<TradeLogist
         return selectList(new LambdaQueryWrapperX<TradeLogisticsPrintDeviceDO>().orderByDesc(TradeLogisticsPrintDeviceDO::getId));
     }
 
-    default TradeLogisticsPrintDeviceDO selectPendingEnrollmentForUpdate() {
+    default TradeLogisticsPrintDeviceDO selectPendingEnrollmentForUpdate(Long merchantId) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getMerchantId, merchantId)
                 .eq(TradeLogisticsPrintDeviceDO::getEnrollmentKey, "ACTIVE")
                 .last("LIMIT 1 FOR UPDATE"));
     }
 
-    default void clearDefault(Long exceptId) {
+    default void updateSettings(TradeLogisticsPrintDeviceDO device) {
         update(null, new LambdaUpdateWrapper<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getId, device.getId())
+                .eq(TradeLogisticsPrintDeviceDO::getMerchantId, device.getMerchantId())
+                .set(TradeLogisticsPrintDeviceDO::getPrinterName, device.getPrinterName())
+                .set(TradeLogisticsPrintDeviceDO::getStatus, device.getStatus())
+                .set(TradeLogisticsPrintDeviceDO::getDefaultFlag, device.getDefaultFlag()));
+    }
+
+    default void clearDefault(Long merchantId, Long exceptId) {
+        update(null, new LambdaUpdateWrapper<TradeLogisticsPrintDeviceDO>()
+                .eq(TradeLogisticsPrintDeviceDO::getMerchantId, merchantId)
                 .ne(exceptId != null, TradeLogisticsPrintDeviceDO::getId, exceptId)
                 .set(TradeLogisticsPrintDeviceDO::getDefaultFlag, false));
     }
 
     @TenantIgnore
-    default int bindPendingDevice(Long id, String deviceCode, String deviceName) {
+    default int bindPendingDevice(Long id, String tokenHash, String deviceCode, String deviceName) {
         return update(null, new LambdaUpdateWrapper<TradeLogisticsPrintDeviceDO>()
                 .eq(TradeLogisticsPrintDeviceDO::getId, id)
+                .eq(TradeLogisticsPrintDeviceDO::getTokenHash, tokenHash)
+                .eq(TradeLogisticsPrintDeviceDO::getStatus, 0)
                 .eq(TradeLogisticsPrintDeviceDO::getEnrollmentKey, "ACTIVE")
                 .set(TradeLogisticsPrintDeviceDO::getDeviceCode, deviceCode)
                 .set(TradeLogisticsPrintDeviceDO::getDeviceName, deviceName)

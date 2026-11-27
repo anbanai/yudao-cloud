@@ -23,7 +23,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Tag(name = "商家端 - 顺丰打单")
 @RestController
 @RequestMapping("/trade/merchant/logistics/sf/waybill")
-@PreAuthorize("denyAll()")
+@PreAuthorize("isAuthenticated()")
 @Validated
 public class MerchantSfWaybillController {
 

@@ -15,6 +15,11 @@ public interface MerchantUserMapper extends BaseMapperX<MerchantUserDO> {
             + "WHERE id = #{userId} AND merchant_id IS NULL")
     int bindMerchantIdIfUnbound(Long userId, Long merchantId);
 
+    default MerchantUserDO selectByIdForUpdate(Long userId) {
+        return selectOne(new LambdaQueryWrapperX<MerchantUserDO>().eq(MerchantUserDO::getId, userId)
+                .last("FOR UPDATE"));
+    }
+
     default PageResult<MerchantUserDO> selectPage(MerchantUserPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<MerchantUserDO>()
                 .likeIfPresent(MerchantUserDO::getUsername, reqVO.getUsername())

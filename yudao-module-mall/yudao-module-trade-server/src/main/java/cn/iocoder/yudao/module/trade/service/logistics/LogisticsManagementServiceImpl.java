@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.trade.service.logistics;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.DigestUtil;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
@@ -12,6 +14,9 @@ import cn.iocoder.yudao.module.trade.dal.mysql.delivery.DeliveryExpressMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsAccountMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsPrintDeviceMapper;
 import cn.iocoder.yudao.module.trade.enums.logistics.SfLabelSpec;
+import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
+import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintTaskDO;
+import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsPrintTaskMapper;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,13 +46,12 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
     @Resource private TradeLogisticsPrintDeviceMapper deviceMapper;
     @Resource private DeliveryExpressMapper expressMapper;
     @Resource private FileApi fileApi;
+    @Resource private TradeLogisticsPrintTaskMapper taskMapper;
     @Resource private PrintBridgeConfigFileGenerator configFileGenerator;
     @Value("${yudao.trade.logistics.printbridge.task-endpoint:}")
     private String printBridgeTaskEndpoint;
-    @Value("${yudao.trade.logistics.printbridge.admin-origin:}")
-    private String printBridgeAdminOrigin;
-    @Value("${yudao.trade.logistics.sf.template-100x150-code:}")
-    private String template100x150Code;
+    @Value("${yudao.trade.logistics.printbridge.merchant-origin:}")
+    private String printBridgeMerchantOrigin;
 
     @Override
     public List<SfLogisticsAccountRespVO> getAccounts() {
@@ -66,19 +70,8 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
                 || StrUtil.isBlank(request.getCheckWord()))) {
             throw exception(LOGISTICS_SF_API_FAILED, "新建账号必须填写 Partner ID 和校验码");
         }
-        if (!List.of("1", "2").contains(request.getServiceCode())) {
-            throw exception(LOGISTICS_SF_API_FAILED, "产品类型仅支持顺丰特快或顺丰标快");
-        }
-        String partnerId = StrUtil.isNotBlank(request.getPartnerId()) ? request.getPartnerId() : account.getPartnerId();
-        String templateCode = resolveTemplateCode(request, account, partnerId);
         account.setName(request.getName()).setLogisticsId(sfExpress.getId())
                 .setEndpoint(cn.iocoder.yudao.module.trade.framework.logistics.sf.SfOpenApiClient.PRODUCTION_ENDPOINT)
-                .setServiceCode(request.getServiceCode()).setTemplateCode(templateCode)
-                .setSenderName(request.getSenderName()).setSenderPhone(request.getSenderPhone())
-                .setSenderProvince(request.getSenderProvince()).setSenderCity(request.getSenderCity())
-                .setSenderDistrict(request.getSenderDistrict()).setSenderAddress(request.getSenderAddress())
-                .setDefaultWeightKg(request.getDefaultWeightKg()).setPaperWidthMm(request.getPaperWidthMm())
-                .setPaperHeightMm(request.getPaperHeightMm()).setDpi(request.getDpi())
                 .setDefaultFlag(Boolean.TRUE.equals(request.getDefaultFlag())).setStatus(request.getStatus());
         if (StrUtil.isNotBlank(request.getPartnerId())) account.setPartnerId(request.getPartnerId());
         if (StrUtil.isNotBlank(request.getCheckWord())) account.setCheckWord(request.getCheckWord());
@@ -93,27 +86,28 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
     }
 
     @Override
+    public List<LogisticsPrintDeviceRespVO> getMerchantDevices(Long merchantId) {
+        return deviceMapper.selectListByMerchantId(merchantId).stream().map(this::toDeviceResp).toList();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
-    public LogisticsPrintDeviceRespVO saveDevice(LogisticsPrintDeviceSaveReqVO request) {
-        if (request.getId() == null) {
-            throw exception(LOGISTICS_DEVICE_AUTH_FAILED, "请先生成 PrintBridge 配置，不要手工填写设备编号");
-        }
-        TradeLogisticsPrintDeviceDO device = request.getId() == null ? new TradeLogisticsPrintDeviceDO()
-                : deviceMapper.selectById(request.getId());
-        if (device == null) throw exception(LOGISTICS_DEVICE_NOT_EXISTS);
+    public LogisticsPrintDeviceRespVO saveDevice(Long merchantId, LogisticsPrintDeviceSaveReqVO request) {
+        TradeLogisticsPrintDeviceDO device = requireOwnedDevice(merchantId, request.getId());
         device.setPrinterName(StrUtil.blankToDefault(request.getPrinterName(), device.getPrinterName()))
-                .setDefaultFlag(Boolean.TRUE.equals(request.getDefaultFlag())).setStatus(request.getStatus());
-        if (Boolean.TRUE.equals(device.getDefaultFlag())) deviceMapper.clearDefault(device.getId());
-        deviceMapper.updateById(device);
+                .setDefaultFlag(Boolean.TRUE.equals(request.getDefaultFlag()) && Integer.valueOf(0).equals(request.getStatus()))
+                .setStatus(request.getStatus());
+        if (Boolean.TRUE.equals(device.getDefaultFlag())) deviceMapper.clearDefault(merchantId, device.getId());
+        deviceMapper.updateSettings(device);
         return toDeviceResp(device);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public LogisticsPrintDeviceRespVO enrollDevice() {
+    public LogisticsPrintDeviceRespVO enrollDevice(Long merchantId) {
         validatePrintBridgeConfiguration();
         LocalDateTime now = LocalDateTime.now();
-        TradeLogisticsPrintDeviceDO device = deviceMapper.selectPendingEnrollmentForUpdate();
+        TradeLogisticsPrintDeviceDO device = deviceMapper.selectPendingEnrollmentForUpdate(merchantId);
         if (device != null && device.getTokenCreatedTime() != null
                 && device.getTokenCreatedTime().isAfter(now.minusMinutes(ENROLLMENT_TTL_MINUTES))) {
             throw exception(LOGISTICS_DEVICE_ENROLLMENT_PENDING);
@@ -122,9 +116,9 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
         String deviceCode = UUID.randomUUID().toString();
         String deviceName = "打印工作站-" + StrUtil.subSuf(deviceCode, deviceCode.length() - 6);
         if (device == null) {
-            device = new TradeLogisticsPrintDeviceDO().setDeviceCode(deviceCode)
+            device = new TradeLogisticsPrintDeviceDO().setMerchantId(merchantId).setDeviceCode(deviceCode)
                     .setDeviceName(deviceName).setEnrollmentKey(ACTIVE_ENROLLMENT_KEY)
-                    .setDefaultFlag(deviceMapper.selectDefaultEnabled() == null).setStatus(0);
+                    .setDefaultFlag(deviceMapper.selectDefaultEnabled(merchantId) == null).setStatus(0);
             device.setTokenHash(LogisticsTokenUtils.hash(token)).setTokenCreatedTime(now);
             try {
                 deviceMapper.insert(device);
@@ -136,14 +130,18 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
                     .setTokenHash(LogisticsTokenUtils.hash(token)).setTokenCreatedTime(now);
             deviceMapper.updateById(device);
         }
-        String configFile = configFileGenerator.generate(printBridgeTaskEndpoint, printBridgeAdminOrigin, token,
+        String configFile = configFileGenerator.generate(printBridgeTaskEndpoint, printBridgeMerchantOrigin, token,
                 deviceCode, deviceName);
         return toDeviceResp(device).setPending(true).setConfigFile(configFile);
     }
 
     @Override
     @SneakyThrows
-    public String createDiagnosticPayload(int paperWidthMm, int paperHeightMm) {
+    public LogisticsPrintTaskRespVO createTestPrint(Long merchantId, Long deviceId, int paperWidthMm, int paperHeightMm) {
+        TradeLogisticsPrintDeviceDO device = requireOwnedDevice(merchantId, deviceId);
+        if (!Integer.valueOf(0).equals(device.getStatus()) || isPending(device) || StrUtil.isBlank(device.getPrinterName())) {
+            throw exception(LOGISTICS_DEVICE_NOT_READY);
+        }
         SfLabelSpec spec = SfLabelSpec.of(paperWidthMm, paperHeightMm, 203);
         BufferedImage image = new BufferedImage(spec.getWidthPixels(), spec.getHeightPixels(),
                 BufferedImage.TYPE_INT_RGB);
@@ -163,26 +161,36 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
         } finally { graphics.dispose(); }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(image, "png", output);
-        FileCreateRespDTO file = fileApi.createPrivateFile(output.toByteArray(),
+        byte[] data = output.toByteArray();
+        FileCreateRespDTO file = fileApi.createPrivateFile(data,
                 "printbridge-test-" + paperWidthMm + "x" + paperHeightMm + ".png",
-                "trade/logistics/" + TenantContextHolder.getRequiredTenantId() + "/diagnostics", "image/png");
-        return fileApi.presignGetUrl(file.getId(), 15 * 60).getCheckedData();
+                "trade/logistics/" + TenantContextHolder.getRequiredTenantId() + "/" + merchantId + "/diagnostics", "image/png");
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO()
+                .setMerchantId(merchantId).setDeviceId(deviceId)
+                .setRequestId("REQ-" + UUID.randomUUID()).setJobId("JOB-" + UUID.randomUUID())
+                .setFormat("image").setLabelFileId(file.getId()).setLabelUrl(file.getUrl())
+                .setPaperWidthMm(paperWidthMm).setPaperHeightMm(paperHeightMm).setDpi(203).setCopies(1)
+                .setChecksum(DigestUtil.sha256Hex(data)).setTestFlag(true).setStatus(LogisticsPrintTaskStatusEnum.PENDING.name());
+        taskMapper.insert(task);
+        return BeanUtils.toBean(task, LogisticsPrintTaskRespVO.class);
     }
 
     private SfLogisticsAccountRespVO toAccountResp(TradeLogisticsAccountDO account) {
         return new SfLogisticsAccountRespVO().setId(account.getId()).setName(account.getName())
                 .setPartnerIdMasked(mask(account.getPartnerId()))
-                .setServiceCode(account.getServiceCode())
-                .setSenderName(account.getSenderName()).setSenderPhone(account.getSenderPhone())
-                .setSenderProvince(account.getSenderProvince()).setSenderCity(account.getSenderCity())
-                .setSenderDistrict(account.getSenderDistrict()).setSenderAddress(account.getSenderAddress())
-                .setDefaultWeightKg(account.getDefaultWeightKg()).setPaperWidthMm(account.getPaperWidthMm())
-                .setPaperHeightMm(account.getPaperHeightMm()).setDpi(account.getDpi())
                 .setDefaultFlag(account.getDefaultFlag()).setStatus(account.getStatus());
     }
 
+    private TradeLogisticsPrintDeviceDO requireOwnedDevice(Long merchantId, Long deviceId) {
+        TradeLogisticsPrintDeviceDO device = deviceMapper.selectByIdAndMerchantId(deviceId, merchantId);
+        if (device == null) {
+            throw exception(LOGISTICS_DEVICE_NOT_EXISTS);
+        }
+        return device;
+    }
+
     private LogisticsPrintDeviceRespVO toDeviceResp(TradeLogisticsPrintDeviceDO device) {
-        return new LogisticsPrintDeviceRespVO().setId(device.getId()).setDeviceCode(device.getDeviceCode())
+        return new LogisticsPrintDeviceRespVO().setId(device.getId()).setMerchantId(device.getMerchantId()).setDeviceCode(device.getDeviceCode())
                 .setDeviceName(device.getDeviceName()).setDefaultFlag(device.getDefaultFlag()).setStatus(device.getStatus())
                 .setVersion(device.getVersion()).setLastPollTime(device.getLastPollTime())
                 .setPrinterName(device.getPrinterName()).setPending(isPending(device))
@@ -199,35 +207,6 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
     private String mask(String value) {
         if (StrUtil.isBlank(value)) return null;
         return value.length() <= 4 ? "****" : "****" + StrUtil.subSuf(value, value.length() - 4);
-    }
-
-    private String resolveTemplateCode(SfLogisticsAccountSaveReqVO request, TradeLogisticsAccountDO account,
-                                       String partnerId) {
-        if (request.getPaperWidthMm() == 76 && request.getPaperHeightMm() == 130) {
-            if (StrUtil.isBlank(partnerId)) {
-                throw exception(LOGISTICS_SF_API_FAILED, "Partner ID 未配置，无法生成 76×130 面单模板");
-            }
-            return "fm_76130_standard_" + partnerId;
-        }
-        // 旧版本已验证可用的商户模板在纸张未变化时继续使用；请求对象不再暴露模板字段。
-        if (account.getId() != null && StrUtil.isNotBlank(account.getTemplateCode()) && !paperChanged(request, account)) {
-            return account.getTemplateCode();
-        }
-        if (StrUtil.isBlank(template100x150Code)) {
-            throw exception(LOGISTICS_CONFIGURATION_INVALID,
-                    "服务器未配置顺丰 100×150 模板（SF_LOGISTICS_TEMPLATE_100X150_CODE）");
-        }
-        if (!template100x150Code.matches("[A-Za-z0-9_-]{3,64}")
-                || StrUtil.startWithIgnoreCase(template100x150Code, "fm_76130_")) {
-            throw exception(LOGISTICS_CONFIGURATION_INVALID, "顺丰 100×150 模板配置无效");
-        }
-        return template100x150Code;
-    }
-
-    private boolean paperChanged(SfLogisticsAccountSaveReqVO request, TradeLogisticsAccountDO account) {
-        return account.getPaperWidthMm() != null && account.getPaperHeightMm() != null
-                && (!account.getPaperWidthMm().equals(request.getPaperWidthMm())
-                || !account.getPaperHeightMm().equals(request.getPaperHeightMm()));
     }
 
     private void validateHttpsEndpoint(String endpoint, String label) {
@@ -256,7 +235,7 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
             }
         } catch (IllegalArgumentException exception) {
             throw exception(LOGISTICS_CONFIGURATION_INVALID,
-                    "PRINTBRIDGE_ADMIN_ORIGIN 必须是标准 Origin，例如 https://admin.example.com（不能带路径或尾部斜杠）");
+                    "PRINTBRIDGE_MERCHANT_ORIGIN 必须是标准 Origin，例如 https://merchant.example.com（不能带路径或尾部斜杠）");
         }
     }
 
@@ -264,10 +243,10 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
         if (StrUtil.isBlank(printBridgeTaskEndpoint)) {
             throw exception(LOGISTICS_CONFIGURATION_INVALID, "缺少 PRINTBRIDGE_TASK_ENDPOINT");
         }
-        if (StrUtil.isBlank(printBridgeAdminOrigin)) {
-            throw exception(LOGISTICS_CONFIGURATION_INVALID, "缺少 PRINTBRIDGE_ADMIN_ORIGIN");
+        if (StrUtil.isBlank(printBridgeMerchantOrigin)) {
+            throw exception(LOGISTICS_CONFIGURATION_INVALID, "缺少 PRINTBRIDGE_MERCHANT_ORIGIN");
         }
         validateHttpsEndpoint(printBridgeTaskEndpoint, "PRINTBRIDGE_TASK_ENDPOINT");
-        validateOrigin(printBridgeAdminOrigin);
+        validateOrigin(printBridgeMerchantOrigin);
     }
 }

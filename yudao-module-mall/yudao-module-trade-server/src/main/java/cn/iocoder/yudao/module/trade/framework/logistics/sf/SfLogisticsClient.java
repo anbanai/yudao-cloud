@@ -9,6 +9,7 @@ import cn.iocoder.yudao.framework.ip.core.enums.AreaTypeEnum;
 import cn.iocoder.yudao.framework.ip.core.utils.AreaUtils;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsAccountDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeMerchantLogisticsConfigDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -44,18 +45,18 @@ public class SfLogisticsClient {
     @Value("${yudao.trade.logistics.sf.label-host-suffixes:sf-express.com,sf-express.cn}")
     private String labelHostSuffixes;
 
-    public WaybillResult createWaybill(TradeLogisticsAccountDO account, String monthlyCard, String providerOrderNo,
-                                       TradeOrderDO order, List<TradeOrderItemDO> items,
-                                       Map<Long, ProductSkuRespDTO> skuMap) {
+    public static ObjectNode buildCreateRequest(TradeMerchantLogisticsConfigDO config, String providerOrderNo,
+                                                TradeOrderDO order, List<TradeOrderItemDO> items,
+                                                Map<Long, ProductSkuRespDTO> skuMap) {
         ObjectNode request = JsonNodeFactory.instance.objectNode();
         request.put("language", "zh-CN").put("orderId", providerOrderNo)
-                .put("monthlyCard", monthlyCard)
-                .put("expressTypeId", Integer.parseInt(account.getServiceCode()))
+                .put("monthlyCard", config.getMonthlyCard())
+                .put("expressTypeId", Integer.parseInt(config.getServiceCode()))
                 .put("payMethod", 1).put("parcelQty", 1).put("isReturnRoutelabel", 1)
-                .put("totalWeight", calculateTotalWeight(items, skuMap, account.getDefaultWeightKg()));
+                .put("totalWeight", calculateTotalWeight(items, skuMap, config.getDefaultWeightKg()));
         ArrayNode contacts = request.putArray("contactInfoList");
-        contacts.add(contact(1, account.getSenderName(), account.getSenderPhone(), account.getSenderProvince(),
-                account.getSenderCity(), account.getSenderDistrict(), account.getSenderAddress()));
+        contacts.add(contact(1, config.getSenderName(), config.getSenderPhone(), config.getSenderProvince(),
+                config.getSenderCity(), config.getSenderDistrict(), config.getSenderAddress()));
         ReceiverArea receiverArea = resolveArea(order.getReceiverAreaId());
         contacts.add(contact(2, order.getReceiverName(), order.getReceiverMobile(), receiverArea.province(),
                 receiverArea.city(), receiverArea.district(), order.getReceiverDetailAddress()));
@@ -64,6 +65,10 @@ public class SfLogisticsClient {
             cargos.addObject().put("name", buildPrintableCargoName(item))
                     .put("count", item.getCount()).put("unit", "件");
         }
+        return request;
+    }
+
+    public WaybillResult createWaybill(TradeLogisticsAccountDO account, JsonNode request) {
         JsonNode response;
         try {
             response = openApiClient.invoke(account, CREATE_ORDER, request);
@@ -72,10 +77,10 @@ public class SfLogisticsClient {
         } catch (RuntimeException exception) {
             throw new SfApiException("INVALID_RESPONSE", "顺丰创建运单响应无法解析", true, exception);
         }
-        return new WaybillResult(providerOrderNo, findWaybillNo(response), response);
+        return new WaybillResult(request.path("orderId").asText(), findWaybillNo(response), response);
     }
 
-    private String buildPrintableCargoName(TradeOrderItemDO item) {
+    private static String buildPrintableCargoName(TradeOrderItemDO item) {
         String suffix = item.getPrice() == null || item.getCount() == null ? ""
                 : item.getPrice() + " * " + item.getCount();
         int nameMaxLength = 100 - suffix.length() - (suffix.isEmpty() ? 0 : 1);
@@ -90,9 +95,9 @@ public class SfLogisticsClient {
         return new WaybillResult(providerOrderNo, findWaybillNo(response), response);
     }
 
-    public byte[] getLabel(TradeLogisticsAccountDO account, String waybillNo) {
+    public byte[] getLabel(TradeLogisticsAccountDO account, String waybillNo, String templateCode) {
         ObjectNode request = JsonNodeFactory.instance.objectNode();
-        request.put("templateCode", account.getTemplateCode()).put("version", "2.0").put("fileType", "pdf")
+        request.put("templateCode", templateCode).put("version", "2.0").put("fileType", "pdf")
                 .put("sync", true);
         request.putArray("documents").addObject().put("masterWaybillNo", waybillNo);
         JsonNode response = openApiClient.invoke(account, CLOUD_PRINT, request);
@@ -211,7 +216,7 @@ public class SfLogisticsClient {
         return openApiClient.invoke(account, SEARCH_ROUTES, request);
     }
 
-    private ObjectNode contact(int type, String name, String phone, String province, String city,
+    private static ObjectNode contact(int type, String name, String phone, String province, String city,
                                String district, String address) {
         return JsonNodeFactory.instance.objectNode().put("contactType", type).put("contact", name)
                 .put("tel", phone).put("province", province).put("city", city).put("county", district)
@@ -232,7 +237,7 @@ public class SfLogisticsClient {
         return value;
     }
 
-    private BigDecimal calculateTotalWeight(List<TradeOrderItemDO> items,
+    private static BigDecimal calculateTotalWeight(List<TradeOrderItemDO> items,
                                             Map<Long, ProductSkuRespDTO> skuMap,
                                             BigDecimal defaultWeight) {
         if (items == null || items.isEmpty() || skuMap == null) {
@@ -272,7 +277,7 @@ public class SfLogisticsClient {
         return null;
     }
 
-    private ReceiverArea resolveArea(Integer areaId) {
+    private static ReceiverArea resolveArea(Integer areaId) {
         String province = "";
         String city = "";
         String district = "";

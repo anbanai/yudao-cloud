@@ -6,7 +6,6 @@ import cn.iocoder.yudao.module.infra.api.file.dto.FileCreateRespDTO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
-import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.TradeMerchantLogisticsConfigRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.*;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -32,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -66,6 +66,7 @@ class LogisticsWaybillServiceImplTest {
     @Mock private LogisticsLabelNormalizer labelNormalizer;
     @Mock private FileApi fileApi;
     @Mock private ProductSkuApi productSkuApi;
+    @Mock private SfLabelTemplateResolver templateResolver;
     @Mock private TradeMerchantLogisticsConfigService merchantLogisticsConfigService;
     @Mock private DeliveryExpressService deliveryExpressService;
     private LogisticsWaybillServiceImpl service;
@@ -96,10 +97,25 @@ class LogisticsWaybillServiceImplTest {
         subOrder.setStatus(10);
         subOrder.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         lenient().when(orderSubMapper.selectById(20L)).thenReturn(subOrder);
-        lenient().when(merchantLogisticsConfigService.getRequiredMonthlyCard(30L)).thenReturn("CARD-30");
-        TradeMerchantLogisticsConfigRespVO config = new TradeMerchantLogisticsConfigRespVO();
-        config.setMonthlyCardMasked("****CARD");
-        lenient().when(merchantLogisticsConfigService.get(30L)).thenReturn(config);
+        ReflectionTestUtils.setField(service, "templateResolver", templateResolver);
+        lenient().when(merchantLogisticsConfigService.getRequiredShippingConfig(30L)).thenReturn(
+                new TradeMerchantLogisticsConfigDO().setMonthlyCard("CARD-30").setServiceCode("2")
+                        .setSenderName("A 仓").setDefaultWeightKg(java.math.BigDecimal.ONE)
+                        .setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203));
+        lenient().when(templateResolver.requireTemplate(any(), eq(76), eq(130), eq(203))).thenReturn("template-a");
+    }
+
+    @Test
+    void getWaybill_onlyDisplaysCardRecordedAtCreation() {
+        var legacy = new TradeLogisticsWaybillDO().setId(40L).setMerchantId(30L);
+        var recorded = new TradeLogisticsWaybillDO().setId(41L).setMerchantId(30L)
+                .setCreateRequestSnapshot("{\"monthlyCard\":\"OLD-1948\"}");
+        when(waybillMapper.selectById(40L)).thenReturn(legacy);
+        when(waybillMapper.selectById(41L)).thenReturn(recorded);
+
+        assertThat(service.getWaybill(40L).getMerchantMonthlyCardMasked()).isNull();
+        assertThat(service.getWaybill(41L).getMerchantMonthlyCardMasked()).isEqualTo("****1948");
+        verifyNoInteractions(merchantLogisticsConfigService);
     }
 
     @Test
@@ -110,23 +126,99 @@ class LogisticsWaybillServiceImplTest {
         TradeLogisticsPrintDeviceDO device = readyDevice();
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account);
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(device);
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(device);
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(null);
         doAnswer(invocation -> {
             ((TradeLogisticsWaybillDO) invocation.getArgument(0)).setId(3L);
             return 1;
         }).when(waybillMapper).insert(any(TradeLogisticsWaybillDO.class));
-        when(sfClient.createWaybill(eq(account), anyString(), anyString(), eq(order), anyList(), anyMap()))
+        when(sfClient.createWaybill(eq(account), any()))
                 .thenThrow(new SfApiException("TIMEOUT", "timeout", true, null));
 
         var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
         assertThat(result.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.UNKNOWN.name());
         assertThat(result.getErrorCode()).isEqualTo("TIMEOUT");
-        verify(sfClient).createWaybill(eq(account), eq("CARD-30"), anyString(), eq(order), anyList(), anyMap());
+        verify(sfClient).createWaybill(eq(account), argThat(payload -> payload.path("monthlyCard").asText().equals("CARD-30")
+                && payload.path("contactInfoList").get(0).path("contact").asText().equals("A 仓")));
         verify(waybillMapper).insert(argThat((TradeLogisticsWaybillDO waybill) -> waybill.getMerchantId().equals(30L)));
         verify(taskMapper, never()).insert(any(TradeLogisticsPrintTaskDO.class));
-        verify(sfClient, never()).getLabel(any(), anyString());
+        verify(sfClient, never()).getLabel(any(), anyString(), any());
+    }
+
+    @Test
+    void siblingSubOrdersUseTheirOwnMerchantSettingsAndDevices() {
+        TradeOrderDO order = new TradeOrderDO().setId(10L).setNo("T10").setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
+        when(orderSubMapper.selectById(21L)).thenReturn(TradeOrderSubDO.builder().id(21L).orderId(10L)
+                .merchantId(31L).status(10).refundStatus(TradeOrderRefundStatusEnum.NONE.getStatus()).build());
+        when(accountMapper.selectDefaultEnabled()).thenReturn(account());
+        when(merchantLogisticsConfigService.getRequiredShippingConfig(31L)).thenReturn(new TradeMerchantLogisticsConfigDO()
+                .setMonthlyCard("CARD-31").setServiceCode("1").setSenderName("B 仓").setDefaultWeightKg(BigDecimal.TEN)
+                .setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203));
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
+        when(deviceMapper.selectDefaultEnabled(31L)).thenReturn(readyDevice().setId(6L).setMerchantId(31L));
+        when(templateResolver.requireTemplate(any(), eq(100), eq(150), eq(203))).thenReturn("template-b");
+        when(sfClient.createWaybill(any(), any())).thenThrow(new SfApiException("TIMEOUT", "timeout", true, null));
+
+        service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
+        service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(21L));
+
+        var captor = ArgumentCaptor.forClass(TradeLogisticsWaybillDO.class);
+        verify(waybillMapper, times(2)).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting("merchantId", "requestedDeviceId", "paperWidthMm", "templateCode")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(30L, 2L, 76, "template-a"),
+                        org.assertj.core.groups.Tuple.tuple(31L, 6L, 100, "template-b"));
+        var requests = captor.getAllValues().stream().map(w -> JsonUtils.parseTree(w.getCreateRequestSnapshot())).toList();
+        assertThat(requests).extracting(r -> r.path("monthlyCard").asText()).containsExactly("CARD-30", "CARD-31");
+        assertThat(requests).extracting(r -> r.path("contactInfoList").get(0).path("contact").asText())
+                .containsExactly("A 仓", "B 仓");
+        assertThat(requests).extracting(r -> r.path("totalWeight").intValue()).containsExactly(1, 10);
+        assertThat(requests).extracting(r -> r.path("expressTypeId").intValue()).containsExactly(2, 1);
+    }
+
+    @Test
+    void failedWaybillRetriesTheStoredRequestWithoutReloadingMerchantSettings() {
+        var waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L).setSubOrderId(20L).setMerchantId(30L)
+                .setStatus("FAILED").setAccountId(1L).setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203)
+                .setTemplateCode("original-template").setCreateRequestSnapshot("""
+                        {"monthlyCard":"OLD-CARD","orderId":"original","totalWeight":3.5,"expressTypeId":1}
+                        """);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(new TradeOrderDO().setId(10L).setStatus(10)
+                .setDeliveryType(1).setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus()));
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
+        var account = account();
+        when(accountMapper.selectById(1L)).thenReturn(account);
+        when(sfClient.createWaybill(eq(account), any())).thenReturn(new SfLogisticsClient.WaybillResult(
+                "original", "SF-1", JsonUtils.parseTree("{}")));
+        when(fileApi.isPrivateMasterSupported()).thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
+        when(sfClient.getLabel(account, "SF-1", "original-template")).thenReturn(new byte[]{1});
+        when(labelNormalizer.normalizePdf(any(), eq(76), eq(130), eq(203))).thenReturn(new byte[]{2});
+        when(fileApi.createPrivateFile(any(), eq("SF-1.png"), eq("trade/logistics/9/labels"), eq("image/png")))
+                .thenReturn(new FileCreateRespDTO().setId(99L).setUrl("test-label"));
+        TenantContextHolder.setTenantId(9L);
+        try {
+            var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
+            assertThat(result.getJobId()).startsWith("JOB-");
+            verify(sfClient).createWaybill(account, JsonUtils.parseTree(waybill.getCreateRequestSnapshot()));
+            verifyNoInteractions(merchantLogisticsConfigService, productSkuApi, itemMapper, templateResolver);
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
+    @Test
+    void legacyReprintCanTargetOnlyItsOriginalUnassignedDevice() {
+        var waybill = new TradeLogisticsWaybillDO().setId(3L).setMerchantId(30L).setStatus("CREATED")
+                .setRequestedDeviceId(2L).setLabelFileId(99L);
+        when(waybillMapper.selectByIdForUpdate(3L)).thenReturn(waybill);
+        when(deviceMapper.selectById(2L)).thenReturn(readyDevice().setMerchantId(null));
+        assertThat(service.reprint(3L, 2L).getDeviceId()).isEqualTo(2L);
+        assertThatThrownBy(() -> service.reprint(3L, 7L))
+                .isInstanceOf(cn.iocoder.yudao.framework.common.exception.ServiceException.class);
+        verify(taskMapper, times(1)).insert(any(TradeLogisticsPrintTaskDO.class));
     }
 
     @Test
@@ -152,8 +244,6 @@ class LogisticsWaybillServiceImplTest {
         TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setJobId("JOB-1")
                 .setStatus(LogisticsPrintTaskStatusEnum.PENDING.name());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
-        when(accountMapper.selectDefaultEnabled()).thenReturn(account());
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(task);
 
@@ -176,8 +266,7 @@ class LogisticsWaybillServiceImplTest {
         TradeLogisticsPrintTaskDO failedTask = new TradeLogisticsPrintTaskDO().setId(4L).setJobId("JOB-FAILED")
                 .setWaybillId(3L).setStatus(LogisticsPrintTaskStatusEnum.FAILED.name());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
-        when(accountMapper.selectDefaultEnabled()).thenReturn(account());
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(failedTask);
 
@@ -201,13 +290,12 @@ class LogisticsWaybillServiceImplTest {
                 .setOrderNo("T10").setAccountId(account.getId()).setWaybillNo("SF1164862794041")
                 .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setDeliveryStatus("PENDING");
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
-        when(accountMapper.selectDefaultEnabled()).thenReturn(account);
         when(accountMapper.selectById(account.getId())).thenReturn(account);
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(waybillMapper.selectByIdForUpdate(3L)).thenReturn(waybill);
         when(fileApi.isPrivateMasterSupported()).thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
-        when(sfClient.getLabel(account, "SF1164862794041")).thenReturn(new byte[]{1});
+        when(sfClient.getLabel(account, "SF1164862794041", "fm_existing")).thenReturn(new byte[]{1});
         when(labelNormalizer.normalizePdf(any(), eq(100), eq(150), eq(203))).thenReturn(new byte[]{2, 3});
         when(fileApi.createPrivateFile(any(), eq("SF1164862794041.png"),
                 eq("trade/logistics/9/labels"), eq("image/png")))
@@ -223,7 +311,7 @@ class LogisticsWaybillServiceImplTest {
                     ArgumentCaptor.forClass(TradeLogisticsPrintTaskDO.class);
             verify(taskMapper).insert(taskCaptor.capture());
             assertThat(taskCaptor.getValue().getLabelFileId()).isEqualTo(99L);
-            verify(sfClient, never()).createWaybill(any(), anyString(), anyString(), any(), anyList(), anyMap());
+            verify(sfClient, never()).createWaybill(any(), any());
         } finally {
             TenantContextHolder.clear();
         }
@@ -255,13 +343,13 @@ class LogisticsWaybillServiceImplTest {
                 .setProviderOrderNo("YD-null-10").setStatus(LogisticsWaybillStatusEnum.CANCELLED.name());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(readyDevice());
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(cancelled);
         doAnswer(invocation -> {
             ((TradeLogisticsWaybillDO) invocation.getArgument(0)).setId(4L);
             return 1;
         }).when(waybillMapper).insert(any(TradeLogisticsWaybillDO.class));
-        when(sfClient.createWaybill(any(), anyString(), anyString(), eq(order), anyList(), anyMap()))
+        when(sfClient.createWaybill(any(), any()))
                 .thenThrow(new SfApiException("REJECTED", "rejected", false, null));
 
         var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
@@ -280,7 +368,7 @@ class LogisticsWaybillServiceImplTest {
                 .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
         when(orderMapper.selectByIdForUpdate(10L)).thenReturn(order);
         when(accountMapper.selectDefaultEnabled()).thenReturn(account());
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(new TradeLogisticsPrintDeviceDO()
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(new TradeLogisticsPrintDeviceDO()
                 .setId(2L).setDeviceCode("device-1").setStatus(0));
 
         assertThatThrownBy(() -> service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L)))
@@ -418,11 +506,11 @@ class LogisticsWaybillServiceImplTest {
 
     private TradeLogisticsAccountDO account() {
         return new TradeLogisticsAccountDO().setId(1L).setLogisticsId(8L).setStatus(0)
-                .setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
+                .setTemplateCode("fm_existing").setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
     }
 
     private TradeLogisticsPrintDeviceDO readyDevice() {
-        return new TradeLogisticsPrintDeviceDO().setId(2L).setDeviceCode("device-1")
+        return new TradeLogisticsPrintDeviceDO().setMerchantId(30L).setId(2L).setDeviceCode("device-1")
                 .setDeviceName("仓库电脑").setPrinterName("Deli GS050DY").setStatus(0);
     }
 }

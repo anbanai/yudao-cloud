@@ -13,5 +13,4 @@ public class LogisticsWaybillBatchCreateReqVO {
     @Size(max = 100, message = "订单数量不能超过 100 个")
     private List<@NotNull(message = "订单编号不能为空") Long> orderIds;
     private Long accountId;
-    private Long deviceId;
 }

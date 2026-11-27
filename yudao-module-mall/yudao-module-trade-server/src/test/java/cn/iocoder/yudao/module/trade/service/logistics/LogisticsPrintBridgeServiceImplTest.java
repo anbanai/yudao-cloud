@@ -13,6 +13,9 @@ import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsPrintEven
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsPrintTaskMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsWaybillMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderSubMapper;
+import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderSubDO;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsPrintTaskStatusEnum;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +50,8 @@ class LogisticsPrintBridgeServiceImplTest {
     private FileApi fileApi;
     @Mock
     private TradeOrderMapper orderMapper;
+    @Mock
+    private TradeOrderSubMapper subOrderMapper;
 
     private LogisticsPrintBridgeServiceImpl service;
 
@@ -60,6 +65,7 @@ class LogisticsPrintBridgeServiceImplTest {
         ReflectionTestUtils.setField(service, "orderUpdateService", orderUpdateService);
         ReflectionTestUtils.setField(service, "fileApi", fileApi);
         ReflectionTestUtils.setField(service, "orderMapper", orderMapper);
+        ReflectionTestUtils.setField(service, "subOrderMapper", subOrderMapper);
     }
 
     @Test
@@ -80,7 +86,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setTokenCreatedTime(LocalDateTime.now());
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
                 .thenReturn(pending);
-        when(deviceMapper.bindPendingDevice(9L, "generated-device-id", "packing-station"))
+        when(deviceMapper.bindPendingDevice(9L, LogisticsTokenUtils.hash("secret-token"), "generated-device-id", "packing-station"))
                 .thenReturn(1);
 
         TradeLogisticsPrintDeviceDO actual = service.authenticate(
@@ -97,13 +103,13 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now());
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
                 .thenReturn(pending);
-        when(deviceMapper.bindPendingDevice(9L, "generated-device-id", "PrintBridge 设备"))
+        when(deviceMapper.bindPendingDevice(9L, LogisticsTokenUtils.hash("secret-token"), "generated-device-id", "PrintBridge 设备"))
                 .thenReturn(1);
 
         TradeLogisticsPrintDeviceDO actual = service.authenticate("secret-token", null, null);
 
         assertThat(actual.getDeviceCode()).isEqualTo("generated-device-id");
-        verify(deviceMapper).bindPendingDevice(9L, "generated-device-id", "PrintBridge 设备");
+        verify(deviceMapper).bindPendingDevice(9L, LogisticsTokenUtils.hash("secret-token"), "generated-device-id", "PrintBridge 设备");
     }
 
     @Test
@@ -123,14 +129,14 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now());
         when(deviceMapper.selectByTokenHashIgnoreTenant(LogisticsTokenUtils.hash("secret-token")))
                 .thenReturn(pending);
-        when(deviceMapper.bindPendingDevice(9L, "existing-device-id", "packing-station"))
+        when(deviceMapper.bindPendingDevice(9L, LogisticsTokenUtils.hash("secret-token"), "existing-device-id", "packing-station"))
                 .thenReturn(1);
 
         TradeLogisticsPrintDeviceDO actual = service.authenticate(
                 "secret-token", "existing-device-id", "packing-station");
 
         assertThat(actual.getDeviceCode()).isEqualTo("existing-device-id");
-        verify(deviceMapper).bindPendingDevice(9L, "existing-device-id", "packing-station");
+        verify(deviceMapper).bindPendingDevice(9L, LogisticsTokenUtils.hash("secret-token"), "existing-device-id", "packing-station");
     }
 
     @Test
@@ -143,7 +149,7 @@ class LogisticsPrintBridgeServiceImplTest {
 
         assertThatThrownBy(() -> service.authenticate("secret-token", "generated-device-id", "仓库电脑"))
                 .isInstanceOf(ServiceException.class);
-        verify(deviceMapper, never()).bindPendingDevice(any(), any(), any());
+        verify(deviceMapper, never()).bindPendingDevice(any(), any(), any(), any());
     }
 
     @Test
@@ -182,7 +188,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
                 .setFormat("image").setLabelFileId(99L).setLabelUrl("http://files.example/label.png")
                 .setPaperWidthMm(100).setPaperHeightMm(150).setCopies(1);
-        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
+        when(taskMapper.selectClaimable(eq(1L), isNull(), any())).thenReturn(task);
         when(fileApi.presignGetUrl(99L, 900))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(task.getLabelUrl()));
 
@@ -198,7 +204,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
                 .setFormat("image").setLabelFileId(99L).setLabelUrl("private://label.png")
                 .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
-        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
+        when(taskMapper.selectClaimable(eq(1L), isNull(), any())).thenReturn(task);
         when(fileApi.presignGetUrl(99L, 900))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
                         "https://files.example/label.png?signature=x&expires=1"));
@@ -216,7 +222,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setJobId("JOB-1").setRequestId("REQ-1").setStatus(LogisticsPrintTaskStatusEnum.PENDING.name())
                 .setFormat("image").setLabelFileId(99L).setLabelUrl("private://label.png")
                 .setPaperWidthMm(76).setPaperHeightMm(130).setCopies(1);
-        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(task);
+        when(taskMapper.selectClaimable(eq(1L), isNull(), any())).thenReturn(task);
         when(fileApi.presignGetUrl(99L, 900))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(
                         "https://files.example/label.png?signature=x&expires=1"));
@@ -231,7 +237,7 @@ class LogisticsPrintBridgeServiceImplTest {
     void pull_ignoresNonAsciiDeviceNameHeader() {
         TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO()
                 .setId(1L).setTenantId(9L).setStatus(0).setDeviceName("PrintBridge device");
-        when(taskMapper.selectClaimable(eq(1L), any())).thenReturn(null);
+        when(taskMapper.selectClaimable(eq(1L), isNull(), any())).thenReturn(null);
 
         service.pull(device, "不忍独享");
 
@@ -240,10 +246,24 @@ class LogisticsPrintBridgeServiceImplTest {
     }
 
     @Test
+    void report_rejectsDifferentMerchantEvenIfTaskReferencesDeviceId() {
+        TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO().setId(1L)
+                .setTenantId(9L).setMerchantId(41L);
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L)
+                .setDeviceId(1L).setMerchantId(42L).setJobId("JOB-1");
+        when(taskMapper.selectByJobIdForUpdate("JOB-1")).thenReturn(task);
+        var receipt = new PrintBridgeStatusReqVO().setJobId("JOB-1").setEventId("EVENT-1").setStatus("success");
+
+        assertThatThrownBy(() -> service.report(device, receipt)).isInstanceOf(ServiceException.class);
+
+        verifyNoInteractions(eventMapper, orderUpdateService);
+    }
+
+    @Test
     void report_successIsIdempotentAndDeliversOrderOnce() {
         TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO()
                 .setId(1L).setTenantId(9L).setDeviceCode("packing-01").setStatus(0);
-        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setWaybillId(3L)
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setWaybillId(3L).setOrderId(4L)
                 .setDeviceId(1L).setJobId("JOB-1").setStatus(LogisticsPrintTaskStatusEnum.ACCEPTED.name());
         TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(4L)
                 .setWaybillNo("SF123456").setDeliveryStatus("PENDING");
@@ -258,6 +278,9 @@ class LogisticsPrintBridgeServiceImplTest {
 
         verify(eventMapper, times(1)).insert(any(TradeLogisticsPrintEventDO.class));
         verify(taskMapper, times(1)).updateById(any(TradeLogisticsPrintTaskDO.class));
+        var locks = org.mockito.Mockito.inOrder(orderMapper, waybillMapper);
+        locks.verify(orderMapper).selectByIdForUpdate(4L);
+        locks.verify(waybillMapper).selectByIdForUpdate(3L);
         verify(orderUpdateService, times(1)).deliveryOrder(argThat(delivery ->
                 delivery.getId().equals(4L) && delivery.getLogisticsNo().equals("SF123456")));
     }
@@ -266,7 +289,7 @@ class LogisticsPrintBridgeServiceImplTest {
     void report_deliveryFailureDoesNotRejectPersistedPrintSuccess() {
         TradeLogisticsPrintDeviceDO device = new TradeLogisticsPrintDeviceDO()
                 .setId(1L).setTenantId(9L).setDeviceCode("packing-01").setStatus(0);
-        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setWaybillId(3L)
+        TradeLogisticsPrintTaskDO task = new TradeLogisticsPrintTaskDO().setId(2L).setWaybillId(3L).setOrderId(4L)
                 .setDeviceId(1L).setJobId("JOB-1").setStatus(LogisticsPrintTaskStatusEnum.ACCEPTED.name());
         TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(4L)
                 .setWaybillNo("SF123456").setDeliveryStatus("PENDING");
@@ -284,10 +307,29 @@ class LogisticsPrintBridgeServiceImplTest {
     }
 
     @Test
+    void compensateDeliveredOrders_usesSubOrderWaybillForMerchantShipment() {
+        var task = new TradeLogisticsPrintTaskDO().setWaybillId(11L).setOrderId(21L).setMerchantId(41L);
+        var waybill = new TradeLogisticsWaybillDO().setId(11L).setOrderId(21L).setSubOrderId(31L)
+                .setMerchantId(41L).setWaybillNo("SF-MERCHANT-A").setDeliveryStatus("PENDING");
+        var deliveredAt = LocalDateTime.now();
+        var child = new TradeOrderSubDO().setOrderId(21L).setStatus(TradeOrderStatusEnum.DELIVERED.getStatus())
+                .setLogisticsNo("SF-MERCHANT-A").setDeliveryTime(deliveredAt);
+        when(taskMapper.selectListByStatus("SUCCESS")).thenReturn(java.util.List.of(task));
+        when(waybillMapper.selectByIdForUpdate(11L)).thenReturn(waybill);
+        when(subOrderMapper.selectByIdAndMerchantId(31L, 41L)).thenReturn(child);
+
+        assertThat(service.compensateDeliveredOrders()).isEqualTo(1);
+
+        verify(waybillMapper).updateById(argThat((TradeLogisticsWaybillDO updated) ->
+                "DELIVERED".equals(updated.getDeliveryStatus()) && deliveredAt.equals(updated.getDeliveredTime())));
+        verifyNoInteractions(orderUpdateService);
+    }
+
+    @Test
     void compensateDeliveredOrders_continuesAfterOneOrderFails() {
-        TradeLogisticsPrintTaskDO first = new TradeLogisticsPrintTaskDO().setId(1L).setWaybillId(11L)
+        TradeLogisticsPrintTaskDO first = new TradeLogisticsPrintTaskDO().setId(1L).setWaybillId(11L).setOrderId(21L)
                 .setStatus(LogisticsPrintTaskStatusEnum.SUCCESS.name()).setTestFlag(false);
-        TradeLogisticsPrintTaskDO second = new TradeLogisticsPrintTaskDO().setId(2L).setWaybillId(12L)
+        TradeLogisticsPrintTaskDO second = new TradeLogisticsPrintTaskDO().setId(2L).setWaybillId(12L).setOrderId(22L)
                 .setStatus(LogisticsPrintTaskStatusEnum.SUCCESS.name()).setTestFlag(false);
         TradeLogisticsWaybillDO firstWaybill = new TradeLogisticsWaybillDO().setId(11L).setOrderId(21L)
                 .setLogisticsId(8L).setWaybillNo("SF-1").setDeliveryStatus("PENDING");

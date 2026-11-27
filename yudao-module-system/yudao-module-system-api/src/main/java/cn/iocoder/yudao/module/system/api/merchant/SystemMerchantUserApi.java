@@ -22,10 +22,17 @@ public interface SystemMerchantUserApi {
     CommonResult<Boolean> bindMerchantId(@RequestParam("userId") Long userId,
                                          @RequestParam("merchantId") Long merchantId);
 
+    @PostMapping(PREFIX + "/bind-approved-merchant")
+    @Operation(summary = "按已审核商家主体的租户绑定账号")
+    CommonResult<Boolean> bindApprovedMerchant(@RequestParam("userId") Long userId,
+                                                @RequestParam("merchantId") Long merchantId,
+                                                @RequestParam("merchantTenantId") Long merchantTenantId);
+
     @PostMapping(PREFIX + "/can-bind-merchant")
     @Operation(summary = "校验商家账号可关联指定主体")
     CommonResult<Boolean> canBindMerchant(@RequestParam("userId") Long userId,
-                                          @RequestParam("merchantId") Long merchantId);
+                                          @RequestParam("merchantId") Long merchantId,
+                                          @RequestParam(value = "merchantTenantId", required = false) Long merchantTenantId);
 
     @PostMapping(PREFIX + "/validate-merchant-binding")
     @Operation(summary = "校验商家账号与商家主体绑定关系")

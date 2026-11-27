@@ -32,6 +32,7 @@ import cn.iocoder.yudao.module.system.api.merchant.SystemMerchantUserApi;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +66,9 @@ public class ProductMerchantApplicationServiceImpl implements ProductMerchantApp
     private static final String TYPE_INITIAL = "INITIAL";
     private static final String TYPE_NEW = "NEW";
     private static final String TYPE_CHANGE = "CHANGE";
+
+    @Value("${yudao.tenant.enable:true}")
+    private boolean tenantEnabled;
 
     @Resource
     private ProductMerchantMapper merchantMapper;
@@ -102,7 +106,8 @@ public class ProductMerchantApplicationServiceImpl implements ProductMerchantApp
         }
         ProductMerchantDO existing = merchantMapper.selectByOwnerAccountId(accountId);
         SystemMerchantUserApi api = merchantUserApiProvider.getIfAvailable();
-        var canBind = api == null ? null : api.canBindMerchant(accountId, merchantId);
+        Long tenantId = ProductMerchantStatusEnum.isAvailable(merchant.getStatus()) ? approvedTenant(merchant) : null;
+        var canBind = api == null ? null : api.canBindMerchant(accountId, merchantId, tenantId);
         if (existing != null && !merchantId.equals(existing.getId())
                 || canBind == null || !canBind.isSuccess() || !Boolean.TRUE.equals(canBind.getData())) {
             throw exception(MERCHANT_IDENTITY_BIND_FAILED);
@@ -118,7 +123,7 @@ public class ProductMerchantApplicationServiceImpl implements ProductMerchantApp
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                bindMerchantAccount(accountId, merchantId);
+                bindMerchantAccount(accountId, merchantId, tenantId);
             }
         });
     }
@@ -175,7 +180,7 @@ public class ProductMerchantApplicationServiceImpl implements ProductMerchantApp
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                bindMerchantAccount(ownerAccountId, merchantId);
+                bindMerchantAccount(ownerAccountId, merchantId, null);
             }
         });
         return application.getId();
@@ -330,6 +335,14 @@ public class ProductMerchantApplicationServiceImpl implements ProductMerchantApp
         if (payOnboardingService != null) {
             // 审批和待补料任务同事务提交，支付服务故障不会丢失入网触发。
             payOnboardingService.enqueueApprovedMerchant(merchant.getId());
+        }
+        Long tenantId = approvedTenant(merchant);
+        if (tenantId != null) {
+            if (merchant.getOwnerAccountId() == null
+                    || !merchant.getOwnerAccountId().equals(application.getOwnerAccountId())) {
+                throw exception(MERCHANT_IDENTITY_BIND_FAILED);
+            }
+            bindMerchantAccount(merchant.getOwnerAccountId(), merchant.getId(), tenantId);
         }
     }
 
@@ -627,14 +640,20 @@ public class ProductMerchantApplicationServiceImpl implements ProductMerchantApp
         }
     }
 
-    private void bindMerchantAccount(Long ownerAccountId, Long merchantId) {
+    private Long approvedTenant(ProductMerchantDO merchant) {
+        Long tenantId = merchant.getTenantId();
+        return tenantEnabled && tenantId != null && tenantId > 0 ? tenantId : null;
+    }
+
+    private void bindMerchantAccount(Long ownerAccountId, Long merchantId, Long tenantId) {
         SystemMerchantUserApi api = merchantUserApiProvider == null
                 ? null : merchantUserApiProvider.getIfAvailable();
         if (api == null) {
             throw exception(MERCHANT_IDENTITY_BIND_FAILED);
         }
         try {
-            var result = api.bindMerchantId(ownerAccountId, merchantId);
+            var result = tenantId == null ? api.bindMerchantId(ownerAccountId, merchantId)
+                    : api.bindApprovedMerchant(ownerAccountId, merchantId, tenantId);
             if (result == null || !result.isSuccess() || !Boolean.TRUE.equals(result.getData())) {
                 throw exception(MERCHANT_IDENTITY_BIND_FAILED);
             }

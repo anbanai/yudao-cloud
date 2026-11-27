@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.system.dal.mysql.user.MerchantUserMapper;
 import cn.iocoder.yudao.module.system.service.member.MemberService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +31,8 @@ public class MerchantUserServiceImpl implements MerchantUserService {
 
     @Resource
     private MerchantUserMapper merchantUserMapper;
+    @Resource
+    private TenantService tenantService;
     @Resource
     private PasswordEncoder passwordEncoder;
     @Resource
@@ -139,6 +142,31 @@ public class MerchantUserServiceImpl implements MerchantUserService {
             return;
         }
         throw exception(SYSTEM_MERCHANT_USER_ALREADY_BOUND);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void bindApprovedMerchant(Long userId, Long merchantId, Long merchantTenantId) {
+        if (merchantTenantId == null || merchantTenantId <= 0 || merchantId == null) {
+            throw exception(SYSTEM_MERCHANT_USER_ALREADY_BOUND);
+        }
+        tenantService.validTenant(merchantTenantId);
+        MerchantUserDO user = merchantUserMapper.selectByIdForUpdate(userId);
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
+        if (user.getMerchantId() != null && !merchantId.equals(user.getMerchantId())
+                || !Long.valueOf(0L).equals(user.getTenantId()) && !merchantTenantId.equals(user.getTenantId())) {
+            throw exception(SYSTEM_MERCHANT_USER_ALREADY_BOUND);
+        }
+        if (merchantId.equals(user.getMerchantId()) && merchantTenantId.equals(user.getTenantId())) {
+            return;
+        }
+        MerchantUserDO update = new MerchantUserDO().setId(userId).setMerchantId(merchantId);
+        update.setTenantId(merchantTenantId);
+        merchantUserMapper.updateById(update);
+        // 旧令牌缓存了绑定前的租户和主体信息，下次登录按已审核的归属签发。
+        oauth2TokenService.removeAccessToken(userId, UserTypeEnum.MERCHANT.getValue());
     }
 
     @Override

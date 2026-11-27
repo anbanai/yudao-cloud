@@ -21,10 +21,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPrintDeviceSaveReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsPrintTaskRespVO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsPrintTaskDO;
+import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsPrintTaskMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +43,7 @@ class LogisticsManagementServiceImplTest {
     @Mock private TradeLogisticsPrintDeviceMapper deviceMapper;
     @Mock private DeliveryExpressMapper expressMapper;
     @Mock private FileApi fileApi;
+    @Mock private TradeLogisticsPrintTaskMapper taskMapper;
     @Mock private PrintBridgeConfigFileGenerator configFileGenerator;
     private LogisticsManagementServiceImpl service;
 
@@ -51,11 +54,11 @@ class LogisticsManagementServiceImplTest {
         ReflectionTestUtils.setField(service, "deviceMapper", deviceMapper);
         ReflectionTestUtils.setField(service, "expressMapper", expressMapper);
         ReflectionTestUtils.setField(service, "fileApi", fileApi);
+        ReflectionTestUtils.setField(service, "taskMapper", taskMapper);
         ReflectionTestUtils.setField(service, "configFileGenerator", configFileGenerator);
         ReflectionTestUtils.setField(service, "printBridgeTaskEndpoint",
                 "https://api.example.test/internal-api/trade/logistics/printbridge/tasks");
-        ReflectionTestUtils.setField(service, "printBridgeAdminOrigin", "https://admin.example.test");
-        ReflectionTestUtils.setField(service, "template100x150Code", "fm_server_100150");
+        ReflectionTestUtils.setField(service, "printBridgeMerchantOrigin", "https://admin.example.test");
     }
 
     @Test
@@ -83,17 +86,6 @@ class LogisticsManagementServiceImplTest {
     }
 
     @Test
-    void saveAccountRejectsUnsupportedProductCode() {
-        SfLogisticsAccountSaveReqVO request = validRequest().setServiceCode("99");
-        when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L).setCode("SF"));
-
-        assertThatThrownBy(() -> service.saveAccount(request))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("顺丰特快或顺丰标快");
-        verifyNoInteractions(accountMapper);
-    }
-
-    @Test
     void saveAccountKeepsVerifiedTemplateWhenHiddenOnEdit() {
         SfLogisticsAccountSaveReqVO request = validRequest().setId(7L);
         TradeLogisticsAccountDO existing = new TradeLogisticsAccountDO().setId(7L)
@@ -110,52 +102,16 @@ class LogisticsManagementServiceImplTest {
     }
 
     @Test
-    void saveAccountGeneratesDocumented76x130StandardTemplate() {
-        SfLogisticsAccountSaveReqVO request = validRequest().setPaperWidthMm(76).setPaperHeightMm(130)
-                .setPartnerId("partner-001");
-        when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L).setCode("SF"));
-
-        service.saveAccount(request);
-
-        var captor = org.mockito.ArgumentCaptor.forClass(TradeLogisticsAccountDO.class);
-        verify(accountMapper).insert(captor.capture());
-        assertThat(captor.getValue().getTemplateCode()).isEqualTo("fm_76130_standard_partner-001");
-    }
-
-    @Test
-    void saveAccountUsesServerTemplateFor100x150() {
-        SfLogisticsAccountSaveReqVO request = validRequest().setPaperWidthMm(100).setPaperHeightMm(150);
-        when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L).setCode("SF"));
-
-        service.saveAccount(request);
-
-        var captor = org.mockito.ArgumentCaptor.forClass(TradeLogisticsAccountDO.class);
-        verify(accountMapper).insert(captor.capture());
-        assertThat(captor.getValue().getTemplateCode()).isEqualTo("fm_server_100150");
-    }
-
-    @Test
-    void saveAccountRequiresServerTemplateFor100x150() {
-        ReflectionTestUtils.setField(service, "template100x150Code", "");
-        SfLogisticsAccountSaveReqVO request = validRequest().setPaperWidthMm(100).setPaperHeightMm(150);
-        when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L).setCode("SF"));
-
-        assertThatThrownBy(() -> service.saveAccount(request))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("服务器未配置顺丰 100×150 模板");
-        verifyNoInteractions(accountMapper);
-    }
-
-    @Test
     void enrollDeviceUsesOnlyServerConfigurationAndDoesNotExposeToken() {
-        when(deviceMapper.selectPendingEnrollmentForUpdate()).thenReturn(null);
-        when(deviceMapper.selectDefaultEnabled()).thenReturn(null);
+        when(deviceMapper.selectPendingEnrollmentForUpdate(41L)).thenReturn(null);
+        when(deviceMapper.selectDefaultEnabled(41L)).thenReturn(null);
         when(configFileGenerator.generate(any(), any(), any(), any(), any())).thenReturn("encrypted-config");
 
-        var response = service.enrollDevice();
+        var response = service.enrollDevice(41L);
 
         var captor = org.mockito.ArgumentCaptor.forClass(TradeLogisticsPrintDeviceDO.class);
         verify(deviceMapper).insert(captor.capture());
+        assertThat(captor.getValue().getMerchantId()).isEqualTo(41L);
         assertThat(captor.getValue().getEnrollmentKey()).isEqualTo("ACTIVE");
         assertThat(captor.getValue().getDeviceCode()).doesNotStartWith("pending-");
         assertThat(captor.getValue().getDeviceName()).startsWith("打印工作站-");
@@ -169,10 +125,10 @@ class LogisticsManagementServiceImplTest {
 
     @Test
     void enrollDeviceRejectsDuplicateFreshEnrollment() {
-        when(deviceMapper.selectPendingEnrollmentForUpdate()).thenReturn(new TradeLogisticsPrintDeviceDO()
+        when(deviceMapper.selectPendingEnrollmentForUpdate(41L)).thenReturn(new TradeLogisticsPrintDeviceDO()
                 .setId(9L).setEnrollmentKey("ACTIVE").setTokenCreatedTime(LocalDateTime.now()));
 
-        assertThatThrownBy(() -> service.enrollDevice())
+        assertThatThrownBy(() -> service.enrollDevice(41L))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("配置已生成");
         verifyNoInteractions(configFileGenerator);
@@ -182,7 +138,7 @@ class LogisticsManagementServiceImplTest {
     void enrollDeviceRejectsMissingServerConfiguration() {
         ReflectionTestUtils.setField(service, "printBridgeTaskEndpoint", "");
 
-        assertThatThrownBy(() -> service.enrollDevice())
+        assertThatThrownBy(() -> service.enrollDevice(41L))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("PRINTBRIDGE_TASK_ENDPOINT");
         verifyNoInteractions(deviceMapper, configFileGenerator);
@@ -190,44 +146,76 @@ class LogisticsManagementServiceImplTest {
 
     @Test
     void enrollDeviceRejectsAdminOriginWithPathOrTrailingSlash() {
-        ReflectionTestUtils.setField(service, "printBridgeAdminOrigin", "https://admin.example.test/");
+        ReflectionTestUtils.setField(service, "printBridgeMerchantOrigin", "https://admin.example.test/");
 
-        assertThatThrownBy(() -> service.enrollDevice())
+        assertThatThrownBy(() -> service.enrollDevice(41L))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("不能带路径或尾部斜杠");
         verifyNoInteractions(deviceMapper, configFileGenerator);
     }
 
     @Test
-    void createDiagnosticPayloadUsesRequested76x130Specification() throws Exception {
+    void saveDeviceRejectsAnotherMerchantDevice() {
+        var request = new LogisticsPrintDeviceSaveReqVO()
+                .setId(7L).setPrinterName("printer").setDefaultFlag(true);
+        assertThatThrownBy(() -> service.saveDevice(41L, request)).hasMessageContaining("打印设备不存在");
+        verify(deviceMapper).selectByIdAndMerchantId(7L, 41L);
+        org.mockito.Mockito.verifyNoMoreInteractions(deviceMapper);
+    }
+
+    @Test
+    void changingDefaultPrinterOnlyClearsDefaultsForThisMerchant() {
+        var device = new TradeLogisticsPrintDeviceDO().setId(7L).setMerchantId(41L);
+        when(deviceMapper.selectByIdAndMerchantId(7L, 41L)).thenReturn(device);
+        var request = new LogisticsPrintDeviceSaveReqVO().setId(7L).setPrinterName("Packing").setDefaultFlag(true);
+
+        var response = service.saveDevice(41L, request);
+
+        assertThat(response.getPrinterName()).isEqualTo("Packing");
+        verify(deviceMapper).clearDefault(41L, 7L);
+        verify(deviceMapper).updateSettings(device);
+    }
+
+    @Test
+    void diagnosticRejectsAnotherMerchantDeviceBeforeCreatingFile() {
+        assertThatThrownBy(() -> service.createTestPrint(41L, 7L, 76, 130))
+                .hasMessageContaining("打印设备不存在");
+        verifyNoInteractions(fileApi);
+    }
+
+    @Test
+    void testPrintQueuesRequested76x130LabelForOwnedDevice() throws Exception {
         doReturn(new FileCreateRespDTO().setId(88L).setUrl("https://files.example/diagnostic"))
                 .when(fileApi).createPrivateFile(any(byte[].class), eq("printbridge-test-76x130.png"),
-                        eq("trade/logistics/9/diagnostics"), eq("image/png"));
-        when(fileApi.presignGetUrl(88L, 15 * 60))
-                .thenReturn(success("https://files.example.test/diagnostic?signature=x&expires=1"));
+                        eq("trade/logistics/9/41/diagnostics"), eq("image/png"));
 
+        when(deviceMapper.selectByIdAndMerchantId(7L, 41L)).thenReturn(new TradeLogisticsPrintDeviceDO()
+                .setId(7L).setStatus(0).setPrinterName("Printer"));
         TenantContextHolder.setTenantId(9L);
-        String url;
+        LogisticsPrintTaskRespVO response;
         try {
-            url = service.createDiagnosticPayload(76, 130);
+            response = service.createTestPrint(41L, 7L, 76, 130);
         } finally {
             TenantContextHolder.clear();
         }
 
         var contentCaptor = org.mockito.ArgumentCaptor.forClass(byte[].class);
         org.mockito.Mockito.verify(fileApi).createPrivateFile(contentCaptor.capture(),
-                eq("printbridge-test-76x130.png"), eq("trade/logistics/9/diagnostics"), eq("image/png"));
+                eq("printbridge-test-76x130.png"), eq("trade/logistics/9/41/diagnostics"), eq("image/png"));
         BufferedImage image = ImageIO.read(new ByteArrayInputStream(contentCaptor.getValue()));
         assertThat(image.getWidth()).isEqualTo(607);
         assertThat(image.getHeight()).isEqualTo(1039);
-        assertThat(url).contains("diagnostic");
+        var taskCaptor = org.mockito.ArgumentCaptor.forClass(TradeLogisticsPrintTaskDO.class);
+        verify(taskMapper).insert(taskCaptor.capture());
+        TradeLogisticsPrintTaskDO task = taskCaptor.getValue();
+        assertThat(task.getMerchantId()).isEqualTo(41L);
+        assertThat(task.getDeviceId()).isEqualTo(7L);
+        assertThat(task.getLabelFileId()).isEqualTo(88L);
+        assertThat(task.getTestFlag()).isTrue();
+        assertThat(response.getStatus()).isEqualTo("PENDING");
     }
 
     private static SfLogisticsAccountSaveReqVO validRequest() {
-        return new SfLogisticsAccountSaveReqVO().setName("顺丰月结账号").setPartnerId("partner")
-                .setCheckWord("check-word").setServiceCode("1")
-                .setSenderName("仓库").setSenderPhone("13800138000")
-                .setSenderProvince("四川省").setSenderCity("成都市").setSenderAddress("高新区 1 号")
-                .setDefaultWeightKg(BigDecimal.ONE).setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
+        return new SfLogisticsAccountSaveReqVO().setPartnerId("partner").setCheckWord("check-word");
     }
 }

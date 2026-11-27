@@ -1,18 +1,22 @@
 package cn.iocoder.yudao.module.trade.dal.dataobject.aftersale;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import cn.iocoder.yudao.module.trade.enums.aftersale.ReturnShipmentFeePayerEnum;
 import cn.iocoder.yudao.module.trade.enums.aftersale.ReturnShipmentStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.experimental.Accessors;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import lombok.ToString;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@TableName("trade_after_sale_return_shipment")
+@TableName(value = "trade_after_sale_return_shipment", autoResultMap = true)
 @KeySequence("trade_after_sale_return_shipment_seq")
 @Data
 @Accessors(chain = true)
@@ -23,6 +27,11 @@ public class AfterSaleReturnShipmentDO extends TenantBaseDO {
     private Long afterSaleId;
     private Long merchantId;
     private Long accountId;
+    private String serviceCode;
+    @TableField(typeHandler = EncryptTypeHandler.class)
+    @JsonIgnore
+    @ToString.Exclude
+    private String monthlyCard;
     private String provider;
     private String providerOrderNo;
     private String waybillNo;

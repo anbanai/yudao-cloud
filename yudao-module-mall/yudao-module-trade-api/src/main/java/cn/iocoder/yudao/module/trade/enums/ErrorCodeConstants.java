@@ -134,6 +134,8 @@ public interface ErrorCodeConstants {
     ErrorCode TRADE_MERCHANT_MONTHLY_CARD_NOT_CONFIGURED = new ErrorCode(1_011_004_315, "商家未配置顺丰月结卡：{}");
     ErrorCode LOGISTICS_SF_MANUAL_DELIVERY_NOT_ALLOWED = new ErrorCode(1_011_004_316, "顺丰必须通过顺丰打单流程发货");
 
+    ErrorCode TRADE_MERCHANT_SF_CONFIG_INVALID = new ErrorCode(1_011_004_317, "商家顺丰发货设置：{}");
+
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");
     ErrorCode EXPRESS_TEMPLATE_NOT_EXISTS = new ErrorCode(1_011_005_001, "运费模板不存在");

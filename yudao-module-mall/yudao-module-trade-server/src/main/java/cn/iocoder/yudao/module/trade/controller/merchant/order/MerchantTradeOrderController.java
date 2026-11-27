@@ -52,6 +52,7 @@ public class MerchantTradeOrderController {
     private MerchantSecurityService merchantSecurityService;
 
     @GetMapping("/page")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "获得我的履约订单分页")
     public CommonResult<PageResult<TradeOrderSubRespVO>> getPage(@Valid MerchantOrderPageReqVO reqVO) {
         Long merchantId = merchantSecurityService.requireOperatingMerchantId();
@@ -60,6 +61,7 @@ public class MerchantTradeOrderController {
     }
 
     @GetMapping("/get-detail")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "获得我的履约订单详情")
     public CommonResult<MerchantOrderDetailRespVO> getDetail(@RequestParam("subOrderId") Long subOrderId) {
         Long merchantId = merchantSecurityService.requireOperatingMerchantId();
@@ -75,7 +77,12 @@ public class MerchantTradeOrderController {
         result.setOrderCreateTime(order.getCreateTime());
         result.setTerminal(order.getTerminal());
         result.setBuyerRemark(order.getUserRemark());
-        result.setReceiver(BeanUtils.toBean(order, MerchantOrderDetailRespVO.Receiver.class));
+        MerchantOrderDetailRespVO.Receiver receiver = new MerchantOrderDetailRespVO.Receiver();
+        receiver.setName(order.getReceiverName());
+        receiver.setMobile(order.getReceiverMobile());
+        receiver.setAreaId(order.getReceiverAreaId());
+        receiver.setDetailAddress(order.getReceiverDetailAddress());
+        result.setReceiver(receiver);
         result.setItems(BeanUtils.toBean(items, MerchantOrderDetailRespVO.Item.class));
         return success(result);
     }

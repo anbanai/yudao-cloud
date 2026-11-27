@@ -19,9 +19,11 @@ public interface TradeLogisticsPrintTaskMapper extends BaseMapperX<TradeLogistic
                 .eq(TradeLogisticsPrintTaskDO::getJobId, jobId).last("FOR UPDATE"));
     }
 
-    default TradeLogisticsPrintTaskDO selectClaimable(Long deviceId, LocalDateTime now) {
+    default TradeLogisticsPrintTaskDO selectClaimable(Long deviceId, Long merchantId, LocalDateTime now) {
         return selectOne(new LambdaQueryWrapperX<TradeLogisticsPrintTaskDO>()
                 .eq(TradeLogisticsPrintTaskDO::getDeviceId, deviceId)
+                .eq(merchantId != null, TradeLogisticsPrintTaskDO::getMerchantId, merchantId)
+                .isNull(merchantId == null, TradeLogisticsPrintTaskDO::getMerchantId)
                 .and(wrapper -> wrapper.eq(TradeLogisticsPrintTaskDO::getStatus, LogisticsPrintTaskStatusEnum.PENDING.name())
                         .or(nested -> nested.eq(TradeLogisticsPrintTaskDO::getStatus,
                                         LogisticsPrintTaskStatusEnum.DISPATCHED.name())
