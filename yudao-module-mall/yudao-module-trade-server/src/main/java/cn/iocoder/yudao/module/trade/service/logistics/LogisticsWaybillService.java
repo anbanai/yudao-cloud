@@ -10,6 +10,7 @@ import java.util.List;
 
 public interface LogisticsWaybillService {
     LogisticsWaybillRespVO createWaybill(LogisticsWaybillCreateReqVO request);
+    void reconcileWaybill(Long id);
     LogisticsWaybillRespVO getWaybill(Long id);
     List<LogisticsWaybillRespVO> getWaybills();
     List<LogisticsPrintTaskRespVO> getPrintTasks();

@@ -72,8 +72,11 @@ public class LogisticsManagementServiceImpl implements LogisticsManagementServic
         }
         account.setName(request.getName()).setLogisticsId(sfExpress.getId())
                 .setEndpoint(cn.iocoder.yudao.module.trade.framework.logistics.sf.SfOpenApiClient.PRODUCTION_ENDPOINT)
-                .setDefaultFlag(Boolean.TRUE.equals(request.getDefaultFlag())).setStatus(request.getStatus());
-        if (StrUtil.isNotBlank(request.getPartnerId())) account.setPartnerId(request.getPartnerId());
+                .setDefaultFlag(Integer.valueOf(0).equals(request.getStatus()) && Boolean.TRUE.equals(request.getDefaultFlag()))
+                .setStatus(request.getStatus());
+        if (StrUtil.isNotBlank(request.getPartnerId()) && !StrUtil.equals(account.getPartnerId(), request.getPartnerId())) {
+            account.setPartnerId(request.getPartnerId()).setTemplateCode(null);
+        }
         if (StrUtil.isNotBlank(request.getCheckWord())) account.setCheckWord(request.getCheckWord());
         if (Boolean.TRUE.equals(account.getDefaultFlag())) accountMapper.clearDefault(account.getId());
         if (account.getId() == null) accountMapper.insert(account); else accountMapper.updateById(account);

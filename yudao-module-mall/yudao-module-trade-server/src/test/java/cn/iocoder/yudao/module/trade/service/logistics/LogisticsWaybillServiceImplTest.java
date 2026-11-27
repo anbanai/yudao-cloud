@@ -179,22 +179,19 @@ class LogisticsWaybillServiceImplTest {
     }
 
     @Test
-    void failedWaybillRetriesTheStoredRequestWithoutReloadingMerchantSettings() {
-        var waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L).setSubOrderId(20L).setMerchantId(30L)
-                .setStatus("FAILED").setAccountId(1L).setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203)
-                .setTemplateCode("original-template").setCreateRequestSnapshot("""
-                        {"monthlyCard":"OLD-CARD","orderId":"original","totalWeight":3.5,"expressTypeId":1}
-                        """);
+    void createWaybill_retriesRejectedRequestWithUpdatedMerchantSettings() {
+        var waybill = pendingWaybill("FAILED").setCreationRejected(true);
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
-        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(new TradeOrderDO().setId(10L).setStatus(10)
-                .setDeliveryType(1).setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus()));
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(undeliveredOrder());
         when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
         var account = account();
         when(accountMapper.selectById(1L)).thenReturn(account);
-        when(sfClient.createWaybill(eq(account), any())).thenReturn(new SfLogisticsClient.WaybillResult(
-                "original", "SF-1", JsonUtils.parseTree("{}")));
+        when(sfClient.createWaybill(eq(account), any())).thenAnswer(invocation -> {
+            assertThat(waybill.getStatus()).isEqualTo("CREATING");
+            return new SfLogisticsClient.WaybillResult("original", "SF-1", JsonUtils.parseTree("{}"));
+        });
         when(fileApi.isPrivateMasterSupported()).thenReturn(cn.iocoder.yudao.framework.common.pojo.CommonResult.success(true));
-        when(sfClient.getLabel(account, "SF-1", "original-template")).thenReturn(new byte[]{1});
+        when(sfClient.getLabel(account, "SF-1", "template-a")).thenReturn(new byte[]{1});
         when(labelNormalizer.normalizePdf(any(), eq(76), eq(130), eq(203))).thenReturn(new byte[]{2});
         when(fileApi.createPrivateFile(any(), eq("SF-1.png"), eq("trade/logistics/9/labels"), eq("image/png")))
                 .thenReturn(new FileCreateRespDTO().setId(99L).setUrl("test-label"));
@@ -202,11 +199,81 @@ class LogisticsWaybillServiceImplTest {
         try {
             var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
             assertThat(result.getJobId()).startsWith("JOB-");
-            verify(sfClient).createWaybill(account, JsonUtils.parseTree(waybill.getCreateRequestSnapshot()));
-            verifyNoInteractions(merchantLogisticsConfigService, productSkuApi, itemMapper, templateResolver);
+            verify(sfClient).createWaybill(eq(account), argThat(payload -> payload.path("orderId").asText().equals("original")
+                    && payload.path("monthlyCard").asText().equals("CARD-30")
+                    && payload.path("contactInfoList").get(0).path("contact").asText().equals("A 仓")));
         } finally {
             TenantContextHolder.clear();
         }
+    }
+
+    @Test
+    void createWaybill_lookupFailureWithoutPrinterKeepsOriginalRequestAndNeverCreatesAgain() {
+        var waybill = pendingWaybill("UNKNOWN");
+        var originalSnapshot = waybill.getCreateRequestSnapshot();
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(undeliveredOrder());
+        var account = account();
+        when(accountMapper.selectById(1L)).thenReturn(account);
+        when(sfClient.queryByProviderOrderNo(account, "original"))
+                .thenThrow(new SfApiException("QUERY_REJECTED", "lookup failed"));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
+            assertThat(result.getStatus()).isEqualTo("UNKNOWN");
+        }
+
+        assertThat(waybill.getCreateRequestSnapshot()).isEqualTo(originalSnapshot);
+        verify(sfClient, times(2)).queryByProviderOrderNo(account, "original");
+        verify(sfClient, never()).createWaybill(any(), any());
+        verifyNoInteractions(merchantLogisticsConfigService, deviceMapper);
+    }
+
+    @Test
+    void createWaybill_duplicateProviderOrderIsReconciledByLookup() {
+        var waybill = pendingWaybill("FAILED");
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(undeliveredOrder());
+        var account = account();
+        when(accountMapper.selectById(1L)).thenReturn(account);
+        when(deviceMapper.selectDefaultEnabled(30L)).thenReturn(readyDevice());
+        var originalRequest = JsonUtils.parseTree(waybill.getCreateRequestSnapshot());
+        when(sfClient.createWaybill(account, originalRequest)).thenThrow(new SfApiException("8016", "重复下单"));
+        when(sfClient.queryByProviderOrderNo(account, "original"))
+                .thenThrow(new SfApiException("LOOKUP_FAILED", "查询失败"));
+
+        var request = new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L);
+        assertThat(service.createWaybill(request).getStatus()).isEqualTo("UNKNOWN");
+        assertThat(service.createWaybill(request).getStatus()).isEqualTo("UNKNOWN");
+        verify(sfClient, times(1)).createWaybill(eq(account), any());
+        verify(sfClient, times(1)).queryByProviderOrderNo(account, "original");
+        verifyNoInteractions(merchantLogisticsConfigService);
+    }
+
+    @Test
+    void reconcileWaybill_doesNotCreateWhenStateChangedAfterJobRead() {
+        var waybill = pendingWaybill("FAILED").setCreationRejected(true);
+        when(waybillMapper.selectById(3L)).thenReturn(waybill);
+        when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
+        when(orderMapper.selectByIdForUpdate(10L)).thenReturn(undeliveredOrder());
+
+        service.reconcileWaybill(3L);
+
+        verifyNoInteractions(sfClient, deviceMapper, merchantLogisticsConfigService);
+    }
+
+    private TradeLogisticsWaybillDO pendingWaybill(String status) {
+        return new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L).setSubOrderId(20L).setMerchantId(30L)
+                .setStatus(status).setAccountId(1L).setProviderOrderNo("original")
+                .setPaperWidthMm(76).setPaperHeightMm(130).setDpi(203)
+                .setTemplateCode("original-template").setCreateRequestSnapshot("""
+                        {"monthlyCard":"OLD-CARD","orderId":"original","totalWeight":3.5,"expressTypeId":1}
+                        """);
+    }
+
+    private TradeOrderDO undeliveredOrder() {
+        return new TradeOrderDO().setId(10L).setStatus(10).setDeliveryType(1)
+                .setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());
     }
 
     @Test
@@ -261,7 +328,7 @@ class LogisticsWaybillServiceImplTest {
         TradeLogisticsWaybillDO waybill = new TradeLogisticsWaybillDO().setId(3L).setOrderId(10L)
                 .setOrderNo("T10").setWaybillNo("SF1164867434966")
                 .setStatus(LogisticsWaybillStatusEnum.CREATED.name()).setLabelFileId(99L)
-                .setLabelUrl("https://files.example/label.png").setLabelChecksum("checksum")
+                .setRequestedDeviceId(8L).setLabelUrl("https://files.example/label.png").setLabelChecksum("checksum")
                 .setPaperWidthMm(100).setPaperHeightMm(150).setDpi(203);
         TradeLogisticsPrintTaskDO failedTask = new TradeLogisticsPrintTaskDO().setId(4L).setJobId("JOB-FAILED")
                 .setWaybillId(3L).setStatus(LogisticsPrintTaskStatusEnum.FAILED.name());
@@ -270,8 +337,11 @@ class LogisticsWaybillServiceImplTest {
         when(waybillMapper.selectByOrderIdForUpdate(10L, 20L)).thenReturn(waybill);
         when(taskMapper.selectLatestByWaybillIdForUpdate(3L)).thenReturn(failedTask);
 
+        lenient().when(deviceMapper.selectById(8L)).thenReturn(readyDevice().setId(8L).setMerchantId(null));
+
         var result = service.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(10L).setSubOrderId(20L));
 
+        assertThat(result.getDeviceId()).isEqualTo(2L);
         assertThat(result.getPrintStatus()).isEqualTo(LogisticsPrintTaskStatusEnum.PENDING.name());
         assertThat(result.getJobId()).isNotEqualTo("JOB-FAILED");
         assertThat(result).extracting("reused").isEqualTo(false);
@@ -360,6 +430,7 @@ class LogisticsWaybillServiceImplTest {
         assertThat(captor.getValue().getProviderOrderNo()).startsWith("YD-null-10-")
                 .isNotEqualTo(cancelled.getProviderOrderNo());
         assertThat(result.getStatus()).isEqualTo(LogisticsWaybillStatusEnum.FAILED.name());
+        assertThat(captor.getValue().getCreationRejected()).isTrue();
     }
 
     @Test

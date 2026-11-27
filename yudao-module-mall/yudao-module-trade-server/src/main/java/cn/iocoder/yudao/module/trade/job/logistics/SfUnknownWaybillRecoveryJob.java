@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.trade.job.logistics;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.tenant.core.job.TenantJob;
-import cn.iocoder.yudao.module.trade.controller.admin.logistics.vo.LogisticsWaybillCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.logistics.TradeLogisticsWaybillDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.logistics.TradeLogisticsWaybillMapper;
 import cn.iocoder.yudao.module.trade.enums.logistics.LogisticsWaybillStatusEnum;
@@ -33,9 +32,7 @@ public class SfUnknownWaybillRecoveryJob {
                         LogisticsWaybillStatusEnum.CANCEL_UNKNOWN.name()).contains(waybill.getStatus())) {
                     waybillService.cancelWaybill(waybill.getId());
                 } else {
-                    waybillService.createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(waybill.getOrderId())
-                            .setSubOrderId(waybill.getSubOrderId())
-                            .setAccountId(waybill.getAccountId()).setDeviceId(waybill.getRequestedDeviceId()));
+                    waybillService.reconcileWaybill(waybill.getId());
                 }
                 count++;
             } catch (Exception exception) {

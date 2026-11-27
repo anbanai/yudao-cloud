@@ -54,7 +54,7 @@ public class SfOpenApiClient {
         } catch (HttpException exception) {
             boolean timeout = exception.getCause() instanceof SocketTimeoutException
                     || exception.getMessage() != null && exception.getMessage().toLowerCase().contains("timed out");
-            throw new SfApiException(timeout ? "TIMEOUT" : "NETWORK", exception.getMessage(), timeout, exception);
+            throw new SfApiException(timeout ? "TIMEOUT" : "NETWORK", exception.getMessage(), true, exception);
         }
     }
 
@@ -80,6 +80,9 @@ public class SfOpenApiClient {
             throw new SfApiException("EMPTY_RESPONSE", "顺丰返回为空", true, null);
         }
         String apiCode = root.path("apiResultCode").asText();
+        if (apiCode.isBlank()) {
+            throw new SfApiException("INVALID_RESPONSE", "顺丰返回缺少 apiResultCode", true, null);
+        }
         if (!"A1000".equals(apiCode)) {
             throw new SfApiException(apiCode, root.path("apiErrorMsg").asText("顺丰接口失败"));
         }

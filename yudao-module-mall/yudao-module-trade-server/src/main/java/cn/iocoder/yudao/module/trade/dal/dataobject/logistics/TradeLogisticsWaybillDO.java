@@ -34,12 +34,13 @@ public class TradeLogisticsWaybillDO extends TenantBaseDO {
     private String providerOrderNo;
     private String waybillNo;
     private String status;
+    private Boolean creationRejected;
     private Long labelFileId;
     private String labelUrl;
     private String labelContentType;
     private String labelChecksum;
     private Long labelSize;
-    /** 首次建单使用的完整顺丰请求，含月结卡与寄收件信息，加密保存供重试使用。 */
+    /** 本次建单的完整顺丰请求，含月结卡与寄收件信息，加密保存供重试及追溯使用。 */
     @TableField(typeHandler = EncryptTypeHandler.class)
     @ToString.Exclude
     @JsonIgnore

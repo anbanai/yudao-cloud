@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -99,6 +100,35 @@ class LogisticsManagementServiceImplTest {
         var captor = org.mockito.ArgumentCaptor.forClass(TradeLogisticsAccountDO.class);
         verify(accountMapper).updateById(captor.capture());
         assertThat(captor.getValue().getTemplateCode()).isEqualTo("fm_verified_merchant_template");
+    }
+
+    @Test
+    void saveAccountClearsDedicatedTemplateWhenPartnerChanges() {
+        var request = validRequest().setId(7L).setPartnerId("new-partner");
+        var existing = new TradeLogisticsAccountDO().setId(7L).setPartnerId("partner")
+                .setTemplateCode("fm_verified_merchant_template").setPaperWidthMm(100).setPaperHeightMm(150);
+        when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L));
+        when(accountMapper.selectById(7L)).thenReturn(existing);
+
+        service.saveAccount(request);
+
+        verify(accountMapper).updateById(existing);
+        assertThat(existing.getPartnerId()).isEqualTo("new-partner");
+        assertThat(existing.getTemplateCode()).isNull();
+        assertThat(new SfLabelTemplateResolver("").supportedPaperSpecs(existing)).containsExactly("76x130");
+    }
+
+    @Test
+    void saveDisabledAccountDoesNotReplaceDefaultAccount() {
+        var request = validRequest().setStatus(1).setDefaultFlag(true);
+        when(expressMapper.selectByCode("SF")).thenReturn(new DeliveryExpressDO().setId(6L));
+
+        service.saveAccount(request);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(TradeLogisticsAccountDO.class);
+        verify(accountMapper).insert(captor.capture());
+        assertThat(captor.getValue().getDefaultFlag()).isFalse();
+        verify(accountMapper, never()).clearDefault(null);
     }
 
     @Test

@@ -75,13 +75,14 @@ CREATE TABLE IF NOT EXISTS `trade_logistics_waybill` (
   `provider_order_no` varchar(128) NOT NULL,
   `waybill_no` varchar(64) DEFAULT NULL,
   `status` varchar(16) NOT NULL COMMENT 'CREATING/CREATED/UNKNOWN/FAILED/CANCELLING/CANCEL_UNKNOWN/CANCELLED',
+  `creation_rejected` bit(1) NOT NULL DEFAULT b'0' COMMENT '顺丰明确拒绝下单',
   `active_order_id` bigint GENERATED ALWAYS AS (CASE WHEN `deleted` = b'0' AND `status` <> 'CANCELLED' THEN `order_id` ELSE NULL END) STORED,
   `label_file_id` bigint DEFAULT NULL COMMENT 'infra_file.id',
   `label_url` varchar(1024) DEFAULT NULL,
   `label_content_type` varchar(32) DEFAULT NULL,
   `label_checksum` varchar(64) DEFAULT NULL,
   `label_size` bigint DEFAULT NULL,
-  `template_code` varchar(64) DEFAULT NULL,
+  `template_code` varchar(96) DEFAULT NULL,
   `paper_width_mm` int DEFAULT NULL,
   `paper_height_mm` int DEFAULT NULL,
   `dpi` int DEFAULT NULL,
@@ -225,9 +226,13 @@ CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_city', 'varc
 CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_district', 'varchar(64)');
 CALL `tmp_sf_add_column`('trade_merchant_logistics_config', 'return_address', 'varchar(512)');
 CALL `tmp_sf_add_column`('trade_logistics_waybill', 'create_request_snapshot', 'mediumtext');
+CALL `tmp_sf_add_column`('trade_logistics_waybill', 'creation_rejected', 'bit(1) NOT NULL DEFAULT b''0'' COMMENT ''顺丰明确拒绝下单''');
 CALL `tmp_sf_add_column`('trade_logistics_print_device', 'merchant_id', 'bigint');
 CALL `tmp_sf_add_column`('trade_logistics_print_task', 'merchant_id', 'bigint');
 DROP PROCEDURE `tmp_sf_add_column`;
+
+ALTER TABLE `trade_logistics_waybill`
+  MODIFY COLUMN `template_code` varchar(96) DEFAULT NULL;
 
 ALTER TABLE `trade_logistics_account`
   MODIFY COLUMN `service_code` varchar(32) DEFAULT NULL,

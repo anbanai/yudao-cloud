@@ -53,6 +53,8 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 @Service
 public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
+    private static final String SF_DUPLICATE_ORDER = "8016";
+
     @Resource private TradeOrderMapper orderMapper;
     @Resource private TradeOrderItemMapper orderItemMapper;
     @Resource private TradeOrderSubMapper orderSubMapper;
@@ -74,25 +76,42 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     @Override
     public LogisticsWaybillRespVO createWaybill(LogisticsWaybillCreateReqVO request) {
-        CreationPreparation preparation = inTransaction(() -> prepareCreation(request));
+        return createWaybill(request, null);
+    }
+
+    @Override
+    public void reconcileWaybill(Long id) {
+        TradeLogisticsWaybillDO waybill = waybillMapper.selectById(id);
+        if (waybill != null) {
+            createWaybill(new LogisticsWaybillCreateReqVO().setOrderId(waybill.getOrderId())
+                    .setSubOrderId(waybill.getSubOrderId()), id);
+        }
+    }
+
+    private LogisticsWaybillRespVO createWaybill(LogisticsWaybillCreateReqVO request, Long reconciliationId) {
+        CreationPreparation preparation = inTransaction(() -> prepareCreation(request, reconciliationId));
+        if (preparation == null) {
+            return null;
+        }
         TradeLogisticsWaybillDO waybill = preparation.waybill();
         if (preparation.task() != null) {
             return toResp(waybill, preparation.task()).setReused(preparation.taskReused());
         }
         TradeLogisticsAccountDO account = preparation.account();
-        if (preparation.newRecord() || LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus())) {
+        if (preparation.submitToCarrier()) {
             createRemoteWaybill(waybill, account);
-        } else if (List.of(LogisticsWaybillStatusEnum.CREATING.name(),
-                LogisticsWaybillStatusEnum.UNKNOWN.name()).contains(waybill.getStatus())) {
+        } else if (isAwaitingCarrierResult(waybill)) {
             queryRemoteWaybill(waybill, account);
         }
         if (!LogisticsWaybillStatusEnum.CREATED.name().equals(waybill.getStatus())) {
             return toResp(waybill, null);
         }
-        return createLabelAndTask(waybill, account, preparation.device());
+        TradeLogisticsPrintDeviceDO device = preparation.device() == null
+                ? getDevice(preparation.merchantId(), request.getDeviceId()) : preparation.device();
+        return createLabelAndTask(waybill, account, device);
     }
 
-    private CreationPreparation prepareCreation(LogisticsWaybillCreateReqVO request) {
+    private CreationPreparation prepareCreation(LogisticsWaybillCreateReqVO request, Long reconciliationId) {
         TradeOrderDO order = orderMapper.selectByIdForUpdate(request.getOrderId());
         validateOrder(order);
         TradeOrderSubDO subOrder = validateSubOrder(order, request.getSubOrderId());
@@ -103,6 +122,10 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
             throw exception(WECHAT_LOGISTICS_WAYBILL_ALREADY_EXISTS);
         }
         TradeLogisticsWaybillDO waybill = waybillMapper.selectByOrderIdForUpdate(order.getId(), subOrder.getId());
+        if (reconciliationId != null && (waybill == null || !reconciliationId.equals(waybill.getId())
+                || !isAwaitingCarrierResult(waybill))) {
+            return null;
+        }
         boolean newRecord = waybill == null || LogisticsWaybillStatusEnum.CANCELLED.name().equals(waybill.getStatus());
         if (newRecord) {
             TradeLogisticsAccountDO account = getAccount(request.getAccountId());
@@ -120,40 +143,47 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
                             config.getPaperHeightMm(), config.getDpi()))
                     .setCreateRequestSnapshot(buildCreateSnapshot(config, providerOrderNo, order, subOrder.getId()));
             waybillMapper.insert(waybill);
-            return new CreationPreparation(account, device, waybill, null, true, false);
+            return new CreationPreparation(account, device, waybill, null, true, false, merchantId);
         }
 
         TradeLogisticsPrintTaskDO task = taskMapper.selectLatestByWaybillIdForUpdate(waybill.getId());
         if (task != null && !LogisticsPrintTaskStatusEnum.FAILED.name().equals(task.getStatus())) {
-            return new CreationPreparation(null, null, waybill, task, false, true);
+            return new CreationPreparation(null, null, waybill, task, false, true, merchantId);
         }
-        boolean rebuildLegacyRequest = waybill.getCreateRequestSnapshot() == null
-                && LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus()) && task == null;
-        TradeLogisticsPrintDeviceDO device = rebuildLegacyRequest ? getDevice(merchantId, request.getDeviceId())
-                : getRetryDevice(waybill, merchantId, request.getDeviceId());
         if (task != null) {
+            TradeLogisticsPrintDeviceDO device = getDevice(merchantId, request.getDeviceId());
             TradeLogisticsPrintTaskDO retryTask = newTask(waybill, device);
             taskMapper.insert(retryTask);
-            return new CreationPreparation(null, device, waybill, retryTask, false, false);
+            return new CreationPreparation(null, device, waybill, retryTask, false, false, merchantId);
         }
         TradeLogisticsAccountDO account = getAccount(waybill.getAccountId());
+        if (LogisticsWaybillStatusEnum.FAILED.name().equals(waybill.getStatus())) {
+            TradeLogisticsPrintDeviceDO device = getDevice(merchantId, request.getDeviceId());
+            // 老记录的 FAILED 也可能来自查询失败。有快照时按原请求重试，直到确认顺丰明确拒绝。
+            if (Boolean.TRUE.equals(waybill.getCreationRejected()) || waybill.getCreateRequestSnapshot() == null) {
+                TradeMerchantLogisticsConfigDO config = merchantLogisticsConfigService.getRequiredShippingConfig(merchantId);
+                waybill.setCreateRequestSnapshot(buildCreateSnapshot(config, waybill.getProviderOrderNo(), order, subOrder.getId()))
+                        .setPaperWidthMm(config.getPaperWidthMm()).setPaperHeightMm(config.getPaperHeightMm())
+                        .setDpi(config.getDpi()).setTemplateCode(templateResolver.requireTemplate(account,
+                                config.getPaperWidthMm(), config.getPaperHeightMm(), config.getDpi()));
+            }
+            waybillMapper.updateById(waybill.setRequestedDeviceId(device.getId())
+                    .setCreationRejected(false).setStatus(LogisticsWaybillStatusEnum.CREATING.name()));
+            return new CreationPreparation(account, device, waybill, null, true, false, merchantId);
+        }
         // 旧版本在面单生成成功后才保存纸张。只为已存在的运单补齐其原接入账号上的规格。
         if (waybill.getPaperWidthMm() == null) {
             waybill.setPaperWidthMm(account.getPaperWidthMm()).setPaperHeightMm(account.getPaperHeightMm())
                     .setTemplateCode(account.getTemplateCode()).setDpi(account.getDpi());
             waybillMapper.updateById(waybill);
         }
-        if (rebuildLegacyRequest) {
-            // 已明确失败的旧运单没有请求快照。使用当前商家确认的完整设置重新准备请求。
-            TradeMerchantLogisticsConfigDO config = merchantLogisticsConfigService.getRequiredShippingConfig(merchantId);
-            waybill.setRequestedDeviceId(device.getId())
-                    .setCreateRequestSnapshot(buildCreateSnapshot(config, waybill.getProviderOrderNo(), order, subOrder.getId()))
-                    .setPaperWidthMm(config.getPaperWidthMm()).setPaperHeightMm(config.getPaperHeightMm())
-                    .setDpi(config.getDpi()).setTemplateCode(templateResolver.requireTemplate(account,
-                            config.getPaperWidthMm(), config.getPaperHeightMm(), config.getDpi()));
-            waybillMapper.updateById(waybill);
-        }
-        return new CreationPreparation(account, device, waybill, null, false, false);
+        // 查询顺丰前无需绑定打印机。查询成功后才解析本次打印设备。
+        return new CreationPreparation(account, null, waybill, null, false, false, merchantId);
+    }
+
+    private static boolean isAwaitingCarrierResult(TradeLogisticsWaybillDO waybill) {
+        return LogisticsWaybillStatusEnum.CREATING.name().equals(waybill.getStatus())
+                || LogisticsWaybillStatusEnum.UNKNOWN.name().equals(waybill.getStatus());
     }
 
     private String buildCreateSnapshot(TradeMerchantLogisticsConfigDO config, String providerOrderNo,
@@ -168,7 +198,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         try {
             markCreated(waybill, sfClient.createWaybill(account, JsonUtils.parseTree(waybill.getCreateRequestSnapshot())));
         } catch (SfApiException exception) {
-            updateFailure(waybill, exception);
+            updateFailure(waybill, exception, exception.isUnknownResult() || SF_DUPLICATE_ORDER.equals(exception.getCode()));
         }
     }
 
@@ -176,7 +206,7 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         try {
             markCreated(waybill, sfClient.queryByProviderOrderNo(account, waybill.getProviderOrderNo()));
         } catch (SfApiException exception) {
-            updateFailure(waybill, exception);
+            updateFailure(waybill, exception, true);
         }
     }
 
@@ -232,6 +262,10 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         inTransaction(() -> {
             TradeLogisticsWaybillDO current = waybillMapper.selectByIdForUpdate(waybill.getId());
             if (current == null) current = waybill;
+            if (!isAwaitingCarrierResult(current)) {
+                copyRemoteState(current, waybill);
+                return null;
+            }
             current.setWaybillNo(result.waybillNo()).setStatus(LogisticsWaybillStatusEnum.CREATED.name())
                     .setProviderResponse(StrUtil.maxLength(JsonUtils.toJsonString(result.rawResponse()), 10_000))
                     .setLastSyncTime(LocalDateTime.now()).setErrorCode(null).setErrorMessage(null);
@@ -241,14 +275,14 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
         });
     }
 
-    private void updateFailure(TradeLogisticsWaybillDO waybill, SfApiException exception) {
+    private void updateFailure(TradeLogisticsWaybillDO waybill, SfApiException exception, boolean unknownResult) {
         inTransaction(() -> {
             TradeLogisticsWaybillDO current = waybillMapper.selectByIdForUpdate(waybill.getId());
             if (current == null) current = waybill;
-            if (!LogisticsWaybillStatusEnum.CREATED.name().equals(current.getStatus())) {
-                current.setStatus(exception.isUnknownResult() ? LogisticsWaybillStatusEnum.UNKNOWN.name()
+            if (isAwaitingCarrierResult(current)) {
+                current.setStatus(unknownResult ? LogisticsWaybillStatusEnum.UNKNOWN.name()
                                 : LogisticsWaybillStatusEnum.FAILED.name())
-                        .setErrorCode(exception.getCode())
+                        .setCreationRejected(!unknownResult).setErrorCode(exception.getCode())
                         .setErrorMessage(StrUtil.maxLength(exception.getMessage(), 1024));
                 waybillMapper.updateById(current);
             }
@@ -565,7 +599,8 @@ public class LogisticsWaybillServiceImpl implements LogisticsWaybillService {
 
     private record CreationPreparation(TradeLogisticsAccountDO account,
                                        TradeLogisticsPrintDeviceDO device, TradeLogisticsWaybillDO waybill,
-                                       TradeLogisticsPrintTaskDO task, boolean newRecord, boolean taskReused) {
+                                       TradeLogisticsPrintTaskDO task, boolean submitToCarrier, boolean taskReused,
+                                       Long merchantId) {
     }
 
     private record CancellationPreparation(TradeLogisticsWaybillDO waybill, TradeLogisticsPrintTaskDO task,

@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.dal.dataobject.logistics;
 
 import cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -30,6 +31,7 @@ public class TradeLogisticsAccountDO extends TenantBaseDO {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String checkWord;
     private String serviceCode;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String templateCode;
     private String senderName;
     private String senderPhone;
