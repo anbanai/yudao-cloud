@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.dal.mysql.spu;
 
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils;
 import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
@@ -7,6 +8,8 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantDatabaseInterceptor;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.mysql.sku.ProductSkuMapper;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
+import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantServiceImpl;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import jakarta.annotation.Resource;
@@ -22,9 +25,13 @@ import javax.sql.DataSource;
 import java.util.List;
 import java.util.Set;
 
+import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MERCHANT_NOT_AVAILABLE;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MERCHANT_NOT_EXISTS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
-@Import(ProductSpuAvailableMerchantQueryTest.TenantQueryTestConfiguration.class)
+@Import({ProductSpuAvailableMerchantQueryTest.TenantQueryTestConfiguration.class, ProductMerchantServiceImpl.class})
 class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
 
     @Resource
@@ -33,6 +40,8 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
     private ProductSkuMapper skuMapper;
     @Resource
     private DataSource dataSource;
+    @Resource
+    private ProductMerchantService merchantService;
 
     @BeforeEach
     void setTenant() {
@@ -70,6 +79,43 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
         assertThat(spuMapper.selectAvailableByIds(List.of(1000L, 2000L, 3000L, 4000L)))
                 .extracting(row -> row.getId()).containsExactly(1000L);
         assertThat(spuMapper.selectAvailableByIds(List.of(2000L))).isEmpty();
+    }
+
+    @Test
+    void testValidateMerchantForManagement_acceptsPlatformMerchantUsedByLegacyProducts() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.update("INSERT INTO product_merchant (id, name, status, tenant_id) VALUES (?, ?, ?, ?)",
+                110L, "平台自营商家", 20, 0L);
+        insertMerchant(jdbc, 111L, 20, false, 0L);
+        insertMerchant(jdbc, 112L, 20, false, 2L);
+        insertMerchant(jdbc, 113L, 40, false, 1L);
+
+        assertThatCode(() -> merchantService.validateMerchantForManagement(110L)).doesNotThrowAnyException();
+        assertServiceException(() -> merchantService.validateMerchantForManagement(111L), MERCHANT_NOT_EXISTS);
+        assertServiceException(() -> merchantService.validateMerchantForManagement(112L), MERCHANT_NOT_EXISTS);
+        assertServiceException(() -> merchantService.validateMerchantForManagement(113L), MERCHANT_NOT_AVAILABLE);
+    }
+
+    @Test
+    void testGetSelectableMerchantPage_onlyIncludesApprovedCurrentTenantAndPlatformMerchant() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.update("INSERT INTO product_merchant (id, name, status, tenant_id) VALUES (?, ?, ?, ?)",
+                120L, "平台自营商家", 20, 0L);
+        insertMerchant(jdbc, 121L, 20, false, 1L);
+        insertMerchant(jdbc, 122L, 20, false, 0L);
+        insertMerchant(jdbc, 123L, 20, false, 2L);
+        insertMerchant(jdbc, 124L, 10, false, 1L);
+        insertMerchant(jdbc, 125L, 20, true, 1L);
+
+        PageParam pageParam = new PageParam();
+        pageParam.setPageSize(1);
+        var firstPage = merchantService.getSelectableMerchantPage(pageParam);
+        assertThat(firstPage.getTotal()).isEqualTo(2L);
+        assertThat(firstPage.getList()).extracting(row -> row.getId()).containsExactly(121L);
+
+        pageParam.setPageNo(2);
+        assertThat(merchantService.getSelectableMerchantPage(pageParam).getList())
+                .extracting(row -> row.getId()).containsExactly(120L);
     }
 
     @Test

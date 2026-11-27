@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.product.service.merchant;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
@@ -13,6 +14,7 @@ import cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantApplica
 import cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantReviewRecordMapper;
 import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -24,6 +26,9 @@ import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.*;
 @Service
 @Validated
 public class ProductMerchantServiceImpl implements ProductMerchantService {
+
+    @Value("${yudao.tenant.enable:true}")
+    private boolean tenantEnabled = true;
 
     @Resource
     private ProductMerchantMapper merchantMapper;
@@ -45,6 +50,12 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
     @Override
     public PageResult<ProductMerchantDO> getMerchantPage(ProductMerchantPageReqVO reqVO) {
         return merchantMapper.selectPage(reqVO);
+    }
+
+    @Override
+    public PageResult<ProductMerchantDO> getSelectableMerchantPage(PageParam pageParam) {
+        Long tenantId = tenantEnabled ? TenantContextHolder.getRequiredTenantId() : null;
+        return merchantMapper.selectSelectablePage(pageParam, tenantId);
     }
 
     @Override
@@ -125,12 +136,10 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
 
     @Override
     public void validateMerchantForManagement(Long id) {
-        ProductMerchantDO merchant = merchantMapper.selectById(id);
+        Long tenantId = tenantEnabled ? TenantContextHolder.getRequiredTenantId() : null;
+        ProductMerchantDO merchant = merchantMapper.selectForManagement(id, tenantId);
         if (merchant == null) {
             throw exception(MERCHANT_NOT_EXISTS);
-        }
-        if (!java.util.Objects.equals(merchant.getTenantId(), TenantContextHolder.getRequiredTenantId())) {
-            throw exception(MERCHANT_TENANT_MISMATCH);
         }
         if (!ProductMerchantStatusEnum.isAvailable(merchant.getStatus())) {
             throw exception(MERCHANT_NOT_AVAILABLE);

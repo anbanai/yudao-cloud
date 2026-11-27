@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.web.config.WebProperties;
 import cn.iocoder.yudao.framework.web.config.YudaoWebAutoConfiguration;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.ProductMerchantApplicationController;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.ProductMerchantBusinessTypeController;
+import cn.iocoder.yudao.module.product.controller.admin.merchant.ProductMerchantController;
 import cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantSpuController;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
@@ -49,6 +50,7 @@ class ProductMerchantControllerMappingTest {
                     cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantApplicationController.class);
             context.registerBean("adminProductMerchantBusinessTypeController",
                     ProductMerchantBusinessTypeController.class);
+            context.registerBean(ProductMerchantController.class);
             context.registerBean("merchantProductMerchantBusinessTypeController",
                     cn.iocoder.yudao.module.product.controller.merchant.ProductMerchantBusinessTypeController.class);
             context.refresh();
@@ -59,6 +61,7 @@ class ProductMerchantControllerMappingTest {
                     .flatMap(mapping -> mapping.getPatternValues().stream())
                     .collect(Collectors.toSet());
             assertThat(paths).contains(
+                    "/admin-api/product/merchant/selectable-page",
                     "/admin-api/product/merchant/application/history",
                     "/merchant-api/product/merchant/application/history",
                     "/admin-api/product/merchant/business-type/page",

@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.service.merchant;
 
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.ProductMerchantPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
@@ -11,6 +12,7 @@ public interface ProductMerchantService {
      */
     ProductMerchantDO getMerchantForTrade(Long id);
     PageResult<ProductMerchantDO> getMerchantPage(ProductMerchantPageReqVO reqVO);
+    PageResult<ProductMerchantDO> getSelectableMerchantPage(PageParam pageParam);
     /**
      * Approves an application after checking the merchant is still in the expected review state.
      * The expected state is part of the transition contract so a stale review cannot approve a
@@ -21,6 +23,6 @@ public interface ProductMerchantService {
     void unfreezeMerchant(Long id, Long reviewerId);
     void updateStoreProfile(Long merchantId, String storeName, String logoUrl, String description);
     void validateMerchantAvailable(Long id);
-    /** 校验后台经营数据使用的商家属于当前租户且处于可经营状态。 */
+    /** 校验后台经营数据使用的是当前租户商家或全局自营商家，且处于可经营状态。 */
     void validateMerchantForManagement(Long id);
 }

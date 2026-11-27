@@ -1,10 +1,10 @@
 package cn.iocoder.yudao.module.product.controller.admin.merchant;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.admin.merchant.vo.*;
 import cn.iocoder.yudao.module.product.convert.merchant.ProductMerchantConvert;
-import cn.iocoder.yudao.module.product.dal.dataobject.merchant.ProductMerchantDO;
 import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,6 +38,15 @@ public class ProductMerchantController {
     @PreAuthorize("@ss.hasPermission('product:merchant:query')")
     public CommonResult<PageResult<ProductMerchantRespVO>> getMerchantPage(@Valid ProductMerchantPageReqVO reqVO) {
         return success(ProductMerchantConvert.INSTANCE.convertPage(merchantService.getMerchantPage(reqVO)));
+    }
+
+    @GetMapping("/selectable-page")
+    @Operation(summary = "获得商品和品牌可选的商家分页")
+    @PreAuthorize("@ss.hasAnyPermissions('product:merchant:query', "
+            + "'product:spu:query', 'product:spu:create', 'product:spu:update', "
+            + "'product:brand:query', 'product:brand:create', 'product:brand:update')")
+    public CommonResult<PageResult<ProductMerchantSimpleRespVO>> getSelectableMerchantPage(@Valid PageParam pageParam) {
+        return success(ProductMerchantConvert.INSTANCE.convertSimplePage(merchantService.getSelectableMerchantPage(pageParam)));
     }
 
     @PostMapping("/freeze")
