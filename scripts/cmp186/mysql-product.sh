@@ -54,10 +54,10 @@ if root < "$brand" > "$work/dual" 2>&1; then exit 1; fi
 grep -q 'Both brand columns exist' "$work/dual"
 test "$(root -e 'SELECT CONCAT(show_in_detail+0,show_on_detail+0) FROM product_brand')" = 10
 root <<SQL
-CREATE TABLE product_merchant(id BIGINT,tenant_id BIGINT,deleted INT, PRIMARY KEY(id,tenant_id));
+CREATE TABLE product_merchant(id BIGINT,tenant_id BIGINT,deleted INT,name VARCHAR(128),store_name VARCHAR(128),status INT,owner_account_id BIGINT, PRIMARY KEY(id,tenant_id));
 CREATE TABLE product_spu(id BIGINT PRIMARY KEY,merchant_id BIGINT,tenant_id BIGINT,deleted INT);
 CREATE TABLE product_sku(id BIGINT PRIMARY KEY,spu_id BIGINT,tenant_id BIGINT,price INT,stock INT,deleted INT);
-INSERT INTO product_merchant VALUES(2,1,0);
+INSERT INTO product_merchant VALUES(2,1,0,'Synthetic',NULL,20,NULL);
 INSERT INTO product_yz_import_grant VALUES(1,2,7);
 INSERT INTO trade_delivery_express_template(id,name,sort,charge_mode,tenant_id,deleted) VALUES(10,'Synthetic',0,1,1,0),(11,'Other tenant',0,1,5,0),(12,'Deleted',0,1,1,1),(13,'Unsupported',0,9,1,0);
 CREATE USER 'product_fixture'@'%' IDENTIFIED BY '$CMP186_PRODUCT_PASSWORD';

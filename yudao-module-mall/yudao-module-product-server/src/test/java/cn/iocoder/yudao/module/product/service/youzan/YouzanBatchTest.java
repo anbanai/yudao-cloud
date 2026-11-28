@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.product.service.youzan;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReqVO;
@@ -20,7 +19,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.mockito.Mockito.*;
@@ -30,7 +28,6 @@ class YouzanBatchTest {
     private JdbcTemplate db;
     private TransactionTemplate tx;
     private YouzanImportService service;
-    private ProductMerchantService merchants;
     private static final List<String> HEADERS = List.of(("商品id|规格id|商品名称|商品规格|商品规格名称|商品编码|规格编码|商品条码|规格条码|商品类型|售卖方式|商品分组|分享描述|商品卖点|价格（元）|成本价（元）|库存|累计销量|会员折扣|商品链接|供货价（元）|供货商|最低零售价（元）|最高零售价（元）|进口税费|海关税率（%）|跨境方式|创建时间|划线价（元）|访客数|浏览量|补货提醒数|商品状态|一级类目|二级类目|三级类目|四级类目|五级类目|类目参数|运费模版|配送方式|售后服务|库存扣减方式|商品页模版|重量（kg）|电子卡券有效期|限购周期及数量|开售时间|商品属性|商品定时下架|优惠券名称|名称备注").split("\\|"));
 
     @BeforeEach void setup() {
@@ -48,21 +45,20 @@ class YouzanBatchTest {
         db = new JdbcTemplate(ds);
         tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
         db.execute("CREATE TABLE product_yz_import_grant(tenant_id BIGINT,merchant_id BIGINT,operator_id BIGINT)");
-        db.execute("CREATE TABLE product_merchant(id BIGINT,tenant_id BIGINT,deleted INT,name VARCHAR,store_name VARCHAR,status INT)");
+        db.execute("CREATE TABLE product_merchant(id BIGINT,tenant_id BIGINT,deleted INT,name VARCHAR,store_name VARCHAR,status INT,owner_account_id BIGINT)");
         db.execute("CREATE TABLE product_spu(id BIGINT,merchant_id BIGINT,tenant_id BIGINT,deleted INT)");
         db.execute("CREATE TABLE product_sku(id BIGINT,spu_id BIGINT,tenant_id BIGINT,price INT,stock INT,deleted INT)");
         db.execute("CREATE TABLE trade_delivery_express_template(id BIGINT,tenant_id BIGINT,charge_mode INT,deleted INT)");
         db.update("INSERT INTO trade_delivery_express_template VALUES(10,1,1,0),(11,5,1,0),(12,1,1,1),(13,1,9,0)");
         db.execute("CREATE TABLE product_yz_import_batch(batch_id VARCHAR PRIMARY KEY,tenant_id BIGINT, merchant_id BIGINT,operator_id BIGINT,confirmed BOOLEAN DEFAULT FALSE,expires_at TIMESTAMP,confirmed_at TIMESTAMP,row_count INT,draft_count INT,payload BLOB)");
         db.execute("CREATE TABLE product_yz_import_draft(tenant_id BIGINT,merchant_id BIGINT,product_key VARCHAR,sku_key VARCHAR,name VARCHAR,specification VARCHAR,source_price INT,source_stock INT,mapping_hints VARCHAR,mall_sku_id BIGINT,batch_id VARCHAR,PRIMARY KEY(tenant_id,merchant_id,product_key,sku_key))");
-        db.update("INSERT INTO product_merchant VALUES (2,1,0,'一号商家','一号店',20),(3,1,0,'二号商家',NULL,20),(2,5,0,'其他租户',NULL,20)");
+        db.update("INSERT INTO product_merchant VALUES (2,1,0,'一号商家','一号店',20,NULL),(3,1,0,'二号商家',NULL,20,NULL),(2,5,0,'其他租户',NULL,20,NULL)");
         db.update("INSERT INTO product_yz_import_grant VALUES(1,2,7),(1,2,8),(1,3,7),(5,2,7)");
         initializeServices();
     }
 
     private void initializeServices() {
-        merchants = (ProductMerchantService) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{ProductMerchantService.class}, (proxy, method, args) -> null);
-        service = new YouzanImportService(db, merchants, new ObjectMapper(), null, null, Base64.getEncoder().encodeToString(new byte[32]));
+        service = new YouzanImportService(db, new ObjectMapper(), null, null, Base64.getEncoder().encodeToString(new byte[32]));
         login(1, 7);
     }
 
@@ -74,7 +70,7 @@ class YouzanBatchTest {
     @AfterEach void cleanup() { TenantContextHolder.clear(); SecurityContextHolder.clearContext(); }
 
     @Test void listsOnlyAvailableMerchantsGrantedToTheCurrentOperator() {
-        db.update("INSERT INTO product_merchant VALUES (4,1,1,'已删除',NULL,20),(5,1,0,'已冻结',NULL,40)");
+        db.update("INSERT INTO product_merchant VALUES (4,1,1,'已删除',NULL,20,NULL),(5,1,0,'已冻结',NULL,40,NULL)");
         db.update("INSERT INTO product_yz_import_grant VALUES (1,4,8),(1,5,8),(1,6,8)");
         login(1, 8);
         assertEquals(List.of(new YouzanImportService.MerchantOption("2", "一号店")),
@@ -84,6 +80,48 @@ class YouzanBatchTest {
                 service.listAuthorizedMerchants());
         login(1, 99);
         assertEquals(List.of(), service.listAuthorizedMerchants());
+    }
+
+    @Test void authorizedPlatformMerchantSupportsImportAndBindingInTheOperatorsTenant() throws Exception {
+        db.update("INSERT INTO product_merchant VALUES (1,0,0,'平台自营商家','平台自营',20,NULL)");
+        db.update("INSERT INTO product_yz_import_grant VALUES (1,1,7),(5,1,7)");
+        installSyntheticCatalog();
+
+        assertTrue(service.listAuthorizedMerchants().contains(new YouzanImportService.MerchantOption("1", "平台自营")));
+        UUID id = UUID.fromString(singleSku(1, "S1").batchId());
+        login(1, 8);
+        assertThrows(AccessDeniedException.class, () -> confirm(1, id));
+        login(5, 7);
+        assertThrows(AccessDeniedException.class, () -> confirm(1, id));
+
+        login(1, 7);
+        assertEquals("UNBOUND", confirm(1, id).lines().get(0).bindingState());
+        var form = singleSkuForm().setMerchantId(1L);
+        Long spu = tx.execute(status -> service.supplement(1, id, "P", Map.of("", "S1"), form));
+        assertEquals(201L, spu);
+        assertEquals("BOUND", service.result(1, id).lines().get(0).bindingState());
+        assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM product_spu WHERE tenant_id=1 AND merchant_id=1", Integer.class));
+        assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft WHERE tenant_id=1 AND merchant_id=1", Integer.class));
+    }
+
+    @Test void importRejectsGrantsToOtherTenantsAndNonPlatformGlobalMerchants() throws Exception {
+        db.update("""
+                INSERT INTO product_merchant VALUES
+                    (4,5,0,'其他租户',NULL,20,NULL),
+                    (5,0,0,'其他全局商家',NULL,20,NULL),
+                    (6,0,0,'平台自营商家',NULL,20,89),
+                    (7,0,0,'平台自营商家',NULL,40,NULL),
+                    (8,0,1,'平台自营商家',NULL,20,NULL)
+                """);
+        db.update("INSERT INTO product_yz_import_grant VALUES (1,4,8),(1,5,8),(1,6,8),(1,7,8),(1,8,8)");
+        login(1, 8);
+        assertEquals(List.of(new YouzanImportService.MerchantOption("2", "一号店")), service.listAuthorizedMerchants());
+        var workbook = file("Sheet1", false);
+        for (long merchant = 4; merchant <= 8; merchant++) {
+            long deniedMerchant = merchant;
+            assertThrows(AccessDeniedException.class, () -> service.preview(deniedMerchant, workbook));
+        }
+        assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_batch", Integer.class));
     }
 
     private MockMultipartFile file(String sheetName, boolean wrongHeader) throws Exception {
@@ -118,6 +156,10 @@ class YouzanBatchTest {
     }
 
     private YouzanImportService.Batch singleSku(String sourceSku) throws Exception {
+        return singleSku(2, sourceSku);
+    }
+
+    private YouzanImportService.Batch singleSku(long merchant, String sourceSku) throws Exception {
         try (var book = new XSSFWorkbook(); var bytes = new ByteArrayOutputStream()) {
             var sheet = book.createSheet("Sheet1");
             var header = sheet.createRow(0);
@@ -126,7 +168,7 @@ class YouzanBatchTest {
             row.createCell(0).setCellValue("P"); row.createCell(1).setCellValue(sourceSku);
             row.createCell(2).setCellValue("合成商品"); row.createCell(14).setCellValue("8.25"); row.createCell(16).setCellValue(7);
             book.write(bytes);
-            return service.preview(2, new MockMultipartFile("file", "synthetic.xlsx", null, bytes.toByteArray()));
+            return service.preview(merchant, new MockMultipartFile("file", "synthetic.xlsx", null, bytes.toByteArray()));
         }
     }
 
@@ -141,12 +183,12 @@ class YouzanBatchTest {
         var skus = mock(ProductSkuService.class);
         when(spus.createUnlistedSpu(any())).thenAnswer(call -> {
             ProductSpuSaveReqVO form = call.getArgument(0);
-            db.update("INSERT INTO product_spu VALUES(201,2,1,0)");
+            db.update("INSERT INTO product_spu VALUES(201,?,?,0)", form.getMerchantId(), TenantContextHolder.getRequiredTenantId());
             db.update("INSERT INTO product_sku VALUES(202,201,1,?,?,0)", form.getSkus().get(0).getPrice(), form.getSkus().get(0).getStock());
             return 201L;
         });
         when(skus.getSkuListBySpuId(201L)).thenReturn(List.of(new ProductSkuDO().setId(202L)));
-        service = new YouzanImportService(db, merchants, new ObjectMapper(), spus, skus, Base64.getEncoder().encodeToString(new byte[32]));
+        service = new YouzanImportService(db, new ObjectMapper(), spus, skus, Base64.getEncoder().encodeToString(new byte[32]));
     }
 
     private Long bind(UUID id, ProductSpuSaveReqVO form) {
@@ -333,7 +375,7 @@ class YouzanBatchTest {
     @Test void supplementRequiresPresaleConfigurationAndBindsExactlyOnce() throws Exception {
         var spus = mock(ProductSpuService.class);
         var skus = mock(ProductSkuService.class);
-        service = new YouzanImportService(db, merchants, new ObjectMapper(), spus, skus, Base64.getEncoder().encodeToString(new byte[32]));
+        service = new YouzanImportService(db, new ObjectMapper(), spus, skus, Base64.getEncoder().encodeToString(new byte[32]));
         UUID id;
         try (var book = new XSSFWorkbook(file("Sheet1", false).getInputStream()); var output = new ByteArrayOutputStream()) {
             var sheet = book.getSheetAt(0);
