@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.member.dal.dataobject.importing;
 
 import cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -29,7 +30,8 @@ public class MemberYouzanImportBatchDO extends TenantBaseDO {
     private Integer importedRows;
     private Integer skippedRows;
     private Integer changedRows;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime expiresAt;
-    @TableField(typeHandler = EncryptTypeHandler.class, updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    @TableField(typeHandler = EncryptTypeHandler.class, updateStrategy = FieldStrategy.ALWAYS)
     private String encryptedPayload;
 }

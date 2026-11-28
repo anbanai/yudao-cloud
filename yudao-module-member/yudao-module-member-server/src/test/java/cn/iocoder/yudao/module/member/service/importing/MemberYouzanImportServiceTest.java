@@ -59,7 +59,8 @@ class MemberYouzanImportServiceTest {
                 var row = sheet.createRow(index + 1);
                 row.createCell(2).setCellValue(suffixes[index].isEmpty() ? "" : "138000000" + suffixes[index]);
                 row.createCell(7).setCellValue(index == 3 ? "2" : "1");
-                row.createCell(8).setCellValue("合成等级1");
+                if (index < 4) row.createCell(8).setCellValue("合成等级1");
+                if (index == 4) row.createCell(8).setCellValue("未配置等级");
                 row.createCell(11).setCellValue(points[index]);
             }
             book.write(output);
@@ -96,6 +97,12 @@ class MemberYouzanImportServiceTest {
             var result = service.preview(workbook(false), 9L);
             assertEquals(1, result.validCount());
             assertEquals(5, result.invalidCount());
+            assertEquals(7, result.rows().get(0).legacyPoints());
+            assertEquals("合成等级1", result.rows().get(0).levelName());
+            assertNull(result.rows().get(4).legacyPoints());
+            assertNull(result.rows().get(4).levelName());
+            assertEquals(0, result.rows().get(5).legacyPoints());
+            assertNull(result.rows().get(5).levelName());
             assertTrue(result.rows().get(2).outcome().contains("整组跳过"));
             assertEquals(result.rows().get(2).outcome(), result.rows().get(3).outcome());
             TenantContextHolder.setTenantId(3L);
@@ -108,7 +115,14 @@ class MemberYouzanImportServiceTest {
             verify(snapshots, never()).insert(any(MemberYouzanPointSnapshotDO.class));
             when(snapshots.findSource(eq(9L), anyString(), eq(true))).thenReturn(null);
             assertEquals(1, service.confirm(12L).importedRows());
-            assertEquals(1, service.confirm(12L).importedRows());
+            assertEquals(result.rows(), service.confirm(12L).rows());
+            when(batches.selectById(12L)).thenReturn(saved.get());
+            assertEquals(result.rows(), service.getResult(12L).rows());
+            saved.get().setMaskedRows("[{\"rowNumber\":2,\"maskedMobile\":\"138****0001\",\"outcome\":\"待导入快照\"}]");
+            var historical = service.getResult(12L).rows().get(0);
+            assertEquals("138****0001", historical.maskedMobile());
+            assertNull(historical.legacyPoints());
+            assertNull(historical.levelName());
             verify(snapshots).insert(any(MemberYouzanPointSnapshotDO.class));
             service.preview(workbook(false), 9L);
             saved.get().setExpiresAt(LocalDateTime.now().minusSeconds(1));

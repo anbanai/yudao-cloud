@@ -38,20 +38,32 @@ public class YouzanImportController {
 
     @PostMapping("/preview")
     @ApiAccessLog(requestEnable = false, responseEnable = false)
-    public CommonResult<YouzanImportService.Batch> preview(@RequestParam long merchantId, @RequestParam MultipartFile file) throws Exception {
+    public CommonResult<YouzanImportService.Batch> preview(@RequestParam(required = false) Long merchantId, @RequestParam MultipartFile file) throws Exception {
         return success(service.preview(merchantId, file));
     }
 
     @PostMapping("/confirm")
     @ApiAccessLog(requestEnable = false, responseEnable = false)
-    public CommonResult<YouzanImportService.Batch> confirm(@RequestParam long merchantId, @RequestParam UUID batchId) throws Exception {
+    public CommonResult<YouzanImportService.Batch> confirm(@RequestParam(required = false) Long merchantId, @RequestParam UUID batchId) throws Exception {
         return success(service.confirm(merchantId, batchId));
     }
 
     @GetMapping("/result")
     @ApiAccessLog(requestEnable = false, responseEnable = false)
-    public CommonResult<YouzanImportService.Batch> result(@RequestParam long merchantId, @RequestParam UUID batchId) throws Exception {
+    public CommonResult<YouzanImportService.Batch> result(@RequestParam(required = false) Long merchantId, @RequestParam UUID batchId) throws Exception {
         return success(service.result(merchantId, batchId));
+    }
+
+    @GetMapping("/pending")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<List<String>> pending(@RequestParam(required = false) UUID before) {
+        return success(service.pending(before));
+    }
+
+    @PostMapping("/assign")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<YouzanImportService.Batch> assign(@RequestParam UUID batchId, @RequestParam long merchantId) throws Exception {
+        return success(service.assign(batchId, merchantId));
     }
 
     public record Supplement(@NotNull UUID batchId, @NotNull String product, @NotNull Map<String,String> sourceByProperties, @Valid @NotNull ProductSpuSaveReqVO form) {}

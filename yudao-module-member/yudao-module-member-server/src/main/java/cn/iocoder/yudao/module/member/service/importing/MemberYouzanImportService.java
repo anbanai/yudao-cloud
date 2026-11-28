@@ -36,6 +36,7 @@ public class MemberYouzanImportService {
     private static final int STATUS_PREVIEW = 0;
     private static final int STATUS_IMPORTED = 1;
     private static final int STATUS_EXPIRED = 2;
+    private static final int STATUS_PENDING_ASSIGNMENT = 3;
     private static final int MAX_ROWS = 10_000;
 
     @Resource
@@ -78,7 +79,9 @@ public class MemberYouzanImportService {
     }
 
     public PreviewResult preview(MultipartFile file, Long merchantId) throws IOException {
-        requireGrant(merchantId, false);
+        if (merchantId != null) {
+            requireGrant(merchantId, false);
+        }
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("请上传客户模板");
         }
@@ -107,12 +110,14 @@ public class MemberYouzanImportService {
             }
             String mobile = get(row, 2);
             String points = get(row, 11);
+            Integer legacyPoints = YouzanCustomerImportRules.parseLegacyPoints(points);
             String error = YouzanCustomerImportRules.validateIdentityAndPoints(mobile, points);
             String level = get(row, 8);
+            Long mappedLevelId = level == null || level.isBlank() ? null : levels.get(level);
             if (error == null && conflicts.contains(YouzanCustomerImportRules.normalizeMobile(mobile))) error = "同一手机号的资产记录冲突，整组跳过";
-            if (error == null && level != null && !level.isBlank() && !levels.containsKey(level)) error = "免费等级未匹配当前五档配置";
+            if (error == null && level != null && !level.isBlank() && mappedLevelId == null) error = "免费等级未匹配当前五档配置";
             if (error == null && get(row, 7) != null && !get(row, 7).isBlank() && parseNonNegativeInteger(get(row, 7)) == null) error = "成长值必须为非负整数";
-            String outcome = "待导入快照";
+            String outcome = merchantId == null ? "待分配会员来源" : "待导入快照";
             YouzanCustomerImportRules.SnapshotDisposition disposition = error == null
                     ? YouzanCustomerImportRules.classifySnapshot(mobile, points, firstPointByMobile)
                     : YouzanCustomerImportRules.SnapshotDisposition.INVALID;
@@ -126,20 +131,25 @@ public class MemberYouzanImportService {
                 validCount++;
                 SnapshotPayload item = new SnapshotPayload();
                 item.setMobile(YouzanCustomerImportRules.normalizeMobile(mobile));
-                item.setPoints(YouzanCustomerImportRules.parseLegacyPoints(points));
+                item.setPoints(legacyPoints);
                 item.setGrowthValue(parseNonNegativeInteger(get(row, 7)));
-                item.setFreeLevel(get(row, 8));
-                item.setMappedLevelId(level == null || level.isBlank() ? null : levels.get(level));
-                var existing = snapshotMapper.findSource(merchantId, YouzanCustomerImportRules.keyedHash(item.getMobile(), hashSecret), false);
-                item.setObserved(observed(existing));
-                if (existing != null) outcome = Objects.equals(existing.getSnapshotHash(), fingerprint(item)) ? "重复快照，跳过" : "来源快照已变化，仅报告";
+                item.setFreeLevel(level);
+                item.setMappedLevelId(mappedLevelId);
+                if (merchantId != null) {
+                    String mobileHash = YouzanCustomerImportRules.keyedHash(item.getMobile(), hashSecret);
+                    var existing = snapshotMapper.findSource(merchantId, mobileHash, false);
+                    item.setObserved(observed(existing));
+                    if (existing != null) {
+                        outcome = Objects.equals(existing.getSnapshotHash(), fingerprint(item)) ? "重复快照，跳过" : "来源快照已变化，仅报告";
+                    }
+                }
                 item.setRowNumber(index + 1);
                 payload.add(item);
             } else {
                 invalidCount++;
             }
             resultRows.add(new PreviewRow(index + 1, YouzanCustomerImportRules.maskMobile(mobile),
-                    accepted ? outcome : error));
+                    legacyPoints, mappedLevelId == null ? null : level, accepted ? outcome : error));
         }
 
         if (resultRows.isEmpty()) throw new IllegalArgumentException("客户模板没有数据行");
@@ -162,8 +172,10 @@ public class MemberYouzanImportService {
     public ImportResult confirm(Long batchId) {
         MemberYouzanImportBatchDO batch = batchMapper.selectByIdForUpdate(batchId);
         validateOwner(batch);
-        requireGrant(batch.getMerchantId(), true);
-        if (batch.getStatus() == STATUS_IMPORTED) {
+        if (batch.getMerchantId() != null) {
+            requireGrant(batch.getMerchantId(), true);
+        }
+        if (batch.getStatus() == STATUS_IMPORTED || batch.getStatus() == STATUS_PENDING_ASSIGNMENT) {
             return toImportResult(batch);
         }
         if (batch.getStatus() != STATUS_PREVIEW) {
@@ -175,6 +187,45 @@ public class MemberYouzanImportService {
             throw new IllegalStateException("预览已过期，请重新上传");
         }
 
+        if (batch.getMerchantId() == null) {
+            batch.setStatus(STATUS_PENDING_ASSIGNMENT);
+            batch.setExpiresAt(null);
+            batchMapper.updateById(batch);
+            return toImportResult(batch);
+        }
+        return importSnapshots(batch);
+    }
+
+    public List<String> listPending(Long beforeBatchId) {
+        return batchMapper.selectList(new LambdaQueryWrapper<MemberYouzanImportBatchDO>()
+                .select(MemberYouzanImportBatchDO::getId)
+                .eq(MemberYouzanImportBatchDO::getTenantId, TenantContextHolder.getRequiredTenantId())
+                .eq(MemberYouzanImportBatchDO::getOperatorId, SecurityFrameworkUtils.getLoginUserId())
+                .eq(MemberYouzanImportBatchDO::getStatus, STATUS_PENDING_ASSIGNMENT)
+                .isNull(MemberYouzanImportBatchDO::getMerchantId)
+                .lt(beforeBatchId != null, MemberYouzanImportBatchDO::getId, beforeBatchId)
+                .orderByDesc(MemberYouzanImportBatchDO::getId).last("LIMIT 20"))
+                .stream().map(batch -> batch.getId().toString()).toList();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ImportResult assign(Long batchId, Long merchantId) {
+        MemberYouzanImportBatchDO batch = batchMapper.selectByIdForUpdate(batchId);
+        validateOwner(batch);
+        requireGrant(merchantId, true);
+        if (batch.getStatus() == STATUS_IMPORTED && Objects.equals(batch.getMerchantId(), merchantId)) {
+            return toImportResult(batch);
+        }
+        if (batch.getStatus() != STATUS_PENDING_ASSIGNMENT || batch.getMerchantId() != null) {
+            throw new IllegalStateException("仅可分配已确认且待分配的批次");
+        }
+        batch.setMerchantId(merchantId);
+        return importSnapshots(batch);
+    }
+
+    private ImportResult importSnapshots(MemberYouzanImportBatchDO batch) {
+        boolean assigning = batch.getStatus() == STATUS_PENDING_ASSIGNMENT;
+        Map<Integer, String> assignedOutcomes = new HashMap<>();
         List<SnapshotPayload> payload;
         try {
             payload = PAYLOAD_JSON.readValue(batch.getEncryptedPayload(), new TypeReference<>() { });
@@ -189,12 +240,17 @@ public class MemberYouzanImportService {
             String mobileHash = YouzanCustomerImportRules.keyedHash(item.getMobile(), hashSecret);
             String snapshotHash = fingerprint(item);
             MemberYouzanPointSnapshotDO existing = snapshotMapper.findSource(batch.getMerchantId(), mobileHash, true);
-            if (!observed(existing).equals(item.getObserved()) || (item.getMappedLevelId() != null && !Objects.equals(levels.get(item.getFreeLevel()), item.getMappedLevelId()))) {
+            if ((!assigning && !observed(existing).equals(item.getObserved()))
+                    || (item.getMappedLevelId() != null && !Objects.equals(levels.get(item.getFreeLevel()), item.getMappedLevelId()))) {
                 throw new IllegalStateException("预览后数据已变化，请重新预览");
             }
             if (existing != null) {
-                if (!snapshotHash.equals(existing.getSnapshotHash())) {
+                boolean different = !snapshotHash.equals(existing.getSnapshotHash());
+                if (different) {
                     changed++;
+                }
+                if (assigning) {
+                    assignedOutcomes.put(item.getRowNumber(), different ? "来源快照已变化，仅报告" : "重复快照，跳过");
                 }
                 skipped++;
                 continue;
@@ -212,7 +268,16 @@ public class MemberYouzanImportService {
             snapshot.setSnapshotHash(snapshotHash);
             snapshot.setRestoreStatus(0);
             snapshotMapper.insert(snapshot);
+            if (assigning) {
+                assignedOutcomes.put(item.getRowNumber(), "已导入快照");
+            }
             imported++;
+        }
+        if (assigning) {
+            List<PreviewRow> rows = maskedRows(batch).stream()
+                    .map(row -> new PreviewRow(row.rowNumber(), row.maskedMobile(), row.legacyPoints(), row.levelName(),
+                            assignedOutcomes.getOrDefault(row.rowNumber(), row.outcome()))).toList();
+            batch.setMaskedRows(JsonUtils.toJsonString(rows));
         }
         batch.setStatus(STATUS_IMPORTED);
         batch.setImportedRows(imported);
@@ -220,16 +285,15 @@ public class MemberYouzanImportService {
         batch.setChangedRows(changed);
         batch.setEncryptedPayload(null);
         batchMapper.updateById(batch);
-        batch.setImportedRows(imported);
-        batch.setSkippedRows(skipped);
-        batch.setChangedRows(changed);
         return toImportResult(batch);
     }
 
     public ImportResult getResult(Long batchId) {
         MemberYouzanImportBatchDO batch = batchMapper.selectById(batchId);
         validateOwner(batch);
-        requireGrant(batch.getMerchantId(), false);
+        if (batch.getMerchantId() != null) {
+            requireGrant(batch.getMerchantId(), false);
+        }
         return toImportResult(batch);
     }
 
@@ -246,7 +310,11 @@ public class MemberYouzanImportService {
     private ImportResult toImportResult(MemberYouzanImportBatchDO batch) {
         return new ImportResult(batch.getId(), batch.getStatus(), batch.getTotalRows(), batch.getValidRows(),
                 batch.getInvalidRows(), batch.getImportedRows(), batch.getSkippedRows(), batch.getChangedRows(),
-                batch.getExpiresAt(), JsonUtils.parseObject(batch.getMaskedRows(), new TypeReference<List<PreviewRow>>() { }));
+                batch.getExpiresAt(), maskedRows(batch), batch.getMerchantId() == null ? null : batch.getMerchantId().toString());
+    }
+
+    private List<PreviewRow> maskedRows(MemberYouzanImportBatchDO batch) {
+        return JsonUtils.parseObject(batch.getMaskedRows(), new TypeReference<List<PreviewRow>>() { });
     }
 
     private boolean readHeader(Map<Integer, String> header) {
@@ -293,10 +361,10 @@ public class MemberYouzanImportService {
         private Integer rowNumber;
     }
 
-    public record PreviewRow(int rowNumber, String maskedMobile, String outcome) { }
+    public record PreviewRow(int rowNumber, String maskedMobile, Integer legacyPoints, String levelName, String outcome) { }
     public record PreviewResult(Long batchId, LocalDateTime expiresAt, int validCount, int invalidCount,
                                 List<PreviewRow> rows) { }
     public record ImportResult(Long batchId, Integer status, Integer totalRows, Integer validRows,
                                Integer invalidRows, Integer importedRows, Integer skippedRows, Integer changedRows,
-                               LocalDateTime expiresAt, List<PreviewRow> rows) { }
+                               LocalDateTime expiresAt, List<PreviewRow> rows, String merchantId) { }
 }

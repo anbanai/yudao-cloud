@@ -52,21 +52,36 @@ public class MemberYouzanImportController {
     @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "上传并校验有赞客户积分快照")
     @PreAuthorize("@ss.hasPermission('member:youzan-import:import')")
-    public CommonResult<MemberYouzanImportService.PreviewResult> preview(@RequestParam("file") MultipartFile file, @RequestParam("merchantId") Long merchantId)
+    public CommonResult<MemberYouzanImportService.PreviewResult> preview(@RequestParam("file") MultipartFile file, @RequestParam(value = "merchantId", required = false) Long merchantId)
             throws IOException {
         return success(importService.preview(file, merchantId));
     }
 
     @PostMapping("/confirm")
-    @Operation(summary = "确认导入为待恢复客户快照，不修改会员余额")
+    @Operation(summary = "确认客户导入；未选择商家的批次保存为待分配")
     @PreAuthorize("@ss.hasPermission('member:youzan-import:import')")
     public CommonResult<MemberYouzanImportService.ImportResult> confirm(@RequestParam("batchId") Long batchId) {
         return success(importService.confirm(batchId));
     }
 
+    @GetMapping("/pending")
+    @Operation(summary = "按批次号倒序查询当前操作人的待分配批次，每页 20 条")
+    @PreAuthorize("@ss.hasAnyPermissions('member:youzan-import:query', 'member:youzan-import:import')")
+    public CommonResult<List<String>> getPending(@RequestParam(value = "before", required = false) Long beforeBatchId) {
+        return success(importService.listPending(beforeBatchId));
+    }
+
+    @PostMapping("/assign")
+    @Operation(summary = "将待分配批次导入授权商家")
+    @PreAuthorize("@ss.hasPermission('member:youzan-import:import')")
+    public CommonResult<MemberYouzanImportService.ImportResult> assign(@RequestParam("batchId") Long batchId,
+                                                                        @RequestParam("merchantId") Long merchantId) {
+        return success(importService.assign(batchId, merchantId));
+    }
+
     @GetMapping("/result")
     @Operation(summary = "查询有赞客户积分导入批次结果")
-    @PreAuthorize("@ss.hasPermission('member:youzan-import:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('member:youzan-import:query', 'member:youzan-import:import')")
     public CommonResult<MemberYouzanImportService.ImportResult> getResult(@RequestParam("batchId") Long batchId) {
         return success(importService.getResult(batchId));
     }

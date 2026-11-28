@@ -46,7 +46,7 @@ public class YouzanImportService {
 
     public record Comparison(Integer price, Integer stock) {}
     public record ResultLine(Row row, String action, Comparison before, String bindingState) {}
-    public record Batch(String batchId, boolean confirmed, List<ResultLine> lines, List<String> unusedColumns) {}
+    public record Batch(String batchId, String merchantId, boolean confirmed, List<ResultLine> lines, List<String> unusedColumns) {}
     public record MerchantOption(String id, String name) {}
 
     public List<MerchantOption> listAuthorizedMerchants() {
@@ -59,26 +59,26 @@ public class YouzanImportService {
     private record Snapshot(List<Line> lines, List<String> unusedColumns) {}
     private Batch response(Scope scope, String id, boolean confirmed, List<Line> lines, List<String> unused) {
         Map<Key, String> states = new HashMap<>();
-        if (confirmed) {
+        if (confirmed && scope.merchant != null) {
             db.query("SELECT product_key,sku_key,mall_sku_id FROM product_yz_import_draft WHERE tenant_id=? AND merchant_id=? AND batch_id=?",
                     rs -> { states.put(new Key(rs.getString(1), rs.getString(2)), rs.getObject(3) == null ? "UNBOUND" : "BOUND"); },
                     scope.tenant, scope.merchant, id);
         }
-        return new Batch(id, confirmed, lines.stream().map(line -> new ResultLine(line.row(), line.action(),
+        return new Batch(id, Objects.toString(scope.merchant, null), confirmed, lines.stream().map(line -> new ResultLine(line.row(), line.action(),
                 line.before() == null ? null : new Comparison(line.before().price(), line.before().stock()),
                 "PENDING".equals(line.action()) ? states.get(line.row().item().key()) : null)).toList(), unused);
     }
-    private record Scope(long tenant, long merchant, long operator) {
+    private record Scope(long tenant, Long merchant, long operator) {
         String aad(String id) { return "product-yz:1:" + tenant + ":" + merchant + ":" + operator + ":" + id; }
     }
-    private record Stored(byte[] bytes, boolean confirmed, boolean expired) {}
+    private record Stored(Long merchant, byte[] bytes, boolean confirmed, boolean expired) {}
 
-    private Scope scope(long merchant, boolean lock) {
+    private Scope scope(Long merchant, boolean lock) {
         long tenant = TenantContextHolder.getRequiredTenantId();
         Long operator = SecurityFrameworkUtils.getLoginUserId();
-        if (operator == null || db.query(AUTHORIZED_MERCHANTS + "AND m.id = ?" + (lock ? " FOR UPDATE" : ""),
+        if (operator == null || (merchant != null && db.query(AUTHORIZED_MERCHANTS + "AND m.id = ?" + (lock ? " FOR UPDATE" : ""),
                 (rs, rowNum) -> rs.getLong("id"), tenant, operator,
-                ProductMerchantStatusEnum.APPROVED.getStatus(), PLATFORM_MERCHANT_NAME, merchant).isEmpty()) {
+                ProductMerchantStatusEnum.APPROVED.getStatus(), PLATFORM_MERCHANT_NAME, merchant).isEmpty())) {
             throw new AccessDeniedException("商家不可用或当前账号没有该商家的商品导入授权");
         }
         return new Scope(tenant, merchant, operator);
@@ -104,7 +104,7 @@ public class YouzanImportService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Batch preview(long merchant, MultipartFile file) throws Exception {
+    public Batch preview(Long merchant, MultipartFile file) throws Exception {
         Scope scope = scope(merchant, false);
         List<Row> rows;
         try { rows = YouzanWorkbook.read(file); }
@@ -113,6 +113,7 @@ public class YouzanImportService {
     }
 
     private List<Line> evaluateBatch(Scope scope, List<Row> rows, boolean lock) {
+        if (scope.merchant == null) return evaluate(rows, key -> null);
         Map<String, Boolean> alreadyImported = new HashMap<>();
         return evaluate(rows, key -> lookup(scope, key, lock)).stream().map(line -> {
             if (!"PENDING".equals(line.action())) return line;
@@ -127,25 +128,56 @@ public class YouzanImportService {
     private Batch save(Scope scope, List<Row> rows, List<String> unused) throws Exception {
         var lines = evaluateBatch(scope, rows, false);
         String id = UUID.randomUUID().toString();
-        byte[] payload = new PreviewCipher(encodedKey).seal(scope.aad(id), json.writeValueAsBytes(new Snapshot(lines, unused)));
-        if (payload.length > 12_000_000) throw exception(BAD_REQUEST);
+        byte[] payload = encode(scope, id, new Snapshot(lines, unused));
         db.update("INSERT INTO product_yz_import_batch(batch_id,tenant_id,merchant_id,operator_id,expires_at,row_count,payload) VALUES(?,?,?,?,TIMESTAMPADD(MINUTE,30,CURRENT_TIMESTAMP(6)),?,?)",
                 id, scope.tenant, scope.merchant, scope.operator, rows.size(), payload);
         return response(scope, id, false, lines, unused);
     }
 
-    private Batch load(Scope scope, UUID batchId, boolean confirm) throws Exception {
+    private byte[] encode(Scope scope, String id, Snapshot snapshot) throws Exception {
+        byte[] payload = new PreviewCipher(encodedKey).seal(scope.aad(id), json.writeValueAsBytes(snapshot));
+        if (payload.length > 12_000_000) throw exception(BAD_REQUEST);
+        return payload;
+    }
+
+    private Snapshot decode(Scope scope, String id, Stored stored) throws Exception {
+        return json.readValue(new PreviewCipher(encodedKey).open(scope.aad(id), stored.bytes), Snapshot.class);
+    }
+
+    private Stored stored(String id, boolean lock) {
+        Scope owner = scope(null, false);
+        var batches = db.query("""
+                SELECT merchant_id,payload,confirmed,expires_at<=NOW(6)
+                FROM product_yz_import_batch WHERE tenant_id=? AND operator_id=? AND batch_id=?
+                """ + (lock ? " FOR UPDATE" : ""),
+                (rs, index) -> new Stored(rs.getObject(1, Long.class), rs.getBytes(2), rs.getBoolean(3), rs.getBoolean(4)),
+                owner.tenant, owner.operator, id);
+        if (batches.isEmpty()) throw new AccessDeniedException("批次不可访问");
+        return batches.get(0);
+    }
+
+    private Batch load(Long merchant, UUID batchId, boolean confirm) throws Exception {
         String id = batchId.toString();
-        var stored = db.query("SELECT payload,confirmed,expires_at<=NOW(6) FROM product_yz_import_batch WHERE tenant_id=? AND merchant_id=? AND operator_id=? AND batch_id=?" + (confirm ? " FOR UPDATE" : ""),
-                (rs, index) -> new Stored(rs.getBytes(1), rs.getBoolean(2), rs.getBoolean(3)), scope.tenant, scope.merchant, scope.operator, id);
-        if (stored.isEmpty()) throw new AccessDeniedException("批次不可访问");
-        var batch = stored.get(0);
+        Stored batch = stored(id, confirm);
+        if (merchant != null && !merchant.equals(batch.merchant)) throw new AccessDeniedException("批次不可访问");
+        Scope scope = scope(batch.merchant, confirm);
         if (!batch.confirmed && batch.expired) throw invalid("预览已过期，请重新上传");
-        var snapshot = json.readValue(new PreviewCipher(encodedKey).open(scope.aad(id), batch.bytes), Snapshot.class);
+        Snapshot snapshot = decode(scope, id, batch);
         var lines = snapshot.lines();
-        if (!confirm || batch.confirmed) return response(scope, id, batch.confirmed, lines, snapshot.unusedColumns());
-        var current = evaluateBatch(scope, lines.stream().map(Line::row).toList(), true);
-        if (!current.equals(lines)) throw invalid("预览后数据已变化，请重新预览");
+        if (confirm && !batch.confirmed) {
+            int count = 0;
+            if (scope.merchant != null) {
+                var current = evaluateBatch(scope, lines.stream().map(Line::row).toList(), true);
+                if (!current.equals(lines)) throw invalid("预览后数据已变化，请重新预览");
+                count = insertDrafts(scope, id, lines);
+            }
+            db.update("UPDATE product_yz_import_batch SET confirmed=TRUE, confirmed_at=NOW(6),draft_count=? WHERE batch_id=? AND tenant_id=? AND operator_id=?",
+                    count, id, scope.tenant, scope.operator);
+        }
+        return response(scope, id, confirm || batch.confirmed, lines, snapshot.unusedColumns());
+    }
+
+    private int insertDrafts(Scope scope, String id, List<Line> lines) throws Exception {
         int count = 0;
         for (Line line : lines) {
             if (!"PENDING".equals(line.action())) continue;
@@ -154,9 +186,39 @@ public class YouzanImportService {
                     scope.tenant, scope.merchant, item.key().product(), item.key().sku(), item.name(), item.specification(), item.cents(), item.stock(), json.writeValueAsString(item.hints()), id);
             count++;
         }
-        db.update("UPDATE product_yz_import_batch SET confirmed=TRUE, confirmed_at=NOW(6),draft_count=? WHERE batch_id=? AND tenant_id=? AND merchant_id=? AND operator_id=?",
-                count, id, scope.tenant, scope.merchant, scope.operator);
-        return response(scope, id, true, lines, snapshot.unusedColumns());
+        return count;
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> pending(UUID before) {
+        Scope owner = scope(null, false);
+        String query = """
+                SELECT batch_id FROM product_yz_import_batch
+                WHERE tenant_id=? AND operator_id=? AND confirmed=TRUE AND merchant_id IS NULL
+                """;
+        String order = " ORDER BY batch_id DESC LIMIT 20";
+        if (before == null) return db.queryForList(query + order, String.class, owner.tenant, owner.operator);
+        return db.queryForList(query + " AND batch_id < ?" + order, String.class, owner.tenant, owner.operator, before.toString());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Batch assign(UUID batchId, long merchant) throws Exception {
+        String id = batchId.toString();
+        Stored batch = stored(id, true);
+        Scope target = scope(merchant, true);
+        if (!batch.confirmed) throw invalid("请先确认导入批次");
+        if (batch.merchant != null && batch.merchant != merchant) throw invalid("该批次已分配至其他商家");
+        Scope previous = new Scope(target.tenant, batch.merchant, target.operator);
+        Snapshot snapshot = decode(previous, id, batch);
+        if (batch.merchant == null) {
+            var lines = evaluateBatch(target, snapshot.lines().stream().map(Line::row).toList(), true);
+            snapshot = new Snapshot(lines, snapshot.unusedColumns());
+            byte[] payload = encode(target, id, snapshot);
+            int count = insertDrafts(target, id, lines);
+            db.update("UPDATE product_yz_import_batch SET merchant_id=?,payload=?,draft_count=? WHERE batch_id=? AND tenant_id=? AND operator_id=?",
+                    merchant, payload, count, id, target.tenant, target.operator);
+        }
+        return response(target, id, true, snapshot.lines(), snapshot.unusedColumns());
     }
 
     private static RuntimeException invalid(String text) {
@@ -164,9 +226,9 @@ public class YouzanImportService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Batch confirm(long merchant, UUID id) throws Exception { return load(scope(merchant, true), id, true); }
+    public Batch confirm(Long merchant, UUID id) throws Exception { return load(merchant, id, true); }
     @Transactional(readOnly = true)
-    public Batch result(long merchant, UUID id) throws Exception { return load(scope(merchant, false), id, false); }
+    public Batch result(Long merchant, UUID id) throws Exception { return load(merchant, id, false); }
 
     @Transactional(rollbackFor = Exception.class)
     public Long supplement(long merchant, UUID batchId, String product, Map<String,String> sourceByProperties, ProductSpuSaveReqVO form) {

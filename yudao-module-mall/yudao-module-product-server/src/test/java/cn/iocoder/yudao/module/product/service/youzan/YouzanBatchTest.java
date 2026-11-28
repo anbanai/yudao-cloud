@@ -99,7 +99,7 @@ class YouzanBatchTest {
         var form = singleSkuForm().setMerchantId(1L);
         Long spu = tx.execute(status -> service.supplement(1, id, "P", Map.of("", "S1"), form));
         assertEquals(201L, spu);
-        assertEquals("BOUND", service.result(1, id).lines().get(0).bindingState());
+        assertEquals("BOUND", service.result(1L, id).lines().get(0).bindingState());
         assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM product_spu WHERE tenant_id=1 AND merchant_id=1", Integer.class));
         assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft WHERE tenant_id=1 AND merchant_id=1", Integer.class));
     }
@@ -152,7 +152,7 @@ class YouzanBatchTest {
     }
 
     private YouzanImportService.Batch preview() throws Exception {
-        return service.preview(2, file("Sheet1", false));
+        return service.preview(2L, file("Sheet1", false));
     }
 
     private YouzanImportService.Batch singleSku(String sourceSku) throws Exception {
@@ -220,11 +220,11 @@ class YouzanBatchTest {
         assertNull(preview.lines().get(0).bindingState());
         assertEquals("UNBOUND", confirm(2, id).lines().get(0).bindingState());
         bind(id, singleSkuForm());
-        var result = service.result(2, id);
+        var result = service.result(2L, id);
         assertEquals("PENDING", result.lines().get(0).action());
         assertEquals("BOUND", result.lines().get(0).bindingState());
         assertEquals(result, confirm(2, id));
-        assertEquals(result, service.result(2, id));
+        assertEquals(result, service.result(2L, id));
         assertThrows(ServiceException.class, () -> bind(id, singleSkuForm()));
         assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM product_spu", Integer.class));
         assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM product_sku", Integer.class));
@@ -246,7 +246,7 @@ class YouzanBatchTest {
             form.setDeliveryTemplateId(invalid);
             assertThrows(ServiceException.class, () -> bind(id, form));
         }
-        assertEquals("UNBOUND", service.result(2, id).lines().get(0).bindingState());
+        assertEquals("UNBOUND", service.result(2L, id).lines().get(0).bindingState());
         assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_spu", Integer.class));
         assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_sku", Integer.class));
         form.setDeliveryTemplateId(10L);
@@ -256,7 +256,7 @@ class YouzanBatchTest {
         });
         assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_spu", Integer.class));
         assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_sku", Integer.class));
-        assertEquals("UNBOUND", service.result(2, id).lines().get(0).bindingState());
+        assertEquals("UNBOUND", service.result(2L, id).lines().get(0).bindingState());
         tx.executeWithoutResult(status -> {
             form.setDeliveryTypes(List.of(2)).setDeliveryTemplateId(999L);
             assertEquals(201L, bind(id, form));
@@ -264,7 +264,7 @@ class YouzanBatchTest {
             status.setRollbackOnly();
         });
         assertEquals(201L, bind(id, form.setDeliveryTypes(List.of(1, 2)).setDeliveryTemplateId(10L)));
-        assertEquals("BOUND", service.result(2, id).lines().get(0).bindingState());
+        assertEquals("BOUND", service.result(2L, id).lines().get(0).bindingState());
     }
 
     private YouzanImportService.Batch confirm(long merchant, UUID id) {
@@ -275,12 +275,129 @@ class YouzanBatchTest {
         });
     }
 
+    private YouzanImportService.Batch assign(UUID id, long merchant) {
+        return tx.execute(status -> {
+            try { return service.assign(id, merchant); }
+            catch (RuntimeException ex) { throw ex; }
+            catch (Exception ex) { throw new IllegalStateException(ex); }
+        });
+    }
+
+    @Test void unassignedBatchSurvivesExpiryAndOnlyOwnerCanAssignToAnAuthorizedMerchant() throws Exception {
+        login(1, 99);
+        var preview = service.preview(null, file("Sheet1", false));
+        UUID id = UUID.fromString(preview.batchId());
+        assertNull(preview.merchantId());
+        assertFalse(preview.confirmed());
+        assertTrue(service.pending(null).isEmpty());
+        db.update("INSERT INTO product_yz_import_grant VALUES (1,2,99),(1,3,99)");
+        assertThrows(ServiceException.class, () -> assign(id, 2));
+        assertThrows(AccessDeniedException.class, () -> service.confirm(2L, id));
+        var confirmed = service.confirm(null, id);
+        assertTrue(confirmed.confirmed());
+        assertNull(confirmed.lines().get(0).bindingState());
+        assertThrows(AccessDeniedException.class, () -> bind(id, singleSkuForm()));
+        db.update("UPDATE product_yz_import_batch SET expires_at=TIMESTAMP '2000-01-01 00:00:00' WHERE batch_id=?", preview.batchId());
+        assertEquals(confirmed, service.result(null, id));
+        assertEquals(confirmed, service.confirm(null, id));
+        assertEquals(List.of(preview.batchId()), service.pending(null));
+        assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
+
+        for (int[] other : List.of(new int[]{1, 8}, new int[]{5, 99})) {
+            login(other[0], other[1]);
+            assertTrue(service.pending(null).isEmpty());
+            assertThrows(AccessDeniedException.class, () -> service.result(null, id));
+            assertThrows(AccessDeniedException.class, () -> service.confirm(null, id));
+            assertThrows(AccessDeniedException.class, () -> assign(id, 2));
+        }
+
+        login(1, 99);
+        assertThrows(AccessDeniedException.class, () -> assign(id, 77));
+        tx.executeWithoutResult(status -> {
+            assertEquals("2", assign(id, 2).merchantId());
+            status.setRollbackOnly();
+        });
+        assertEquals(confirmed, service.result(null, id));
+        assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
+        var assigned = assign(id, 2);
+        assertEquals("2", assigned.merchantId());
+        assertEquals("UNBOUND", assigned.lines().get(0).bindingState());
+        assertEquals(assigned, assign(id, 2));
+        assertEquals(assigned, service.result(null, id));
+        assertEquals(assigned, service.confirm(null, id));
+        assertEquals(assigned, service.result(2L, id));
+        assertTrue(service.pending(null).isEmpty());
+        assertThrows(ServiceException.class, () -> assign(id, 3));
+        assertThrows(AccessDeniedException.class, () -> service.result(3L, id));
+        assertEquals(9, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
+        db.update("DELETE FROM product_yz_import_grant WHERE tenant_id=1 AND operator_id=99 AND merchant_id=2");
+        assertThrows(AccessDeniedException.class, () -> service.result(null, id));
+        assertThrows(AccessDeniedException.class, () -> service.confirm(null, id));
+        assertThrows(AccessDeniedException.class, () -> assign(id, 2));
+    }
+
+    @Test void assignmentReevaluatesTheLiveCatalogAndPersistsTheComparison() throws Exception {
+        UUID id = UUID.fromString(service.preview(null, file("Sheet1", false)).batchId());
+        service.confirm(null, id);
+        confirm(2, UUID.fromString(preview().batchId()));
+        db.update("INSERT INTO product_spu VALUES(401,2,1,0)");
+        db.update("INSERT INTO product_sku VALUES(402,401,1,707,8,0)");
+        db.update("UPDATE product_yz_import_draft SET mall_sku_id=402 WHERE sku_key='000'");
+        var assigned = assign(id, 2);
+        assertEquals("DIFFERENCE", assigned.lines().get(0).action());
+        assertEquals(new YouzanImportService.Comparison(707, 8), assigned.lines().get(0).before());
+        assertTrue(assigned.lines().subList(1, 9).stream().allMatch(line -> line.action().equals("DUPLICATE")));
+        assertEquals(0, db.queryForObject("SELECT draft_count FROM product_yz_import_batch WHERE batch_id=?", Integer.class, id.toString()));
+        assertEquals(9, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
+        db.update("UPDATE product_sku SET stock=20 WHERE id=402");
+        assertEquals(assigned, assign(id, 2));
+        assertEquals(assigned, service.result(null, id));
+    }
+
+    @Test void pendingListPagesOnlyConfirmedUnassignedBatchesOfTheOwner() {
+        List<String> expected = new ArrayList<>();
+        for (int index = 1; index <= 25; index++) {
+            String id = new UUID(0, index).toString();
+            int tenant = index == 24 ? 5 : 1;
+            int operator = index == 23 ? 8 : 7;
+            Long merchant = index == 22 ? 2L : null;
+            boolean confirmed = index != 25;
+            db.update("""
+                    INSERT INTO product_yz_import_batch(batch_id,tenant_id,merchant_id,operator_id,confirmed,expires_at,row_count,payload)
+                    VALUES(?,?,?,?,?,NOW(),0,?)
+                    """, id, tenant, merchant, operator, confirmed, new byte[]{1});
+            if (index <= 21) expected.add(id);
+        }
+        expected.sort(Comparator.reverseOrder());
+        var first = service.pending(null);
+        assertEquals(expected.subList(0, 20), first);
+        assertEquals(expected.subList(20, 21), service.pending(UUID.fromString(first.get(19))));
+    }
+
+    @Test void concurrentAssignmentsOfTheSameBatchInsertDraftsOnce() throws Exception {
+        UUID id = UUID.fromString(service.preview(null, file("Sheet1", false)).batchId());
+        service.confirm(null, id);
+        var barrier = new CyclicBarrier(2);
+        var pool = Executors.newFixedThreadPool(2);
+        Callable<YouzanImportService.Batch> submit = () -> {
+            login(1, 7);
+            try { barrier.await(5, TimeUnit.SECONDS); return assign(id, 2); }
+            finally { cleanup(); }
+        };
+        try {
+            var first = pool.submit(submit);
+            var second = pool.submit(submit);
+            assertEquals(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+            assertEquals(9, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
+        } finally { pool.shutdownNow(); }
+    }
+
     @Test void staleAndExpiredPreviewsCannotWriteAndRepeatedConfirmationIsIdempotent() throws Exception {
         UUID id = UUID.fromString(preview().batchId());
         UUID stale = UUID.fromString(preview().batchId());
         assertEquals(0, db.queryForObject("SELECT count(*) FROM product_yz_import_draft", Integer.class));
         assertTrue(confirm(2, id).confirmed());
-        assertEquals(confirm(2, id), service.result(2, id));
+        assertEquals(confirm(2, id), service.result(2L, id));
         assertThrows(ServiceException.class, () -> confirm(2, stale));
         var again = preview();
         assertTrue(again.lines().stream().allMatch(line -> line.action().equals("DUPLICATE")));
@@ -307,14 +424,14 @@ class YouzanBatchTest {
     }
 
     @Test void scopeAndTemplateErrorsWriteNothing() throws Exception {
-        assertThrows(ServiceException.class, () -> service.preview(2, file("Other", false)));
-        assertThrows(ServiceException.class, () -> service.preview(2, file("sheet1", false)));
-        assertThrows(ServiceException.class, () -> service.preview(2, file("Sheet1", true)));
+        assertThrows(ServiceException.class, () -> service.preview(2L, file("Other", false)));
+        assertThrows(ServiceException.class, () -> service.preview(2L, file("sheet1", false)));
+        assertThrows(ServiceException.class, () -> service.preview(2L, file("Sheet1", true)));
         assertEquals(0, db.queryForObject("SELECT count(*) FROM product_yz_import_batch", Integer.class));
         UUID id = UUID.fromString(preview().batchId());
         assertThrows(AccessDeniedException.class, () -> confirm(3, id));
         login(1, 8);
-        assertThrows(AccessDeniedException.class, () -> service.result(2, id));
+        assertThrows(AccessDeniedException.class, () -> service.result(2L, id));
         login(5, 7);
         assertThrows(AccessDeniedException.class, () -> confirm(2, id));
         assertEquals(0, db.queryForObject("SELECT count(*) FROM product_yz_import_draft", Integer.class));
@@ -365,7 +482,7 @@ class YouzanBatchTest {
             sheet.getRow(2).getCell(1).setBlank();
             for (int index = 1; index <= 2; index++) sheet.getRow(index).createCell(8).setCellValue("000");
             book.write(output);
-            var batch = service.preview(2, new MockMultipartFile("file", "synthetic.xlsx", null, output.toByteArray()));
+            var batch = service.preview(2L, new MockMultipartFile("file", "synthetic.xlsx", null, output.toByteArray()));
             assertEquals(List.of("ERROR", "ERROR"), batch.lines().subList(0, 2).stream().map(YouzanImportService.ResultLine::action).toList());
             confirm(2, UUID.fromString(batch.batchId()));
             assertEquals(7, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
@@ -385,13 +502,13 @@ class YouzanBatchTest {
             sheet.getRow(1).getCell(14).setCellValue("bad");
             sheet.getRow(2).getCell(16).setCellValue("-1");
             book.write(output);
-            var batch = service.preview(2, new MockMultipartFile("file", "synthetic.xlsx", null, output.toByteArray()));
+            var batch = service.preview(2L, new MockMultipartFile("file", "synthetic.xlsx", null, output.toByteArray()));
             id = UUID.fromString(batch.batchId());
             assertEquals("ERROR", batch.lines().get(0).action());
             assertEquals("ERROR", batch.lines().get(1).action());
             assertEquals("PENDING", batch.lines().get(8).action());
             assertEquals("", batch.lines().get(8).row().item().name());
-            assertEquals(confirm(2, id), service.result(2, id));
+            assertEquals(confirm(2, id), service.result(2L, id));
             assertEquals(7, db.queryForObject("SELECT COUNT(*) FROM product_yz_import_draft", Integer.class));
         }
         var sku = new ProductSkuSaveReqVO().setPrice(999).setStock(999);
