@@ -335,7 +335,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     }
 
     private void validateMerchantAndBrand(Long merchantId, Long brandId) {
-        merchantService.validateMerchantForManagement(merchantId);
+        merchantService.validateSelectableMerchant(merchantId);
         brandService.validateProductBrand(brandId);
         ProductBrandDO brand = brandService.getBrand(brandId);
         if (brand == null) {
@@ -599,7 +599,7 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验存在
         ProductSpuDO spu = validateSpuExists(updateReqVO.getId());
         // 状态更新同样属于经营操作，避免管理员在商家冻结或资料复审期间重新上架商品。
-        merchantService.validateMerchantForManagement(spu.getMerchantId());
+        merchantService.validateSelectableMerchant(spu.getMerchantId());
         // TODO 芋艿：【可选】参与活动中的商品，不允许下架？？？
 
         // 更新状态

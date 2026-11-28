@@ -45,24 +45,24 @@ public interface ProductMerchantMapper extends BaseMapperX<ProductMerchantDO> {
     }
 
     default PageResult<ProductMerchantDO> selectSelectablePage(PageParam pageParam, Long tenantId) {
-        LambdaQueryWrapperX<ProductMerchantDO> query = managementMerchantQuery(tenantId);
+        LambdaQueryWrapperX<ProductMerchantDO> query = catalogMerchantQuery(tenantId);
         query.select(ProductMerchantDO::getId, ProductMerchantDO::getName, ProductMerchantDO::getStoreName)
                 .eq(ProductMerchantDO::getStatus, ProductMerchantStatusEnum.APPROVED.getStatus())
                 .orderByDesc(ProductMerchantDO::getId);
         return TenantUtils.executeIgnore(() -> selectPage(pageParam, query));
     }
 
-    default ProductMerchantDO selectForManagement(Long id, Long tenantId) {
+    default ProductMerchantDO selectForCatalog(Long id, Long tenantId) {
         if (id == null) {
             return null;
         }
-        LambdaQueryWrapperX<ProductMerchantDO> query = managementMerchantQuery(tenantId);
+        LambdaQueryWrapperX<ProductMerchantDO> query = catalogMerchantQuery(tenantId);
         query.select(ProductMerchantDO::getId, ProductMerchantDO::getStatus)
                 .eq(ProductMerchantDO::getId, id);
         return TenantUtils.executeIgnore(() -> selectOne(query));
     }
 
-    private LambdaQueryWrapperX<ProductMerchantDO> managementMerchantQuery(Long tenantId) {
+    private LambdaQueryWrapperX<ProductMerchantDO> catalogMerchantQuery(Long tenantId) {
         LambdaQueryWrapperX<ProductMerchantDO> query = new LambdaQueryWrapperX<>();
         // 历史商品和品牌由迁移脚本统一关联到全局的平台自营商家。
         query.and(tenantId != null, scope -> scope.eq(ProductMerchantDO::getTenantId, tenantId)

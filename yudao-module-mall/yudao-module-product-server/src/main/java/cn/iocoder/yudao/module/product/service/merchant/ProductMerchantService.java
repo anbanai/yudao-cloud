@@ -23,6 +23,8 @@ public interface ProductMerchantService {
     void unfreezeMerchant(Long id, Long reviewerId);
     void updateStoreProfile(Long merchantId, String storeName, String logoUrl, String description);
     void validateMerchantAvailable(Long id);
-    /** 校验后台经营数据使用的是当前租户商家或全局自营商家，且处于可经营状态。 */
+    /** 校验商家属于当前租户且处于可经营状态。 */
     void validateMerchantForManagement(Long id);
+    /** 校验商品或品牌可以关联该商家。 */
+    void validateSelectableMerchant(Long id);
 }

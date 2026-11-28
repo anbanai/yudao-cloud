@@ -136,8 +136,22 @@ public class ProductMerchantServiceImpl implements ProductMerchantService {
 
     @Override
     public void validateMerchantForManagement(Long id) {
+        ProductMerchantDO merchant = merchantMapper.selectById(id);
+        if (merchant == null) {
+            throw exception(MERCHANT_NOT_EXISTS);
+        }
+        if (!java.util.Objects.equals(merchant.getTenantId(), TenantContextHolder.getRequiredTenantId())) {
+            throw exception(MERCHANT_TENANT_MISMATCH);
+        }
+        if (!ProductMerchantStatusEnum.isAvailable(merchant.getStatus())) {
+            throw exception(MERCHANT_NOT_AVAILABLE);
+        }
+    }
+
+    @Override
+    public void validateSelectableMerchant(Long id) {
         Long tenantId = tenantEnabled ? TenantContextHolder.getRequiredTenantId() : null;
-        ProductMerchantDO merchant = merchantMapper.selectForManagement(id, tenantId);
+        ProductMerchantDO merchant = merchantMapper.selectForCatalog(id, tenantId);
         if (merchant == null) {
             throw exception(MERCHANT_NOT_EXISTS);
         }

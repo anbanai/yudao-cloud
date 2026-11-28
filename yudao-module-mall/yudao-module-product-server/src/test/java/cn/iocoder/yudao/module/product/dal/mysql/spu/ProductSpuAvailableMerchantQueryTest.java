@@ -28,6 +28,7 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MERCHANT_NOT_AVAILABLE;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MERCHANT_NOT_EXISTS;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MERCHANT_TENANT_MISMATCH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
@@ -82,7 +83,7 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
     }
 
     @Test
-    void testValidateMerchantForManagement_acceptsPlatformMerchantUsedByLegacyProducts() {
+    void testValidateSelectableMerchant_acceptsPlatformMerchantUsedByLegacyProducts() {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         jdbc.update("INSERT INTO product_merchant (id, name, status, tenant_id) VALUES (?, ?, ?, ?)",
                 110L, "平台自营商家", 20, 0L);
@@ -90,10 +91,21 @@ class ProductSpuAvailableMerchantQueryTest extends BaseDbUnitTest {
         insertMerchant(jdbc, 112L, 20, false, 2L);
         insertMerchant(jdbc, 113L, 40, false, 1L);
 
-        assertThatCode(() -> merchantService.validateMerchantForManagement(110L)).doesNotThrowAnyException();
-        assertServiceException(() -> merchantService.validateMerchantForManagement(111L), MERCHANT_NOT_EXISTS);
-        assertServiceException(() -> merchantService.validateMerchantForManagement(112L), MERCHANT_NOT_EXISTS);
-        assertServiceException(() -> merchantService.validateMerchantForManagement(113L), MERCHANT_NOT_AVAILABLE);
+        assertThatCode(() -> merchantService.validateSelectableMerchant(110L)).doesNotThrowAnyException();
+        assertServiceException(() -> merchantService.validateSelectableMerchant(111L), MERCHANT_NOT_EXISTS);
+        assertServiceException(() -> merchantService.validateSelectableMerchant(112L), MERCHANT_NOT_EXISTS);
+        assertServiceException(() -> merchantService.validateSelectableMerchant(113L), MERCHANT_NOT_AVAILABLE);
+    }
+
+    @Test
+    void testValidateMerchantForManagement_preservesTenantOwnershipForImport() {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.update("INSERT INTO product_merchant (id, name, status, tenant_id) VALUES (?, ?, ?, ?)",
+                130L, "平台自营商家", 20, 0L);
+        insertMerchant(jdbc, 131L, 20, false, 1L);
+
+        assertServiceException(() -> merchantService.validateMerchantForManagement(130L), MERCHANT_TENANT_MISMATCH);
+        assertThatCode(() -> merchantService.validateMerchantForManagement(131L)).doesNotThrowAnyException();
     }
 
     @Test
