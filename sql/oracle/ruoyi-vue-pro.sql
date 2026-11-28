@@ -14,27 +14,27 @@
 -- ----------------------------
 CREATE TABLE infra_api_access_log (
     id number  NOT NULL,
-    trace_id varchar2(64) DEFAULT '' NULL,
+    trace_id varchar2(64 char) DEFAULT '' NULL,
     user_id number DEFAULT 0 NOT NULL,
     user_type smallint DEFAULT 0 NOT NULL,
-    application_name varchar2(50)  NULL,
-    request_method varchar2(16) DEFAULT '' NULL,
-    request_url varchar2(255) DEFAULT '' NULL,
+    application_name varchar2(50 char)  NULL,
+    request_method varchar2(16 char) DEFAULT '' NULL,
+    request_url varchar2(255 char) DEFAULT '' NULL,
     request_params clob  NULL,
     response_body clob  NULL,
-    user_ip varchar2(50)  NULL,
-    user_agent varchar2(512)  NULL,
-    operate_module varchar2(50) DEFAULT NULL NULL,
-    operate_name varchar2(50) DEFAULT NULL NULL,
+    user_ip varchar2(50 char)  NULL,
+    user_agent varchar2(512 char)  NULL,
+    operate_module varchar2(50 char) DEFAULT NULL NULL,
+    operate_name varchar2(50 char) DEFAULT NULL NULL,
     operate_type smallint DEFAULT 0 NULL,
     begin_time date  NOT NULL,
     end_time date  NOT NULL,
     duration number  NOT NULL,
     result_code number DEFAULT 0 NOT NULL,
-    result_msg varchar2(512) DEFAULT '' NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    result_msg varchar2(512 char) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -78,30 +78,30 @@ CREATE SEQUENCE infra_api_access_log_seq
 -- ----------------------------
 CREATE TABLE infra_api_error_log (
     id number  NOT NULL,
-    trace_id varchar2(64)  NULL,
+    trace_id varchar2(64 char)  NULL,
     user_id number DEFAULT 0 NOT NULL,
     user_type smallint DEFAULT 0 NOT NULL,
-    application_name varchar2(50)  NULL,
-    request_method varchar2(16)  NULL,
-    request_url varchar2(255)  NULL,
-    request_params varchar2(4000)  NULL,
-    user_ip varchar2(50)  NULL,
-    user_agent varchar2(512)  NULL,
+    application_name varchar2(50 char)  NULL,
+    request_method varchar2(16 char)  NULL,
+    request_url varchar2(255 char)  NULL,
+    request_params varchar2(4000 char)  NULL,
+    user_ip varchar2(50 char)  NULL,
+    user_agent varchar2(512 char)  NULL,
     exception_time date  NOT NULL,
-    exception_name varchar2(128) DEFAULT '' NULL,
+    exception_name varchar2(128 char) DEFAULT '' NULL,
     exception_message clob  NULL,
     exception_root_cause_message clob  NULL,
     exception_stack_trace clob  NULL,
-    exception_class_name varchar2(512)  NULL,
-    exception_file_name varchar2(512)  NULL,
-    exception_method_name varchar2(512)  NULL,
+    exception_class_name varchar2(512 char)  NULL,
+    exception_file_name varchar2(512 char)  NULL,
+    exception_method_name varchar2(512 char)  NULL,
     exception_line_number number  NOT NULL,
     process_status smallint  NOT NULL,
     process_time date DEFAULT NULL NULL,
     process_user_id number DEFAULT 0 NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -149,25 +149,25 @@ CREATE SEQUENCE infra_api_error_log_seq
 CREATE TABLE infra_codegen_column (
     id number  NOT NULL,
     table_id number  NOT NULL,
-    column_name varchar2(200)  NULL,
-    data_type varchar2(100)  NULL,
-    column_comment varchar2(500)  NULL,
+    column_name varchar2(200 char)  NULL,
+    data_type varchar2(100 char)  NULL,
+    column_comment varchar2(500 char)  NULL,
     nullable number(1,0)  NOT NULL,
     primary_key number(1,0)  NOT NULL,
     ordinal_position number  NOT NULL,
-    java_type varchar2(32)  NULL,
-    java_field varchar2(64)  NULL,
-    dict_type varchar2(200) DEFAULT '' NULL,
-    example varchar2(64) DEFAULT NULL NULL,
+    java_type varchar2(32 char)  NULL,
+    java_field varchar2(64 char)  NULL,
+    dict_type varchar2(200 char) DEFAULT '' NULL,
+    example varchar2(64 char) DEFAULT NULL NULL,
     create_operation number(1,0)  NOT NULL,
     update_operation number(1,0)  NOT NULL,
     list_operation number(1,0)  NOT NULL,
-    list_operation_condition varchar2(32) DEFAULT '=' NULL,
+    list_operation_condition varchar2(32 char) DEFAULT '=' NULL,
     list_operation_result number(1,0)  NOT NULL,
-    html_type varchar2(32)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    html_type varchar2(32 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -210,14 +210,14 @@ CREATE TABLE infra_codegen_table (
     id number  NOT NULL,
     data_source_config_id number  NOT NULL,
     scene smallint DEFAULT 1 NOT NULL,
-    table_name varchar2(200) DEFAULT '' NULL,
-    table_comment varchar2(500) DEFAULT '' NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
-    module_name varchar2(30)  NULL,
-    business_name varchar2(30)  NULL,
-    class_name varchar2(100) DEFAULT '' NULL,
-    class_comment varchar2(50)  NULL,
-    author varchar2(50)  NULL,
+    table_name varchar2(200 char) DEFAULT '' NULL,
+    table_comment varchar2(500 char) DEFAULT '' NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
+    module_name varchar2(30 char)  NULL,
+    business_name varchar2(30 char)  NULL,
+    class_name varchar2(100 char) DEFAULT '' NULL,
+    class_comment varchar2(50 char)  NULL,
+    author varchar2(50 char)  NULL,
     template_type smallint DEFAULT 1 NOT NULL,
     front_type smallint  NOT NULL,
     parent_menu_id number DEFAULT NULL NULL,
@@ -226,9 +226,9 @@ CREATE TABLE infra_codegen_table (
     sub_join_many number(1,0) DEFAULT NULL NULL,
     tree_parent_column_id number DEFAULT NULL NULL,
     tree_name_column_id number DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -268,16 +268,16 @@ CREATE SEQUENCE infra_codegen_table_seq
 -- ----------------------------
 CREATE TABLE infra_config (
     id number  NOT NULL,
-    category varchar2(50)  NULL,
+    category varchar2(50 char)  NULL,
     type smallint  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
-    config_key varchar2(100) DEFAULT '' NULL,
-    value varchar2(500) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
+    config_key varchar2(100 char) DEFAULT '' NULL,
+    value varchar2(500 char) DEFAULT '' NULL,
     visible number(1,0)  NOT NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -322,13 +322,13 @@ CREATE SEQUENCE infra_config_seq
 -- ----------------------------
 CREATE TABLE infra_data_source_config (
     id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
-    url varchar2(1024)  NULL,
-    username varchar2(255)  NULL,
-    password varchar2(255) DEFAULT '' NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
+    url varchar2(1024 char)  NULL,
+    username varchar2(255 char)  NULL,
+    password varchar2(255 char) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -355,14 +355,14 @@ CREATE SEQUENCE infra_data_source_config_seq
 CREATE TABLE infra_file (
     id number  NOT NULL,
     config_id number DEFAULT NULL NULL,
-    name varchar2(256) DEFAULT NULL NULL,
-    path varchar2(512)  NULL,
-    url varchar2(1024)  NULL,
-    type varchar2(128) DEFAULT NULL NULL,
+    name varchar2(256 char) DEFAULT NULL NULL,
+    path varchar2(512 char)  NULL,
+    url varchar2(1024 char)  NULL,
+    type varchar2(128 char) DEFAULT NULL NULL,
     "size" number  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -390,14 +390,14 @@ CREATE SEQUENCE infra_file_seq
 -- ----------------------------
 CREATE TABLE infra_file_config (
     id number  NOT NULL,
-    name varchar2(63)  NULL,
+    name varchar2(63 char)  NULL,
     storage smallint  NOT NULL,
-    remark varchar2(255) DEFAULT NULL NULL,
+    remark varchar2(255 char) DEFAULT NULL NULL,
     master number(1,0)  NOT NULL,
-    config varchar2(4000)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    config varchar2(4000 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -443,11 +443,11 @@ CREATE SEQUENCE infra_file_config_seq
 CREATE TABLE infra_file_content (
     id number  NOT NULL,
     config_id number  NOT NULL,
-    path varchar2(512)  NULL,
+    path varchar2(512 char)  NULL,
     content blob  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -474,17 +474,17 @@ CREATE SEQUENCE infra_file_content_seq
 -- ----------------------------
 CREATE TABLE infra_job (
     id number  NOT NULL,
-    name varchar2(32)  NULL,
+    name varchar2(32 char)  NULL,
     status smallint  NOT NULL,
-    handler_name varchar2(64)  NULL,
-    handler_param varchar2(255) DEFAULT NULL NULL,
-    cron_expression varchar2(32)  NULL,
+    handler_name varchar2(64 char)  NULL,
+    handler_param varchar2(255 char) DEFAULT NULL NULL,
+    cron_expression varchar2(32 char)  NULL,
     retry_count number DEFAULT 0 NOT NULL,
     retry_interval number DEFAULT 0 NOT NULL,
     monitor_timeout number DEFAULT 0 NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -551,17 +551,17 @@ CREATE SEQUENCE infra_job_seq
 CREATE TABLE infra_job_log (
     id number  NOT NULL,
     job_id number  NOT NULL,
-    handler_name varchar2(64)  NULL,
-    handler_param varchar2(255) DEFAULT NULL NULL,
+    handler_name varchar2(64 char)  NULL,
+    handler_param varchar2(255 char) DEFAULT NULL NULL,
     execute_index smallint DEFAULT 1 NOT NULL,
     begin_time date  NOT NULL,
     end_time date DEFAULT NULL NULL,
     duration number DEFAULT NULL NULL,
     status smallint  NOT NULL,
-    result varchar2(4000) DEFAULT '' NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    result varchar2(4000 char) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -595,16 +595,16 @@ CREATE SEQUENCE infra_job_log_seq
 -- ----------------------------
 CREATE TABLE system_dept (
     id number  NOT NULL,
-    name varchar2(30) DEFAULT '' NULL,
+    name varchar2(30 char) DEFAULT '' NULL,
     parent_id number DEFAULT 0 NOT NULL,
     sort number DEFAULT 0 NOT NULL,
     leader_user_id number DEFAULT NULL NULL,
-    phone varchar2(11) DEFAULT NULL NULL,
-    email varchar2(50) DEFAULT NULL NULL,
+    phone varchar2(11 char) DEFAULT NULL NULL,
+    email varchar2(50 char) DEFAULT NULL NULL,
     status smallint  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -659,16 +659,16 @@ CREATE SEQUENCE system_dept_seq
 CREATE TABLE system_dict_data (
     id number  NOT NULL,
     sort number DEFAULT 0 NOT NULL,
-    label varchar2(100) DEFAULT '' NULL,
-    value varchar2(100) DEFAULT '' NULL,
-    dict_type varchar2(100) DEFAULT '' NULL,
+    label varchar2(100 char) DEFAULT '' NULL,
+    value varchar2(100 char) DEFAULT '' NULL,
+    dict_type varchar2(100 char) DEFAULT '' NULL,
     status smallint DEFAULT 0 NOT NULL,
-    color_type varchar2(100) DEFAULT '' NULL,
-    css_class varchar2(100) DEFAULT '' NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    color_type varchar2(100 char) DEFAULT '' NULL,
+    css_class varchar2(100 char) DEFAULT '' NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -1055,24 +1055,24 @@ INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_t
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (358, 1, '赢单', '1', 'crm_business_end_status_type', 0, 'success', '', '', '1', to_date('2024-04-13 23:26:57', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (359, 2, '输单', '2', 'crm_business_end_status_type', 0, 'primary', '', '', '1', to_date('2024-04-13 23:27:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (360, 3, '无效', '3', 'crm_business_end_status_type', 0, 'info', '', '', '1', to_date('2024-04-13 23:27:59', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (361, 1, 'OpenAI', 'OpenAI', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-09 22:33:47', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (362, 2, 'Ollama', 'Ollama', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-17 23:02:55', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (363, 3, '文心一言', 'YiYan', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-18 09:24:20', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (364, 4, '讯飞星火', 'XingHuo', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-18 10:08:56', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (365, 5, '通义千问', 'TongYi', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-18 10:32:29', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (366, 6, 'StableDiffusion', 'StableDiffusion', 'ai_platform', 0, '', '', '', '1', to_date('2024-06-01 15:09:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (361, 1, 'OpenAI', 'OPENAI', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-09 22:33:47', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (362, 2, 'Ollama', 'OLLAMA', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-17 23:02:55', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (363, 3, '百度', 'BAIDU', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-18 09:24:20', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (364, 4, '科大讯飞', 'IFLYTEK', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-18 10:08:56', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (365, 5, '阿里巴巴', 'ALIBABA', 'ai_platform', 0, '', '', '', '1', to_date('2024-05-18 10:32:29', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (366, 6, 'Stability AI', 'STABILITYAI', 'ai_platform', 0, '', '', '', '1', to_date('2024-06-01 15:09:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (367, 10, '进行中', '10', 'ai_image_status', 0, 'primary', '', '', '1', to_date('2024-06-26 20:51:41', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (368, 20, '已完成', '20', 'ai_image_status', 0, 'success', '', '', '1', to_date('2024-06-26 20:52:07', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (369, 30, '已失败', '30', 'ai_image_status', 0, 'warning', '', '', '1', to_date('2024-06-26 20:52:25', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (370, 7, 'Midjourney', 'Midjourney', 'ai_platform', 0, '', '', '', '1', to_date('2024-06-26 22:14:46', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (370, 7, 'Midjourney', 'MIDJOURNEY', 'ai_platform', 0, '', '', '', '1', to_date('2024-06-26 22:14:46', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (371, 10, '进行中', '10', 'ai_music_status', 0, 'primary', '', '', '1', to_date('2024-06-27 22:45:22', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (372, 20, '已完成', '20', 'ai_music_status', 0, 'success', '', '', '1', to_date('2024-06-27 22:45:33', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (373, 30, '已失败', '30', 'ai_music_status', 0, 'danger', '', '', '1', to_date('2024-06-27 22:45:44', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (374, 1, '歌词模式', '1', 'ai_generate_mode', 0, '', '', '', '1', to_date('2024-06-27 22:46:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (375, 2, '描述模式', '2', 'ai_generate_mode', 0, '', '', '', '1', to_date('2024-06-27 22:46:37', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (376, 8, 'Suno', 'Suno', 'ai_platform', 0, '', '', '', '1', to_date('2024-06-29 09:13:36', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (377, 9, 'DeepSeek', 'DeepSeek', 'ai_platform', 0, '', '', '', '1', to_date('2024-07-06 12:04:30', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (378, 13, '智谱', 'ZhiPu', 'ai_platform', 0, '', '', '', '1', to_date('2024-07-06 18:00:35', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (376, 8, 'Suno', 'SUNO', 'ai_platform', 0, '', '', '', '1', to_date('2024-06-29 09:13:36', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (377, 9, 'DeepSeek', 'DEEPSEEK', 'ai_platform', 0, '', '', '', '1', to_date('2024-07-06 12:04:30', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (378, 13, '智谱', 'ZHIPU', 'ai_platform', 0, '', '', '', '1', to_date('2024-07-06 18:00:35', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (379, 4, '长', '4', 'ai_write_length', 0, '', '', '', '1', to_date('2024-07-07 15:49:03', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (380, 5, '段落', '5', 'ai_write_format', 0, '', '', '', '1', to_date('2024-07-07 15:49:54', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (381, 6, '文章', '6', 'ai_write_format', 0, '', '', '', '1', to_date('2024-07-07 15:50:05', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
@@ -1103,23 +1103,23 @@ INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_t
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (406, 2, '回复', '2', 'ai_write_type', 0, '', '', '', '1', to_date('2024-07-10 21:26:06', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (407, 2, '腾讯云', 'TENCENT', 'system_sms_channel_code', 0, '', '', '', '1', to_date('2024-07-22 22:23:16', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (408, 3, '华为云', 'HUAWEI', 'system_sms_channel_code', 0, '', '', '', '1', to_date('2024-07-22 22:23:46', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (409, 1, 'OpenAI 微软', 'AzureOpenAI', 'ai_platform', 0, '', '', '', '1', to_date('2024-08-10 14:07:41', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (409, 1, 'OpenAI 微软', 'AZURE', 'ai_platform', 0, '', '', '', '1', to_date('2024-08-10 14:07:41', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (410, 10, 'BPMN 设计器', '10', 'bpm_model_type', 0, 'primary', '', '', '1', to_date('2024-08-26 15:22:17', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (411, 20, 'SIMPLE 设计器', '20', 'bpm_model_type', 0, 'success', '', '', '1', to_date('2024-08-26 15:22:27', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (412, 4, '七牛云', 'QINIU', 'system_sms_channel_code', 0, '', '', '', '1', to_date('2024-08-31 08:45:03', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (413, 3, '新人券', '3', 'promotion_coupon_take_type', 0, 'info', '', '新人注册后，自动发放', '1', to_date('2024-09-03 11:57:16', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (414, 5, '微信零钱', '5', 'brokerage_withdraw_type', 0, '', '', 'API 打款', '1', to_date('2024-10-13 11:06:48', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (415, 10, '字节豆包', 'DouBao', 'ai_platform', 0, '', '', '', '1', to_date('2025-02-23 19:51:40', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (416, 11, '腾讯混元', 'HunYuan', 'ai_platform', 0, '', '', '', '1', to_date('2025-02-23 20:58:04', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (417, 12, '硅基流动', 'SiliconFlow', 'ai_platform', 0, '', '', '', '1', to_date('2025-02-24 20:19:09', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (415, 10, '字节跳动', 'BYTEDANCE', 'ai_platform', 0, '', '', '', '1', to_date('2025-02-23 19:51:40', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (416, 11, '腾讯', 'TENCENT', 'ai_platform', 0, '', '', '', '1', to_date('2025-02-23 20:58:04', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (417, 12, '硅基流动', 'SILICONFLOW', 'ai_platform', 0, '', '', '', '1', to_date('2025-02-24 20:19:09', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (418, 1, '聊天', '1', 'ai_model_type', 0, '', '', '', '1', to_date('2025-03-03 12:26:34', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (419, 2, '图像', '2', 'ai_model_type', 0, '', '', '', '1', to_date('2025-03-03 12:27:23', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (420, 3, '音频', '3', 'ai_model_type', 0, '', '', '', '1', to_date('2025-03-03 12:27:51', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (421, 4, '视频', '4', 'ai_model_type', 0, '', '', '', '1', to_date('2025-03-03 12:28:03', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (422, 5, '向量', '5', 'ai_model_type', 0, '', '', '', '1', to_date('2025-03-03 12:28:15', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (423, 6, '重排', '6', 'ai_model_type', 0, '', '', '', '1', to_date('2025-03-03 12:28:26', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (424, 14, 'MiniMax', 'MiniMax', 'ai_platform', 0, '', '', '', '1', to_date('2025-03-11 20:04:51', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (425, 15, '月之暗面', 'Moonshot', 'ai_platform', 0, '', '', '', '1', to_date('2025-03-11 20:05:08', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (424, 14, 'MiniMax', 'MINIMAX', 'ai_platform', 0, '', '', '', '1', to_date('2025-03-11 20:04:51', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (425, 15, '月之暗面', 'MOONSHOT', 'ai_platform', 0, '', '', '', '1', to_date('2025-03-11 20:05:08', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (426, 0, '直连设备', '0', 'iot_product_device_type', 0, 'default', '', '', '1', to_date('2024-08-10 11:54:58', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (427, 2, '网关设备', '2', 'iot_product_device_type', 0, 'default', '', '', '1', to_date('2024-08-10 11:55:08', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (428, 1, '网关子设备', '1', 'iot_product_device_type', 0, 'default', '', '', '1', to_date('2024-08-10 11:55:20', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
@@ -1289,7 +1289,7 @@ INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_t
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (592, 1, '设备属性设置', '1', 'iot_rule_scene_action_type_enum', 0, 'primary', '', '', '1', to_date('2025-03-28 15:27:12', 'SYYYY-MM-DD HH24:MI:SS'), '"1"', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (593, 2, '设备服务调用', '2', 'iot_rule_scene_action_type_enum', 0, 'primary', '', '', '1', to_date('2025-03-28 15:27:25', 'SYYYY-MM-DD HH24:MI:SS'), '"1"', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (594, 100, '告警触发', '100', 'iot_rule_scene_action_type_enum', 0, 'primary', '', '', '1', to_date('2025-03-28 15:27:35', 'SYYYY-MM-DD HH24:MI:SS'), '"1"', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (595, 16, '百川智能', 'BaiChuan', 'ai_platform', 0, '', '', '', '1', to_date('2025-03-23 12:15:46', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (595, 16, '百川智能', 'BAICHUAN', 'ai_platform', 0, '', '', '', '1', to_date('2025-03-23 12:15:46', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (596, 40, 'Vben5.0 Ant Design Schema 模版', '40', 'infra_codegen_front_type', 0, '', '', NULL, '1', to_date('2025-04-23 21:47:47', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (597, 6, '支付宝余额', '6', 'brokerage_withdraw_type', 0, '', '', 'API 打款', '1', to_date('2025-05-10 08:24:49', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (598, 3, 'WARN', '3', 'iot_alert_level', 0, 'warning', '', '', '1', to_date('2025-06-27 20:32:22', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
@@ -1313,8 +1313,8 @@ INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_t
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (616, 4, '设备服务调用', '4', 'iot_rule_scene_trigger_type_enum', 0, '', '', '', '1', to_date('2025-07-06 10:28:35', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (617, 100, '定时触发', '100', 'iot_rule_scene_trigger_type_enum', 0, '', '', '', '1', to_date('2025-07-06 10:28:48', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (618, 101, '告警恢复', '101', 'iot_rule_scene_action_type_enum', 0, '', '', '', '1', to_date('2025-07-06 10:37:57', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (619, 2, 'Anthropic', 'Anthropic', 'ai_platform', 0, '', '', '', '1', to_date('2025-08-21 22:54:24', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (620, 2, '谷歌 Gemini', 'Gemini', 'ai_platform', 0, '', '', '', '1', to_date('2025-08-22 22:39:35', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (619, 2, 'Anthropic', 'ANTHROPIC', 'ai_platform', 0, '', '', '', '1', to_date('2025-08-21 22:54:24', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (620, 2, '谷歌 Gemini', 'GEMINI', 'ai_platform', 0, '', '', '', '1', to_date('2025-08-22 22:39:35', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (621, 1, '文件系统', 'filesystem', 'ai_mcp_client_name', 0, '', '', '', '1', to_date('2025-08-28 13:58:43', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (622, 41, 'Vben5.0 Ant Design 标准模版', '41', 'infra_codegen_front_type', 0, '', '', '', '1', to_date('2025-09-04 23:26:07', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_dict_data (id, sort, label, value, dict_type, status, color_type, css_class, remark, creator, create_time, updater, update_time, deleted) VALUES (623, 50, 'Vben5.0 Element Plus Schema 模版', '50', 'infra_codegen_front_type', 0, '', '', '', '1', to_date('2025-09-04 23:26:38', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
@@ -2262,13 +2262,13 @@ CREATE SEQUENCE system_dict_data_seq
 -- ----------------------------
 CREATE TABLE system_dict_type (
     id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
-    type varchar2(100) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
+    type varchar2(100 char) DEFAULT '' NULL,
     status smallint DEFAULT 0 NOT NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     deleted_time date DEFAULT NULL NULL
@@ -2648,16 +2648,16 @@ CREATE SEQUENCE system_dict_type_seq
 CREATE TABLE system_login_log (
     id number  NOT NULL,
     log_type number  NOT NULL,
-    trace_id varchar2(64) DEFAULT '' NULL,
+    trace_id varchar2(64 char) DEFAULT '' NULL,
     user_id number DEFAULT 0 NOT NULL,
     user_type smallint DEFAULT 0 NOT NULL,
-    username varchar2(50) DEFAULT '' NULL,
+    username varchar2(50 char) DEFAULT '' NULL,
     result smallint  NOT NULL,
-    user_ip varchar2(50)  NULL,
-    user_agent varchar2(512)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    user_ip varchar2(50 char)  NULL,
+    user_agent varchar2(512 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -2692,16 +2692,16 @@ CREATE SEQUENCE system_login_log_seq
 -- ----------------------------
 CREATE TABLE system_mail_account (
     id number  NOT NULL,
-    mail varchar2(255)  NULL,
-    username varchar2(255)  NULL,
-    password varchar2(255)  NULL,
-    host varchar2(255)  NULL,
+    mail varchar2(255 char)  NULL,
+    username varchar2(255 char)  NULL,
+    password varchar2(255 char)  NULL,
+    host varchar2(255 char)  NULL,
     port number  NOT NULL,
     ssl_enable number(1,0) DEFAULT '0' NOT NULL,
     starttls_enable number(1,0) DEFAULT '0' NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -2743,24 +2743,24 @@ CREATE TABLE system_mail_log (
     id number  NOT NULL,
     user_id number DEFAULT NULL NULL,
     user_type smallint DEFAULT NULL NULL,
-    to_mails varchar2(1024)  NULL,
-    cc_mails varchar2(1024) DEFAULT NULL NULL,
-    bcc_mails varchar2(1024) DEFAULT NULL NULL,
+    to_mails varchar2(1024 char)  NULL,
+    cc_mails varchar2(1024 char) DEFAULT NULL NULL,
+    bcc_mails varchar2(1024 char) DEFAULT NULL NULL,
     account_id number  NOT NULL,
-    from_mail varchar2(255)  NULL,
+    from_mail varchar2(255 char)  NULL,
     template_id number  NOT NULL,
-    template_code varchar2(63)  NULL,
-    template_nickname varchar2(255) DEFAULT NULL NULL,
-    template_title varchar2(255)  NULL,
+    template_code varchar2(63 char)  NULL,
+    template_nickname varchar2(255 char) DEFAULT NULL NULL,
+    template_title varchar2(255 char)  NULL,
     template_content clob  NULL,
-    template_params varchar2(255)  NULL,
+    template_params varchar2(255 char)  NULL,
     send_status smallint DEFAULT 0 NOT NULL,
     send_time date DEFAULT NULL NULL,
-    send_message_id varchar2(255) DEFAULT NULL NULL,
-    send_exception varchar2(4000) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    send_message_id varchar2(255 char) DEFAULT NULL NULL,
+    send_exception varchar2(4000 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -2799,18 +2799,18 @@ CREATE SEQUENCE system_mail_log_seq
 -- ----------------------------
 CREATE TABLE system_mail_template (
     id number  NOT NULL,
-    name varchar2(63)  NULL,
-    code varchar2(63)  NULL,
+    name varchar2(63 char)  NULL,
+    code varchar2(63 char)  NULL,
     account_id number  NOT NULL,
-    nickname varchar2(255) DEFAULT NULL NULL,
-    title varchar2(255)  NULL,
-    content varchar2(4000)  NULL,
-    params varchar2(255)  NULL,
+    nickname varchar2(255 char) DEFAULT NULL NULL,
+    title varchar2(255 char)  NULL,
+    content varchar2(4000 char)  NULL,
+    params varchar2(255 char)  NULL,
     status smallint  NOT NULL,
-    remark varchar2(255) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(255 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -2851,22 +2851,22 @@ CREATE SEQUENCE system_mail_template_seq
 -- ----------------------------
 CREATE TABLE system_menu (
     id number  NOT NULL,
-    name varchar2(50)  NULL,
-    permission varchar2(100) DEFAULT '' NULL,
+    name varchar2(50 char)  NULL,
+    permission varchar2(100 char) DEFAULT '' NULL,
     type smallint  NOT NULL,
     sort number DEFAULT 0 NOT NULL,
     parent_id number DEFAULT 0 NOT NULL,
-    path varchar2(200) DEFAULT '' NULL,
-    icon varchar2(100) DEFAULT '#' NULL,
-    component varchar2(255) DEFAULT NULL NULL,
-    component_name varchar2(255) DEFAULT NULL NULL,
+    path varchar2(200 char) DEFAULT '' NULL,
+    icon varchar2(100 char) DEFAULT '#' NULL,
+    component varchar2(255 char) DEFAULT NULL NULL,
+    component_name varchar2(255 char) DEFAULT NULL NULL,
     status smallint DEFAULT 0 NOT NULL,
     visible number(1,0) DEFAULT '1' NOT NULL,
     keep_alive number(1,0) DEFAULT '1' NOT NULL,
     always_show number(1,0) DEFAULT '1' NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -3705,16 +3705,16 @@ INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (814, '消息查询', 'ai:chat-message:query', 3, 11, 811, '', '', '', '', 0, '1', '1', '1', '1', to_date('2024-05-25 08:38:56', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (815, '消息删除', 'ai:chat-message:delete', 3, 12, 811, '', '', '', '', 0, '1', '1', '1', '1', to_date('2024-05-25 08:39:10', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (816, 'AI 绘画', '', 2, 2, 791, 'image', 'ep:picture-rounded', 'ai/image/index/index.vue', 'AiImage', 0, '1', '1', '1', '1', to_date('2024-05-26 11:45:17', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (817, '绘画管理', '', 2, 11, 793, 'image', 'fa:file-image-o', 'ai/image/manager/index.vue', 'AiImageManager', 0, '1', '1', '1', '', to_date('2024-06-26 13:32:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (817, '图片生成管理', '', 2, 11, 793, 'image', 'fa:file-image-o', 'ai/image/manager/index.vue', 'AiImageManager', 0, '1', '1', '1', '', to_date('2024-06-26 13:32:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (818, '绘画查询', 'ai:image:query', 3, 1, 817, '', '', '', '', 0, '1', '1', '1', '', to_date('2024-06-26 13:32:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (819, '绘画删除', 'ai:image:delete', 3, 4, 817, '', '', '', '', 0, '1', '1', '1', '', to_date('2024-06-26 13:32:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (820, '绘图更新', 'ai:image:update', 3, 2, 817, '', '', '', '', 0, '1', '1', '1', '1', to_date('2024-06-26 22:47:56', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (821, '音乐管理', '', 2, 12, 793, 'music', 'fa:music', 'ai/music/manager/index.vue', 'AiMusicManager', 0, '1', '1', '1', '', to_date('2024-06-27 15:03:33', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (821, '音乐生成管理', '', 2, 12, 793, 'music', 'fa:music', 'ai/music/manager/index.vue', 'AiMusicManager', 0, '1', '1', '1', '', to_date('2024-06-27 15:03:33', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (822, '音乐查询', 'ai:music:query', 3, 1, 821, '', '', '', NULL, 0, '1', '1', '1', '', to_date('2024-06-27 15:03:33', 'SYYYY-MM-DD HH24:MI:SS'), '', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (823, '音乐更新', 'ai:music:update', 3, 3, 821, '', '', '', NULL, 0, '1', '1', '1', '', to_date('2024-06-27 15:03:33', 'SYYYY-MM-DD HH24:MI:SS'), '', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (824, '音乐删除', 'ai:music:delete', 3, 4, 821, '', '', '', NULL, 0, '1', '1', '1', '', to_date('2024-06-27 15:03:33', 'SYYYY-MM-DD HH24:MI:SS'), '', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (825, 'AI 写作', '', 2, 3, 791, 'write', 'fa-solid:book-reader', 'ai/write/index/index.vue', 'AiWrite', 0, '1', '1', '1', '1', to_date('2024-07-08 09:26:44', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (826, '写作管理', '', 2, 13, 793, 'write', 'fa:bookmark-o', 'ai/write/manager/index.vue', 'AiWriteManager', 0, '1', '1', '1', '', to_date('2024-07-10 13:24:34', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (826, '写作翻译管理', '', 2, 13, 793, 'write', 'fa:bookmark-o', 'ai/write/manager/index.vue', 'AiWriteManager', 0, '1', '1', '1', '', to_date('2024-07-10 13:24:34', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (827, 'AI 写作查询', 'ai:write:query', 3, 1, 826, '', '', '', NULL, 0, '1', '1', '1', '', to_date('2024-07-10 13:24:34', 'SYYYY-MM-DD HH24:MI:SS'), '', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (828, 'AI 写作删除', 'ai:write:delete', 3, 4, 826, '', '', '', NULL, 0, '1', '1', '1', '', to_date('2024-07-10 13:24:34', 'SYYYY-MM-DD HH24:MI:SS'), '', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_menu (id, name, permission, type, sort, parent_id, path, icon, component, component_name, status, visible, keep_alive, always_show, creator, create_time, updater, update_time, deleted) VALUES (829, 'AI 音乐', '', 2, 4, 791, 'music', 'fa:music', 'ai/music/index/index.vue', 'AiMusic', 0, '1', '1', '1', '1', to_date('2024-07-17 09:21:12', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-08-14 01:49:42', 'SYYYY-MM-DD HH24:MI:SS'), '0');
@@ -5070,13 +5070,13 @@ CREATE SEQUENCE system_menu_seq
 -- ----------------------------
 CREATE TABLE system_notice (
     id number  NOT NULL,
-    title varchar2(50)  NULL,
+    title varchar2(50 char)  NULL,
     content clob  NULL,
     type smallint  NOT NULL,
     status smallint DEFAULT 0 NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5117,16 +5117,16 @@ CREATE TABLE system_notify_message (
     user_id number  NOT NULL,
     user_type smallint  NOT NULL,
     template_id number  NOT NULL,
-    template_code varchar2(64)  NULL,
-    template_nickname varchar2(63)  NULL,
-    template_content varchar2(1024)  NULL,
+    template_code varchar2(64 char)  NULL,
+    template_nickname varchar2(63 char)  NULL,
+    template_content varchar2(1024 char)  NULL,
     template_type number  NOT NULL,
-    template_params varchar2(255)  NULL,
+    template_params varchar2(255 char)  NULL,
     read_status number(1,0)  NOT NULL,
     read_time date DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5264,17 +5264,17 @@ CREATE SEQUENCE system_notify_message_seq
 -- ----------------------------
 CREATE TABLE system_notify_template (
     id number  NOT NULL,
-    name varchar2(63)  NULL,
-    code varchar2(64)  NULL,
-    nickname varchar2(255)  NULL,
-    content varchar2(1024)  NULL,
+    name varchar2(63 char)  NULL,
+    code varchar2(64 char)  NULL,
+    nickname varchar2(255 char)  NULL,
+    content varchar2(1024 char)  NULL,
     type smallint  NOT NULL,
-    params varchar2(255) DEFAULT NULL NULL,
+    params varchar2(255 char) DEFAULT NULL NULL,
     status smallint  NOT NULL,
-    remark varchar2(255) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(255 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -5306,15 +5306,15 @@ CREATE TABLE system_oauth2_access_token (
     id number  NOT NULL,
     user_id number  NOT NULL,
     user_type smallint  NOT NULL,
-    user_info varchar2(512)  NULL,
-    access_token varchar2(255)  NULL,
-    refresh_token varchar2(32)  NULL,
-    client_id varchar2(255)  NULL,
-    scopes varchar2(255) DEFAULT NULL NULL,
+    user_info varchar2(512 char)  NULL,
+    access_token varchar2(255 char)  NULL,
+    refresh_token varchar2(32 char)  NULL,
+    client_id varchar2(255 char)  NULL,
+    scopes varchar2(255 char) DEFAULT NULL NULL,
     expires_time date  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5322,8 +5322,8 @@ CREATE TABLE system_oauth2_access_token (
 
 ALTER TABLE system_oauth2_access_token ADD CONSTRAINT pk_system_oauth2_access_token PRIMARY KEY (id);
 
-CREATE INDEX idx_system_oauth2_access_token_01 ON system_oauth2_access_token (access_token);
-CREATE INDEX idx_system_oauth2_access_token_02 ON system_oauth2_access_token (refresh_token);
+CREATE INDEX idx_system_oauth2_acces_02b420 ON system_oauth2_access_token (access_token);
+CREATE INDEX idx_system_oauth2_acces_d66daa ON system_oauth2_access_token (refresh_token);
 
 COMMENT ON COLUMN system_oauth2_access_token.id IS '编号';
 COMMENT ON COLUMN system_oauth2_access_token.user_id IS '用户编号';
@@ -5351,13 +5351,13 @@ CREATE TABLE system_oauth2_approve (
     id number  NOT NULL,
     user_id number  NOT NULL,
     user_type smallint  NOT NULL,
-    client_id varchar2(255)  NULL,
-    scope varchar2(255) DEFAULT '' NULL,
+    client_id varchar2(255 char)  NULL,
+    scope varchar2(255 char) DEFAULT '' NULL,
     approved number(1,0) DEFAULT '0' NOT NULL,
     expires_time date  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5389,24 +5389,24 @@ CREATE SEQUENCE system_oauth2_approve_seq
 -- ----------------------------
 CREATE TABLE system_oauth2_client (
     id number  NOT NULL,
-    client_id varchar2(255)  NULL,
-    secret varchar2(255)  NULL,
-    name varchar2(255)  NULL,
-    logo varchar2(255)  NULL,
-    description varchar2(255) DEFAULT NULL NULL,
+    client_id varchar2(255 char)  NULL,
+    secret varchar2(255 char)  NULL,
+    name varchar2(255 char)  NULL,
+    logo varchar2(255 char)  NULL,
+    description varchar2(255 char) DEFAULT NULL NULL,
     status smallint  NOT NULL,
     access_token_validity_seconds number  NOT NULL,
     refresh_token_validity_seconds number  NOT NULL,
-    redirect_uris varchar2(255)  NULL,
-    authorized_grant_types varchar2(255)  NULL,
-    scopes varchar2(255) DEFAULT NULL NULL,
-    auto_approve_scopes varchar2(255) DEFAULT NULL NULL,
-    authorities varchar2(255) DEFAULT NULL NULL,
-    resource_ids varchar2(255) DEFAULT NULL NULL,
-    additional_information varchar2(4000) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    redirect_uris varchar2(255 char)  NULL,
+    authorized_grant_types varchar2(255 char)  NULL,
+    scopes varchar2(255 char) DEFAULT NULL NULL,
+    auto_approve_scopes varchar2(255 char) DEFAULT NULL NULL,
+    authorities varchar2(255 char) DEFAULT NULL NULL,
+    resource_ids varchar2(255 char) DEFAULT NULL NULL,
+    additional_information varchar2(4000 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -5444,7 +5444,7 @@ COMMENT ON TABLE system_oauth2_client IS 'OAuth2 客户端表';
 -- @formatter:off
 INSERT INTO system_oauth2_client (id, client_id, secret, name, logo, description, status, access_token_validity_seconds, refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes, auto_approve_scopes, authorities, resource_ids, additional_information, creator, create_time, updater, update_time, deleted) VALUES (1, 'default', 'admin123', '芋道源码', 'http://test.yudao.iocoder.cn/20250502/sort2_1746189740718.png', '我是描述', 0, 1800, 2592000, '["https://www.iocoder.cn","https://doc.iocoder.cn"]', '["password","authorization_code","implicit","refresh_token","client_credentials"]', '["user.read","user.write"]', '[]', '["user.read","user.write"]', '[]', '{}', '1', to_date('2022-05-11 21:47:12', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2025-12-07 20:07:09', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_oauth2_client (id, client_id, secret, name, logo, description, status, access_token_validity_seconds, refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes, auto_approve_scopes, authorities, resource_ids, additional_information, creator, create_time, updater, update_time, deleted) VALUES (40, 'test', 'test2', 'biubiu', 'http://test.yudao.iocoder.cn/20251227/javayuanma_1766829882970.jpg', '啦啦啦啦', 0, 1800, 43200, '["https://www.iocoder.cn"]', '["password","authorization_code","implicit"]', '["user_info","projects"]', '["user_info"]', '[]', '[]', '{}', '1', to_date('2022-05-12 00:28:20', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2025-12-27 18:04:44', 'SYYYY-MM-DD HH24:MI:SS'), '0');
-INSERT INTO system_oauth2_client (id, client_id, secret, name, logo, description, status, access_token_validity_seconds, refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes, auto_approve_scopes, authorities, resource_ids, additional_information, creator, create_time, updater, update_time, deleted) VALUES (41, 'yudao-sso-demo-by-code', 'test', '基于授权码模式，如何实现 SSO 单点登录？', 'http://test.yudao.iocoder.cn/it/20250502/sign_1746181948685.png', NULL, 0, 1800, 43200, '["http://127.0.0.1:18080"]', '["authorization_code","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', NULL, '1', to_date('2022-09-29 13:28:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2025-05-02 18:32:30', 'SYYYY-MM-DD HH24:MI:SS'), '0');
+INSERT INTO system_oauth2_client (id, client_id, secret, name, logo, description, status, access_token_validity_seconds, refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes, auto_approve_scopes, authorities, resource_ids, additional_information, creator, create_time, updater, update_time, deleted) VALUES (41, 'yudao-sso-demo-by-code', 'test', '基于授权码模式，如何实现 SSO 单点登录？', 'http://test.yudao.iocoder.cn/it/20250502/sign_1746181948685.png', NULL, 0, 1800, 43200, '["http://127.0.0.1:18080/callback.html"]', '["authorization_code","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', NULL, '1', to_date('2022-09-29 13:28:31', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2025-05-02 18:32:30', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 INSERT INTO system_oauth2_client (id, client_id, secret, name, logo, description, status, access_token_validity_seconds, refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes, auto_approve_scopes, authorities, resource_ids, additional_information, creator, create_time, updater, update_time, deleted) VALUES (42, 'yudao-sso-demo-by-password', 'test', '基于密码模式，如何实现 SSO 单点登录？', 'http://test.yudao.iocoder.cn/oauth2/20260615/iShot_2026-05-31_23.18.10.png', NULL, 0, 1800, 43200, '["http://127.0.0.1:18080"]', '["password","refresh_token"]', '["user.read","user.write"]', '[]', '[]', '[]', NULL, '1', to_date('2022-10-04 17:40:16', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-06-15 18:58:30', 'SYYYY-MM-DD HH24:MI:SS'), '0');
 COMMIT;
 -- @formatter:on
@@ -5458,15 +5458,15 @@ CREATE TABLE system_oauth2_code (
     id number  NOT NULL,
     user_id number  NOT NULL,
     user_type smallint  NOT NULL,
-    code varchar2(32)  NULL,
-    client_id varchar2(255)  NULL,
-    scopes varchar2(255) DEFAULT '' NULL,
+    code varchar2(32 char)  NULL,
+    client_id varchar2(255 char)  NULL,
+    scopes varchar2(255 char) DEFAULT '' NULL,
     expires_time date  NOT NULL,
-    redirect_uri varchar2(255) DEFAULT NULL NULL,
-    state varchar2(255) DEFAULT '' NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    redirect_uri varchar2(255 char) DEFAULT NULL NULL,
+    state varchar2(255 char) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5501,14 +5501,14 @@ CREATE SEQUENCE system_oauth2_code_seq
 CREATE TABLE system_oauth2_refresh_token (
     id number  NOT NULL,
     user_id number  NOT NULL,
-    refresh_token varchar2(32)  NULL,
+    refresh_token varchar2(32 char)  NULL,
     user_type smallint  NOT NULL,
-    client_id varchar2(255)  NULL,
-    scopes varchar2(255) DEFAULT NULL NULL,
+    client_id varchar2(255 char)  NULL,
+    scopes varchar2(255 char) DEFAULT NULL NULL,
     expires_time date  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5516,7 +5516,7 @@ CREATE TABLE system_oauth2_refresh_token (
 
 ALTER TABLE system_oauth2_refresh_token ADD CONSTRAINT pk_system_oauth2_refresh_token PRIMARY KEY (id);
 
-CREATE INDEX idx_system_oauth2_refresh_token_01 ON system_oauth2_refresh_token (refresh_token);
+CREATE INDEX idx_system_oauth2_refre_8f9088 ON system_oauth2_refresh_token (refresh_token);
 
 COMMENT ON COLUMN system_oauth2_refresh_token.id IS '编号';
 COMMENT ON COLUMN system_oauth2_refresh_token.user_id IS '用户编号';
@@ -5533,29 +5533,29 @@ COMMENT ON COLUMN system_oauth2_refresh_token.deleted IS '是否删除';
 COMMENT ON COLUMN system_oauth2_refresh_token.tenant_id IS '租户编号';
 COMMENT ON TABLE system_oauth2_refresh_token IS 'OAuth2 刷新令牌';
 
-CREATE SEQUENCE system_oauth2_refresh_token_seq
+CREATE SEQUENCE system_oauth2_refresh_t_d1db7c
     START WITH 1;
 -- ----------------------------
 -- Table structure for system_operate_log
 -- ----------------------------
 CREATE TABLE system_operate_log (
     id number  NOT NULL,
-    trace_id varchar2(64) DEFAULT '' NULL,
+    trace_id varchar2(64 char) DEFAULT '' NULL,
     user_id number  NOT NULL,
     user_type smallint DEFAULT 0 NOT NULL,
-    type varchar2(50)  NULL,
-    sub_type varchar2(50)  NULL,
+    type varchar2(50 char)  NULL,
+    sub_type varchar2(50 char)  NULL,
     biz_id number  NOT NULL,
-    action varchar2(2000) DEFAULT '' NULL,
+    action varchar2(2000 char) DEFAULT '' NULL,
     success number(1,0) DEFAULT '1' NOT NULL,
-    extra varchar2(2000) DEFAULT '' NULL,
-    request_method varchar2(16) DEFAULT '' NULL,
-    request_url varchar2(255) DEFAULT '' NULL,
-    user_ip varchar2(50) DEFAULT NULL NULL,
-    user_agent varchar2(512) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    extra varchar2(2000 char) DEFAULT '' NULL,
+    request_method varchar2(16 char) DEFAULT '' NULL,
+    request_url varchar2(255 char) DEFAULT '' NULL,
+    user_ip varchar2(50 char) DEFAULT NULL NULL,
+    user_agent varchar2(512 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5595,14 +5595,14 @@ CREATE SEQUENCE system_operate_log_seq
 -- ----------------------------
 CREATE TABLE system_post (
     id number  NOT NULL,
-    code varchar2(64)  NULL,
-    name varchar2(50)  NULL,
+    code varchar2(64 char)  NULL,
+    name varchar2(50 char)  NULL,
     sort number  NOT NULL,
     status smallint  NOT NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5642,17 +5642,17 @@ CREATE SEQUENCE system_post_seq
 -- ----------------------------
 CREATE TABLE system_role (
     id number  NOT NULL,
-    name varchar2(30)  NULL,
-    code varchar2(100)  NULL,
+    name varchar2(30 char)  NULL,
+    code varchar2(100 char)  NULL,
     sort number  NOT NULL,
     data_scope smallint DEFAULT 1 NOT NULL,
-    data_scope_dept_ids varchar2(500) DEFAULT '' NULL,
+    data_scope_dept_ids varchar2(500 char) DEFAULT '' NULL,
     status smallint  NOT NULL,
     type smallint  NOT NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -5687,7 +5687,7 @@ INSERT INTO system_role (id, name, code, sort, data_scope, data_scope_dept_ids, 
 INSERT INTO system_role (id, name, code, sort, data_scope, data_scope_dept_ids, status, type, remark, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (109, '租户管理员', 'tenant_admin', 0, 1, '', 0, 1, '系统自动生成', '1', to_date('2022-02-22 00:56:14', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2022-02-22 00:56:14', 'SYYYY-MM-DD HH24:MI:SS'), '0', 121);
 INSERT INTO system_role (id, name, code, sort, data_scope, data_scope_dept_ids, status, type, remark, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (111, '租户管理员', 'tenant_admin', 0, 1, '', 0, 1, '系统自动生成', '1', to_date('2022-03-07 21:37:58', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2022-03-07 21:37:58', 'SYYYY-MM-DD HH24:MI:SS'), '0', 122);
 INSERT INTO system_role (id, name, code, sort, data_scope, data_scope_dept_ids, status, type, remark, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (155, '测试数据权限12', 'test-dp', 4, 2, '[112,100,102,103,104,105,107,108]', 0, 2, '1111', '1', to_date('2025-03-31 14:58:06', 'SYYYY-MM-DD HH24:MI:SS'), '1', to_date('2026-06-26 10:42:44', 'SYYYY-MM-DD HH24:MI:SS'), '0', 1);
-INSERT INTO system_role (id, name, code, sort, data_scope, data_scope_dept_ids, status, type, remark, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (162, 'HRMå›¢é˜Ÿè´Ÿè´£äºº', 'hrm_team_leader', 50, 2, '', 0, 2, 'æœ¬åœ°å›¢é˜Ÿå·¥ä½œå°æ¼”ç¤ºè§’è‰²', 'admin', to_date('2026-08-01 03:52:53', 'SYYYY-MM-DD HH24:MI:SS'), 'admin', to_date('2026-08-01 03:52:53', 'SYYYY-MM-DD HH24:MI:SS'), '0', 1);
+INSERT INTO system_role (id, name, code, sort, data_scope, data_scope_dept_ids, status, type, remark, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (162, 'HRM团队负责人', 'hrm_team_leader', 50, 2, '', 0, 2, '本地团队工作台演示角色', 'admin', to_date('2026-08-01 03:52:53', 'SYYYY-MM-DD HH24:MI:SS'), 'admin', to_date('2026-08-01 03:52:53', 'SYYYY-MM-DD HH24:MI:SS'), '0', 1);
 COMMIT;
 -- @formatter:on
 
@@ -5700,9 +5700,9 @@ CREATE TABLE system_role_menu (
     id number  NOT NULL,
     role_id number  NOT NULL,
     menu_id number  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7289,16 +7289,16 @@ CREATE SEQUENCE system_role_menu_seq
 -- ----------------------------
 CREATE TABLE system_sms_channel (
     id number  NOT NULL,
-    signature varchar2(12)  NULL,
-    code varchar2(63)  NULL,
+    signature varchar2(12 char)  NULL,
+    code varchar2(63 char)  NULL,
     status smallint  NOT NULL,
-    remark varchar2(255) DEFAULT NULL NULL,
-    api_key varchar2(128)  NULL,
-    api_secret varchar2(128) DEFAULT NULL NULL,
-    callback_url varchar2(255) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(255 char) DEFAULT NULL NULL,
+    api_key varchar2(128 char)  NULL,
+    api_secret varchar2(128 char) DEFAULT NULL NULL,
+    callback_url varchar2(255 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -7337,17 +7337,17 @@ CREATE SEQUENCE system_sms_channel_seq
 -- ----------------------------
 CREATE TABLE system_sms_code (
     id number  NOT NULL,
-    mobile varchar2(11)  NULL,
-    code varchar2(6)  NULL,
-    create_ip varchar2(15)  NULL,
+    mobile varchar2(11 char)  NULL,
+    code varchar2(6 char)  NULL,
+    create_ip varchar2(15 char)  NULL,
     scene smallint  NOT NULL,
     today_index smallint  NOT NULL,
     used smallint  NOT NULL,
     used_time date DEFAULT NULL NULL,
-    used_ip varchar2(255) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    used_ip varchar2(255 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7382,29 +7382,29 @@ CREATE SEQUENCE system_sms_code_seq
 CREATE TABLE system_sms_log (
     id number  NOT NULL,
     channel_id number  NOT NULL,
-    channel_code varchar2(63)  NULL,
+    channel_code varchar2(63 char)  NULL,
     template_id number  NOT NULL,
-    template_code varchar2(63)  NULL,
+    template_code varchar2(63 char)  NULL,
     template_type smallint  NOT NULL,
-    template_content varchar2(255)  NULL,
-    template_params varchar2(255)  NULL,
-    api_template_id varchar2(63)  NULL,
-    mobile varchar2(11)  NULL,
+    template_content varchar2(255 char)  NULL,
+    template_params varchar2(255 char)  NULL,
+    api_template_id varchar2(63 char)  NULL,
+    mobile varchar2(11 char)  NULL,
     user_id number DEFAULT NULL NULL,
     user_type smallint DEFAULT NULL NULL,
     send_status smallint DEFAULT 0 NOT NULL,
     send_time date DEFAULT NULL NULL,
-    api_send_code varchar2(63) DEFAULT NULL NULL,
-    api_send_msg varchar2(255) DEFAULT NULL NULL,
-    api_request_id varchar2(255) DEFAULT NULL NULL,
-    api_serial_no varchar2(255) DEFAULT NULL NULL,
+    api_send_code varchar2(63 char) DEFAULT NULL NULL,
+    api_send_msg varchar2(255 char) DEFAULT NULL NULL,
+    api_request_id varchar2(255 char) DEFAULT NULL NULL,
+    api_serial_no varchar2(255 char) DEFAULT NULL NULL,
     receive_status smallint DEFAULT 0 NOT NULL,
     receive_time date DEFAULT NULL NULL,
-    api_receive_code varchar2(63) DEFAULT NULL NULL,
-    api_receive_msg varchar2(255) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    api_receive_code varchar2(63 char) DEFAULT NULL NULL,
+    api_receive_msg varchar2(255 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -7449,17 +7449,17 @@ CREATE TABLE system_sms_template (
     id number  NOT NULL,
     type smallint  NOT NULL,
     status smallint  NOT NULL,
-    code varchar2(63)  NULL,
-    name varchar2(63)  NULL,
-    content varchar2(255)  NULL,
-    params varchar2(255)  NULL,
-    remark varchar2(255) DEFAULT NULL NULL,
-    api_template_id varchar2(63)  NULL,
+    code varchar2(63 char)  NULL,
+    name varchar2(63 char)  NULL,
+    content varchar2(255 char)  NULL,
+    params varchar2(255 char)  NULL,
+    remark varchar2(255 char) DEFAULT NULL NULL,
+    api_template_id varchar2(63 char)  NULL,
     channel_id number  NOT NULL,
-    channel_code varchar2(63)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    channel_code varchar2(63 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -7513,17 +7513,17 @@ CREATE SEQUENCE system_sms_template_seq
 -- ----------------------------
 CREATE TABLE system_social_client (
     id number  NOT NULL,
-    name varchar2(255)  NULL,
+    name varchar2(255 char)  NULL,
     social_type smallint  NOT NULL,
     user_type smallint  NOT NULL,
-    client_id varchar2(255)  NULL,
-    client_secret varchar2(255)  NULL,
-    agent_id varchar2(255) DEFAULT NULL NULL,
-    public_key varchar2(2048) DEFAULT NULL NULL,
+    client_id varchar2(255 char)  NULL,
+    client_secret varchar2(255 char)  NULL,
+    agent_id varchar2(255 char) DEFAULT NULL NULL,
+    public_key varchar2(2048 char) DEFAULT NULL NULL,
     status smallint  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7571,17 +7571,17 @@ CREATE SEQUENCE system_social_client_seq
 CREATE TABLE system_social_user (
     id number  NOT NULL,
     type smallint  NOT NULL,
-    openid varchar2(32)  NULL,
-    token varchar2(256) DEFAULT NULL NULL,
-    raw_token_info varchar2(1024)  NULL,
-    nickname varchar2(32)  NULL,
-    avatar varchar2(255) DEFAULT NULL NULL,
-    raw_user_info varchar2(1024)  NULL,
-    code varchar2(256)  NULL,
-    state varchar2(256) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    openid varchar2(32 char)  NULL,
+    token varchar2(256 char) DEFAULT NULL NULL,
+    raw_token_info varchar2(1024 char)  NULL,
+    nickname varchar2(32 char)  NULL,
+    avatar varchar2(255 char) DEFAULT NULL NULL,
+    raw_user_info varchar2(1024 char)  NULL,
+    code varchar2(256 char)  NULL,
+    state varchar2(256 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7621,9 +7621,9 @@ CREATE TABLE system_social_user_bind (
     user_type smallint  NOT NULL,
     social_type smallint  NOT NULL,
     social_user_id number  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7653,18 +7653,18 @@ CREATE SEQUENCE system_social_user_bind_seq
 -- ----------------------------
 CREATE TABLE system_tenant (
     id number  NOT NULL,
-    name varchar2(30)  NULL,
+    name varchar2(30 char)  NULL,
     contact_user_id number DEFAULT NULL NULL,
-    contact_name varchar2(30)  NULL,
-    contact_mobile varchar2(500) DEFAULT NULL NULL,
+    contact_name varchar2(30 char)  NULL,
+    contact_mobile varchar2(500 char) DEFAULT NULL NULL,
     status smallint DEFAULT 0 NOT NULL,
-    websites varchar2(1024) DEFAULT '' NULL,
+    websites varchar2(1024 char) DEFAULT '' NULL,
     package_id number  NOT NULL,
     expire_time date  NOT NULL,
     account_count number  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -7705,13 +7705,13 @@ CREATE SEQUENCE system_tenant_seq
 -- ----------------------------
 CREATE TABLE system_tenant_package (
     id number  NOT NULL,
-    name varchar2(30)  NULL,
+    name varchar2(30 char)  NULL,
     status smallint DEFAULT 0 NOT NULL,
-    remark varchar2(256) DEFAULT '' NULL,
-    menu_ids varchar2(4000)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    remark varchar2(256 char) DEFAULT '' NULL,
+    menu_ids varchar2(4000 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL
 );
@@ -7748,9 +7748,9 @@ CREATE TABLE system_user_post (
     id number  NOT NULL,
     user_id number DEFAULT 0 NOT NULL,
     post_id number DEFAULT 0 NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7796,9 +7796,9 @@ CREATE TABLE system_user_role (
     id number  NOT NULL,
     user_id number  NOT NULL,
     role_id number  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7856,22 +7856,22 @@ CREATE SEQUENCE system_user_role_seq
 -- ----------------------------
 CREATE TABLE system_users (
     id number  NOT NULL,
-    username varchar2(30)  NULL,
-    password varchar2(100) DEFAULT '' NULL,
-    nickname varchar2(30)  NULL,
-    remark varchar2(500) DEFAULT NULL NULL,
+    username varchar2(30 char)  NULL,
+    password varchar2(100 char) DEFAULT '' NULL,
+    nickname varchar2(30 char)  NULL,
+    remark varchar2(500 char) DEFAULT NULL NULL,
     dept_id number DEFAULT NULL NULL,
-    post_ids varchar2(255) DEFAULT NULL NULL,
-    email varchar2(50) DEFAULT '' NULL,
-    mobile varchar2(11) DEFAULT '' NULL,
+    post_ids varchar2(255 char) DEFAULT NULL NULL,
+    email varchar2(50 char) DEFAULT '' NULL,
+    mobile varchar2(11 char) DEFAULT '' NULL,
     sex smallint DEFAULT 0 NULL,
-    avatar varchar2(512) DEFAULT '' NULL,
+    avatar varchar2(512 char) DEFAULT '' NULL,
     status smallint DEFAULT 0 NOT NULL,
-    login_ip varchar2(50) DEFAULT '' NULL,
+    login_ip varchar2(50 char) DEFAULT '' NULL,
     login_date date DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7941,14 +7941,14 @@ CREATE SEQUENCE system_users_seq
 -- ----------------------------
 CREATE TABLE yudao_demo01_contact (
     id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
     sex smallint  NOT NULL,
     birthday date  NOT NULL,
-    description varchar2(255)  NULL,
-    avatar varchar2(512) DEFAULT NULL NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    description varchar2(255 char)  NULL,
+    avatar varchar2(512 char) DEFAULT NULL NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -7985,11 +7985,11 @@ CREATE SEQUENCE yudao_demo01_contact_seq
 -- ----------------------------
 CREATE TABLE yudao_demo02_category (
     id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
     parent_id number  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -8030,11 +8030,11 @@ CREATE SEQUENCE yudao_demo02_category_seq
 CREATE TABLE yudao_demo03_course (
     id number  NOT NULL,
     student_id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
     score smallint  NOT NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -8086,11 +8086,11 @@ CREATE SEQUENCE yudao_demo03_course_seq
 CREATE TABLE yudao_demo03_grade (
     id number  NOT NULL,
     student_id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
-    teacher varchar2(255)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
+    teacher varchar2(255 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL
@@ -8127,13 +8127,13 @@ CREATE SEQUENCE yudao_demo03_grade_seq
 -- ----------------------------
 CREATE TABLE yudao_demo03_student (
     id number  NOT NULL,
-    name varchar2(100) DEFAULT '' NULL,
+    name varchar2(100 char) DEFAULT '' NULL,
     sex smallint  NOT NULL,
     birthday date  NOT NULL,
-    description varchar2(255)  NULL,
-    creator varchar2(64) DEFAULT '' NULL,
+    description varchar2(255 char)  NULL,
+    creator varchar2(64 char) DEFAULT '' NULL,
     create_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updater varchar2(64) DEFAULT '' NULL,
+    updater varchar2(64 char) DEFAULT '' NULL,
     update_time date DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted number(1,0) DEFAULT 0 NOT NULL,
     tenant_id number DEFAULT 0 NOT NULL

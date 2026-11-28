@@ -20,7 +20,7 @@ public class MiniMaxChatModel implements ChatModel {
 
     public static final String BASE_URL = "https://api.minimaxi.com/v1";
 
-    public static final String MODEL_DEFAULT = "MiniMax-M3";
+    public static final String MODEL_DEFAULT = "MiniMax-M3.1-Flash";
 
     /**
      * 兼容 OpenAI 接口，复用 DeepSeek 客户端
@@ -38,8 +38,8 @@ public class MiniMaxChatModel implements ChatModel {
     }
 
     @Override
-    public ChatOptions getDefaultOptions() {
-        return deepSeekChatModel.getDefaultOptions();
+    public ChatOptions getOptions() {
+        return deepSeekChatModel.getOptions();
     }
 
 }

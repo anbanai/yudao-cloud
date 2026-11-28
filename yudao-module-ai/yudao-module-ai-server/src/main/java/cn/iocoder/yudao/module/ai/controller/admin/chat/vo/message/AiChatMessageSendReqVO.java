@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.ai.controller.admin.chat.vo.message;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -27,5 +27,8 @@ public class AiChatMessageSendReqVO {
 
     @Schema(description = "附件 URL 数组", example = "https://www.iocoder.cn/1.png")
     private List<String> attachmentUrls;
+
+    @Schema(description = "本次思考档位；为空表示使用模型默认档位，模型未配置档位时必须为空", example = "high")
+    private String reasoningLevel;
 
 }

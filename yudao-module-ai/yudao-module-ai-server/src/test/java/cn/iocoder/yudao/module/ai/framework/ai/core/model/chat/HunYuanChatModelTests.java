@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import static cn.iocoder.yudao.module.ai.util.AiUtils.validateApiKey;
+import static cn.iocoder.yudao.module.ai.framework.ai.core.model.AiModelTestUtils.validateApiKey;
 
 /**
  * {@link HunYuanChatModel} 集成测试
@@ -38,7 +38,7 @@ public class HunYuanChatModelTests {
                     .completionsPath(HunYuanChatModel.COMPLETE_PATH)
                     .apiKey(API_KEY) // apiKey
                     .build())
-            .defaultOptions(DeepSeekChatOptions.builder()
+            .options(DeepSeekChatOptions.builder()
                     .model(MODEL) // 模型
                     .temperature(0.7)
                     .build())

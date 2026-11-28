@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import static cn.iocoder.yudao.module.ai.util.AiUtils.validateApiKey;
+import static cn.iocoder.yudao.module.ai.framework.ai.core.model.AiModelTestUtils.validateApiKey;
 
 /**
  * {@link MiniMaxChatModel} 的集成测试
@@ -37,7 +37,7 @@ public class MiniMaxChatModelTests {
                     .baseUrl(MiniMaxChatModel.BASE_URL)
                     .apiKey(API_KEY)
                     .build())
-            .defaultOptions(DeepSeekChatOptions.builder()
+            .options(DeepSeekChatOptions.builder()
                     .model(MODEL)
                     .build())
             .build());

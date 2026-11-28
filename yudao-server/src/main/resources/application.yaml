@@ -192,7 +192,7 @@ spring:
           host: 127.0.0.1
           port: 19530
     openai: # OpenAI 官方
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1} # OpenAI 官方 SDK 的 baseUrl 需包含 /v1
       api-key: ${OPENAI_API_KEY:sk-xxxx}
     azure: # OpenAI 微软
       openai:
@@ -234,68 +234,78 @@ spring:
           enabled: false # TODO @芋艿：有 bug https://github.com/spring-projects/spring-ai/issues/4917 需要官方修复
 
 yudao:
-  ai:
-    gemini: # 谷歌 Gemini
-      enable: true
-      api-key: ${GEMINI_API_KEY:sk-xxxx}
-      model: gemini-2.5-flash
-    doubao: # 字节豆包
-      enable: true
-      api-key: ${DOUBAO_API_KEY:sk-xxxx}
-      model: doubao-seed-2-1-turbo-260628
-    hunyuan: # 腾讯混元
-      enable: true
-      api-key: ${HUNYUAN_API_KEY:sk-xxxx}
-      model: hy3-preview
+  ai: # 按「提供方 + 能力」分层，对齐 spring.ai.{provider}.{capability}
+    gemini: # 谷歌：Gemini
+      chat:
+        enable: true
+        api-key: ${GEMINI_API_KEY:sk-xxxx}
+        model: gemini-2.5-flash
+    bytedance: # 字节跳动：豆包
+      chat:
+        enable: true
+        api-key: ${DOUBAO_API_KEY:sk-xxxx}
+        model: doubao-seed-2-1-turbo-260628
+    tencent: # 腾讯：混元
+      chat:
+        enable: true
+        api-key: ${HUNYUAN_API_KEY:sk-xxxx}
+        model: hy3-preview
     siliconflow: # 硅基流动
-      enable: true
-      api-key: ${SILICONFLOW_API_KEY:sk-xxxx}
-      model: deepseek-ai/DeepSeek-V4-Pro
-    xinghuo: # 讯飞星火
-      enable: true
-      api-key: ${XINGHUO_API_KEY:sk-xxxx}
-      model: x2-flash
+      chat:
+        enable: true
+        api-key: ${SILICONFLOW_API_KEY:sk-xxxx}
+        model: deepseek-ai/DeepSeek-V4-Pro
+    iflytek: # 科大讯飞：星火
+      chat:
+        enable: true
+        api-key: ${XINGHUO_API_KEY:sk-xxxx}
+        model: x2-flash
     baichuan: # 百川智能
-      enable: true
-      api-key: ${BAICHUAN_API_KEY:sk-xxxx}
-      model: Baichuan-M3
-    yiyan: # 文心一言
-      enable: false
-      api-key: ${YIYAN_API_KEY:sk-xxxx}
-      model: ernie-5.1
-    zhipu: # 智谱 AI（GLM）
-      enable: false
-      api-key: ${ZHIPU_API_KEY:sk-xxxx}
-      model: glm-5.2
+      chat:
+        enable: true
+        api-key: ${BAICHUAN_API_KEY:sk-xxxx}
+        model: Baichuan-M3
+    baidu: # 百度：文心一言
+      chat:
+        enable: false
+        api-key: ${YIYAN_API_KEY:sk-xxxx}
+        model: ernie-5.1
+    zhipu: # 智谱：GLM
+      chat:
+        enable: false
+        api-key: ${ZHIPU_API_KEY:sk-xxxx}
+        model: glm-5.2
     minimax: # MiniMax
-      enable: false
-      api-key: ${MINIMAX_API_KEY:sk-xxxx}
-      model: MiniMax-M3
-    moonshot: # 月之暗面（KIMI）
-      enable: false
-      api-key: ${MOONSHOT_API_KEY:sk-xxxx}
-      model: kimi-k2.6
+      chat:
+        enable: false
+        api-key: ${MINIMAX_API_KEY:sk-xxxx}
+        model: MiniMax-M3
+    moonshot: # 月之暗面：Kimi
+      chat:
+        enable: false
+        api-key: ${MOONSHOT_API_KEY:sk-xxxx}
+        model: kimi-k2.6
     stepfun: # 阶跃星辰
-      enable: false
-      api-key: ${STEPFUN_API_KEY:sk-xxxx}
-      model: step-3.7-flash
+      chat:
+        enable: false
+        api-key: ${STEPFUN_API_KEY:sk-xxxx}
+        model: step-3.7-flash
     grok: # Grok
-      enable: false
-      api-key: ${GROK_API_KEY:sk-xxxx}
-      model: grok-4.3
-    midjourney:
-      enable: true
-  #    base-url: https://api.holdai.top/mj-relax/mj
-      base-url: https://api.holdai.top/mj
-      api-key: ${MIDJOURNEY_API_KEY:sk-xxxx}
-      notify-url: http://java.nat300.top/admin-api/ai/image/midjourney/notify
-    suno:
-      enable: true
-  #    base-url: https://suno-55ishh05u-status2xxs-projects.vercel.app
-      base-url: http://127.0.0.1:3001
+      chat:
+        enable: false
+        api-key: ${GROK_API_KEY:sk-xxxx}
+        model: grok-4.3
+    midjourney: # Midjourney
+      image:
+        enable: true
+  #      base-url: https://api.holdai.top/mj-relax/mj
+        base-url: https://api.holdai.top/mj
+        api-key: ${MIDJOURNEY_API_KEY:sk-xxxx}
+        notify-url: http://java.nat300.top/admin-api/ai/image/midjourney/notify
     web-search:
       enable: true
-      api-key: ${WEB_SEARCH_API_KEY:sk-xxxx}
+      platform: bocha # 联网搜索平台：bocha（默认）、parallel（匿名访问 mcp.parallel.ai，无需 API Key）、keenable（未配置 API Key 时匿名访问 api.keenable.ai，有使用限额）
+      api-key: ${WEB_SEARCH_API_KEY:sk-xxxx} # 对应平台的 API Key：博查；Keenable 可选
 
 --- #################### 芋道相关配置 ####################
 
@@ -325,6 +335,7 @@ yudao:
     enable: true # websocket的开关
     path: /infra/ws # 路径
     sender-type: local # 消息发送的类型，可选值为 local、redis、rocketmq、kafka、rabbitmq
+    # 下面 sender-rocketmq、sender-rabbitmq、sender-kafka 为 WebSocket 消息广播的 MQ 配置
     sender-rocketmq:
       topic: ${spring.application.name}-websocket # 消息发送的 RocketMQ Topic
       consumer-group: ${spring.application.name}-websocket-consumer # 消息发送的 RocketMQ Consumer Group
@@ -334,6 +345,25 @@ yudao:
     sender-kafka:
       topic: ${spring.application.name}-websocket # 消息发送的 Kafka Topic
       consumer-group: ${spring.application.name}-websocket-consumer # 消息发送的 Kafka Consumer Group
+  sse: # SSE 与 WebSocket 相互独立：开关、路径、sender-type、MQ 配置、心跳与超时均独立配置
+    enable: false # SSE 的开关，默认关闭
+    path: /infra/sse # 路径，提供 {path}/connect、{path}/close 两个接口
+    sender-type: local # 消息发送的类型，可选值为 local、redis、rocketmq、kafka、rabbitmq；redis 复用 spring.redis 配置
+    heartbeat-interval: 25s # 心跳间隔，需小于代理（例如说 Nginx）的空闲超时
+    emitter-timeout: 30m # 连接超时时间，到期后客户端按 retry 自动重连
+    retry-interval: 5s # 客户端断线后的重连间隔，通过 retry 字段下发
+    send-timeout: 3s # 单次发送等待连接锁的超时时间
+    max-send-failures: 3 # 连续发送失败多少次后断开连接
+    # 下面 sender-rocketmq、sender-rabbitmq、sender-kafka 为 SSE 消息广播的 MQ 配置；默认 topic、exchange 与 WebSocket 不同
+    sender-rocketmq:
+      topic: ${spring.application.name}-sse # 消息发送的 RocketMQ Topic
+      consumer-group: ${spring.application.name}-sse-consumer # 消息发送的 RocketMQ Consumer Group
+    sender-rabbitmq:
+      exchange: ${spring.application.name}-sse-exchange # 消息发送的 RabbitMQ Exchange
+      queue: ${spring.application.name}-sse-queue # 消息发送的 RabbitMQ Queue
+    sender-kafka:
+      topic: ${spring.application.name}-sse # 消息发送的 Kafka Topic
+      consumer-group: ${spring.application.name}-sse-consumer # 消息发送的 Kafka Consumer Group
   swagger:
     title: 芋道快速开发平台
     description: 提供管理后台、用户 App 的所有功能
@@ -392,5 +422,7 @@ yudao:
   iot:
     message-bus:
       type: redis # 消息总线的类型
+    storage:
+      type: tdengine # 时序存储的类型：tdengine、iotdb，需要配置同名的 spring.datasource.dynamic.datasource 数据源
 
 debug: false

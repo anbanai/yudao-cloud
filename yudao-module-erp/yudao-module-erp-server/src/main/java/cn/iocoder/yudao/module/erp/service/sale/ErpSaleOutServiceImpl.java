@@ -148,7 +148,7 @@ public class ErpSaleOutServiceImpl implements ErpSaleOutService {
             saleOut.setDiscountPercent(BigDecimal.ZERO);
         }
         saleOut.setDiscountPrice(MoneyUtils.priceMultiplyPercent(saleOut.getTotalPrice(), saleOut.getDiscountPercent()));
-        saleOut.setTotalPrice(saleOut.getTotalPrice().subtract(saleOut.getDiscountPrice().add(saleOut.getOtherPrice())));
+        saleOut.setTotalPrice(saleOut.getTotalPrice().subtract(saleOut.getDiscountPrice()).add(saleOut.getOtherPrice()));
     }
 
     private void updateSaleOrderOutCount(Long orderId) {
@@ -198,7 +198,7 @@ public class ErpSaleOutServiceImpl implements ErpSaleOutService {
     @Override
     public void updateSaleInReceiptPrice(Long id, BigDecimal receiptPrice) {
         ErpSaleOutDO saleOut = saleOutMapper.selectById(id);
-        if (saleOut.getReceiptPrice().equals(receiptPrice)) {
+        if (saleOut.getReceiptPrice().compareTo(receiptPrice) == 0) {
             return;
         }
         if (receiptPrice.compareTo(saleOut.getTotalPrice()) > 0) {

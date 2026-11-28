@@ -240,7 +240,9 @@ public class CrmContractServiceImpl implements CrmContractService {
 
         // 2.1 删除合同
         contractMapper.deleteById(id);
-        // 2.2 删除数据权限
+        // 2.2 删除合同产品
+        contractProductMapper.deleteByContractId(id);
+        // 2.3 删除数据权限
         crmPermissionService.deletePermission(CrmBizTypeEnum.CRM_CONTRACT.getType(), id);
 
         // 3. 记录操作日志上下文
@@ -293,6 +295,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = CRM_CONTRACT_TYPE, subType = CRM_CONTRACT_SUBMIT_SUB_TYPE, bizNo = "{{#id}}",
             success = CRM_CONTRACT_SUBMIT_SUCCESS)
+    @CrmPermission(bizType = CrmBizTypeEnum.CRM_CONTRACT, bizId = "#id", level = CrmPermissionLevelEnum.WRITE)
     public void submitContract(Long id, Long userId) {
         // 1. 校验合同是否在审批
         CrmContractDO contract = validateContractExists(id);

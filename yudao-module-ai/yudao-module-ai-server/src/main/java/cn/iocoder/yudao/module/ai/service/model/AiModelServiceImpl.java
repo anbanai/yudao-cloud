@@ -1,9 +1,11 @@
 package cn.iocoder.yudao.module.ai.service.model;
 
+import cn.hutool.core.util.ObjUtil;
 import cn.iocoder.yudao.module.ai.enums.model.AiPlatformEnum;
 import cn.iocoder.yudao.module.ai.framework.ai.core.model.AiModelFactory;
 import cn.iocoder.yudao.module.ai.framework.ai.core.model.midjourney.api.MidjourneyApi;
 import cn.iocoder.yudao.module.ai.framework.ai.core.model.suno.api.SunoApi;
+import cn.iocoder.yudao.module.ai.framework.ai.core.model.tencent.api.TencentTtsApi;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -12,14 +14,17 @@ import cn.iocoder.yudao.module.ai.controller.admin.model.vo.model.AiModelSaveReq
 import cn.iocoder.yudao.module.ai.dal.dataobject.model.AiApiKeyDO;
 import cn.iocoder.yudao.module.ai.dal.dataobject.model.AiModelDO;
 import cn.iocoder.yudao.module.ai.dal.mysql.model.AiChatMapper;
+import cn.iocoder.yudao.module.ai.util.AiReasoningUtils;
 import com.agentsflex.llm.ollama.OllamaLlm;
 import com.agentsflex.llm.ollama.OllamaLlmConfig;
 import com.agentsflex.llm.qwen.QwenLlm;
 import com.agentsflex.llm.qwen.QwenLlmConfig;
 import dev.tinyflow.core.Tinyflow;
-import jakarta.annotation.Resource;
+import javax.annotation.Resource;
+import cn.iocoder.yudao.module.ai.framework.ai.core.model.speech.AiSpeechModel;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
+import com.volcengine.ark.runtime.service.ArkService;
 import org.springframework.ai.image.ImageModel;
 import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -53,11 +58,15 @@ public class AiModelServiceImpl implements AiModelService {
     @Override
     public Long createModel(AiModelSaveReqVO createReqVO) {
         // 1. 校验
-        AiPlatformEnum.validatePlatform(createReqVO.getPlatform());
-        apiKeyService.validateApiKey(createReqVO.getKeyId());
-
-        // 2. 插入
+        AiPlatformEnum platform = AiPlatformEnum.validatePlatform(createReqVO.getPlatform());
+        AiApiKeyDO apiKey = apiKeyService.validateApiKey(createReqVO.getKeyId());
         AiModelDO model = BeanUtils.toBean(createReqVO, AiModelDO.class);
+        validateReasoningConfig(platform, apiKey, model.getType(), model.getReasoningConfig());
+
+        // 2. 插入：未配置（null 或档位为空）时思考配置不写入
+        if (!AiReasoningUtils.isReasoningConfigured(model)) {
+            model.setReasoningConfig(null);
+        }
         modelMapper.insert(model);
         return model.getId();
     }
@@ -66,12 +75,29 @@ public class AiModelServiceImpl implements AiModelService {
     public void updateModel(AiModelSaveReqVO updateReqVO) {
         // 1. 校验
         validateModelExists(updateReqVO.getId());
-        AiPlatformEnum.validatePlatform(updateReqVO.getPlatform());
-        apiKeyService.validateApiKey(updateReqVO.getKeyId());
-
-        // 2. 更新
+        AiPlatformEnum platform = AiPlatformEnum.validatePlatform(updateReqVO.getPlatform());
+        AiApiKeyDO apiKey = apiKeyService.validateApiKey(updateReqVO.getKeyId());
         AiModelDO updateObj = BeanUtils.toBean(updateReqVO, AiModelDO.class);
-        modelMapper.updateById(updateObj);
+        validateReasoningConfig(platform, apiKey, updateObj.getType(), updateObj.getReasoningConfig());
+
+        // 2. 更新：未配置（null 或档位为空）时思考配置清空，由 updateForSave 与普通字段同一条 UPDATE 置空
+        if (!AiReasoningUtils.isReasoningConfigured(updateObj)) {
+            updateObj.setReasoningConfig(null);
+        }
+        modelMapper.updateForSave(updateObj);
+    }
+
+    /**
+     * 校验思考配置的业务规则；档位格式、判重、默认档位、思考参数 null 已由 {@link AiModelSaveReqVO} 校验
+     *
+     * 未配置或清空时，不做平台相关的校验
+     */
+    private static void validateReasoningConfig(AiPlatformEnum platform, AiApiKeyDO apiKey, Integer type,
+                                                AiModelDO.ReasoningConfig config) {
+        if (!AiReasoningUtils.isReasoningConfigured(config)) {
+            return;
+        }
+        AiReasoningUtils.validateReasoningConfig(platform, AiPlatformEnum.validatePlatform(apiKey.getPlatform()), type, config);
     }
 
     @Override
@@ -127,32 +153,91 @@ public class AiModelServiceImpl implements AiModelService {
 
     @Override
     public ChatModel getChatModel(Long id) {
+        return getChatModel(id, null);
+    }
+
+    @Override
+    public ChatModel getChatModel(Long id, Map<String, Object> reasoningOptions) {
         AiModelDO model = validateModel(id);
         AiApiKeyDO apiKey = apiKeyService.validateApiKey(model.getKeyId());
         AiPlatformEnum platform = AiPlatformEnum.validatePlatform(apiKey.getPlatform());
-        return modelFactory.getOrCreateChatModel(platform, apiKey.getApiKey(), apiKey.getUrl());
+        return modelFactory.getOrCreateChatModel(platform, apiKey.getApiKey(), apiKey.getUrl(), reasoningOptions);
+    }
+
+    @Override
+    public AiPlatformEnum validateReasoningPlatform(AiModelDO model) {
+        AiPlatformEnum platform = AiPlatformEnum.validatePlatform(model.getPlatform());
+        // 未配置思考：不查 API 密钥、不校验，与现状一致
+        if (!AiReasoningUtils.isReasoningConfigured(model)) {
+            return platform;
+        }
+        // 已配置思考：选客户端用 API 密钥的平台，路由用模型的平台，两者必须一致（库里已有的不一致数据也在这里拒绝）
+        AiApiKeyDO apiKey = apiKeyService.validateApiKey(model.getKeyId());
+        if (!platform.getPlatform().equals(apiKey.getPlatform())) {
+            throw exception(MODEL_REASONING_PLATFORM_MISMATCH, platform.getPlatform(), apiKey.getPlatform());
+        }
+        return platform;
     }
 
     @Override
     public ImageModel getImageModel(Long id) {
         AiModelDO model = validateModel(id);
         AiApiKeyDO apiKey = apiKeyService.validateApiKey(model.getKeyId());
-        AiPlatformEnum platform = AiPlatformEnum.validatePlatform(apiKey.getPlatform());
-        return modelFactory.getOrCreateImageModel(platform, apiKey.getApiKey(), apiKey.getUrl());
+        AiPlatformEnum platform = validateImagePlatform(model, apiKey);
+        return modelFactory.getOrCreateImageModel(platform, apiKey.getApiKey(), apiKey.getUrl(), model.getModel());
     }
 
     @Override
     public MidjourneyApi getMidjourneyApi(Long id) {
         AiModelDO model = validateModel(id);
         AiApiKeyDO apiKey = apiKeyService.validateApiKey(model.getKeyId());
+        validateImagePlatform(model, apiKey);
         return modelFactory.getOrCreateMidjourneyApi(apiKey.getApiKey(), apiKey.getUrl());
     }
 
     @Override
-    public SunoApi getSunoApi() {
-        AiApiKeyDO apiKey = apiKeyService.getRequiredDefaultApiKey(
-                AiPlatformEnum.SUNO.getPlatform(), CommonStatusEnum.ENABLE.getStatus());
+    public MidjourneyApi getMidjourneyApi(AiApiKeyDO apiKey) {
+        // 绘图记录绑定的 API 密钥，平台可能在之后被修改，所以仍需校验
+        if (ObjUtil.notEqual(apiKey.getPlatform(), AiPlatformEnum.MIDJOURNEY.getPlatform())) {
+            throw exception(IMAGE_MODEL_PLATFORM_MISMATCH, AiPlatformEnum.MIDJOURNEY.getPlatform(), apiKey.getPlatform());
+        }
+        return modelFactory.getOrCreateMidjourneyApi(apiKey.getApiKey(), apiKey.getUrl());
+    }
+
+    @Override
+    public ArkService getArkService(Long id) {
+        AiModelDO model = validateModel(id);
+        AiApiKeyDO apiKey = apiKeyService.validateApiKey(model.getKeyId());
+        validateImagePlatform(model, apiKey);
+        return modelFactory.getOrCreateArkService(apiKey.getApiKey(), apiKey.getUrl());
+    }
+
+    /**
+     * 校验绘图模型的平台，与 API 密钥的平台一致
+     *
+     * 客户端按 API 密钥的平台创建，而绘图参数按模型的平台构建，两者不一致时会请求错误的平台
+     */
+    private static AiPlatformEnum validateImagePlatform(AiModelDO model, AiApiKeyDO apiKey) {
+        if (ObjUtil.notEqual(model.getPlatform(), apiKey.getPlatform())) {
+            throw exception(IMAGE_MODEL_PLATFORM_MISMATCH, model.getPlatform(), apiKey.getPlatform());
+        }
+        return AiPlatformEnum.validatePlatform(apiKey.getPlatform());
+    }
+
+    @Override
+    public SunoApi getSunoApi(AiApiKeyDO apiKey) {
         return modelFactory.getOrCreateSunoApi(apiKey.getApiKey(), apiKey.getUrl());
+    }
+
+    @Override
+    public AiSpeechModel getTextToSpeechModel(AiApiKeyDO apiKey, String model) {
+        AiPlatformEnum platform = AiPlatformEnum.validatePlatform(apiKey.getPlatform());
+        return modelFactory.getOrCreateTextToSpeechModel(platform, apiKey.getApiKey(), apiKey.getUrl(), model);
+    }
+
+    @Override
+    public TencentTtsApi getTencentTtsApi(AiApiKeyDO apiKey) {
+        return modelFactory.getOrCreateTencentTtsApi(apiKey.getApiKey(), apiKey.getUrl());
     }
 
     @Override
@@ -182,7 +267,7 @@ public class AiModelServiceImpl implements AiModelService {
         switch (platform) {
             // TODO @lesan 考虑到未来不需要使用agents-flex 现在仅测试通义千问
             // TODO @lesan：【重要】是不是可以实现一个 SpringAiLlm，这样的话，内部全部用它就好了。只实现 chat 部分；这样，就把 flex 作为一个 agent 框架，内部调用，还是 spring ai 相关的。成本可能低一点？！
-            case TONG_YI:
+            case ALIBABA:
                 QwenLlmConfig qwenLlmConfig = new QwenLlmConfig();
                 qwenLlmConfig.setApiKey(apiKey.getApiKey());
                 qwenLlmConfig.setModel(model.getModel());

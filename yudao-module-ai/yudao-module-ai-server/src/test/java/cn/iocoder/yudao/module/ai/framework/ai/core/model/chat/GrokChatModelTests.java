@@ -11,14 +11,13 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import static cn.iocoder.yudao.module.ai.util.AiUtils.validateApiKey;
+import static cn.iocoder.yudao.module.ai.framework.ai.core.model.AiModelTestUtils.validateApiKey;
 
 /**
  * {@link GrokChatModel} 集成测试
@@ -33,12 +32,9 @@ public class GrokChatModelTests {
             GrokChatModel.MODEL_DEFAULT);
 
     private final GrokChatModel chatModel = new GrokChatModel(OpenAiChatModel.builder()
-            .openAiApi(OpenAiApi.builder()
+            .options(OpenAiChatOptions.builder()
                     .baseUrl(GrokChatModel.BASE_URL)
-                    .completionsPath(GrokChatModel.COMPLETE_PATH)
                     .apiKey(API_KEY)
-                    .build())
-            .defaultOptions(OpenAiChatOptions.builder()
                     .model(MODEL)
                     .temperature(0.7)
                     .build())

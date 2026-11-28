@@ -14,7 +14,7 @@
     <url>https://github.com/YunaiV/ruoyi-vue-pro</url>
 
     <properties>
-        <revision>2026.09-jdk8-SNAPSHOT</revision>
+        <revision>2026.10-jdk8-SNAPSHOT</revision>
         <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
         <!-- 统一依赖管理 -->
         <spring.framework.version>5.3.39</spring.framework.version>
@@ -22,6 +22,7 @@
         <spring.boot.version>2.7.18</spring.boot.version>
         <spring.cloud.version>2021.0.9</spring.cloud.version> <!-- Spring Boot 2.X 最多使用 2021.0.9 版本 -->
         <spring.cloud.alibaba.version>2021.0.6.2</spring.cloud.alibaba.version> <!-- Spring Boot 2.X 最多使用 2021.0.6.2 版本 -->
+        <kotlin.version>2.1.21</kotlin.version>
         <!-- Web 相关 -->
         <servlet.versoin>2.5</servlet.versoin>
         <springdoc.version>1.8.0</springdoc.version>
@@ -29,15 +30,19 @@
         <!-- DB 相关 -->
         <druid.version>1.2.28</druid.version>
         <mybatis.version>3.5.19</mybatis.version>
-        <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <mybatis-plus.version>3.5.18.1</mybatis-plus.version>
         <mybatis-plus-join.version>1.5.9</mybatis-plus-join.version>
-        <dynamic-datasource.version>4.5.0</dynamic-datasource.version>
+        <easy-es.version>3.0.2</easy-es.version>
+        <elasticsearch-client.version>7.17.28</elasticsearch-client.version>
+        <jakarta-json.version>2.1.3</jakarta-json.version>
+        <dynamic-datasource.version>4.6.0</dynamic-datasource.version>
         <easy-trans.version>2.3.6</easy-trans.version> <!-- Spring Boot 2.X 最多使用 2.3.6 版本 -->
-        <redisson.version>4.7.0</redisson.version>
+        <redisson.version>4.8.0</redisson.version>
         <dm8.jdbc.version>8.1.3.140</dm8.jdbc.version>
         <kingbase.jdbc.version>9.0.1.jre7</kingbase.jdbc.version>
-        <opengauss.jdbc.version>7.0.0-RC3-og</opengauss.jdbc.version>
-        <taos.version>3.9.2</taos.version>
+        <opengauss.jdbc.version>7.0.0-og</opengauss.jdbc.version>
+        <taos.version>3.10.0</taos.version>
+        <iotdb.version>2.0.8</iotdb.version>  <!-- TODO 特殊：暂不升级 2.0.10/2.0.11，其 TablePreparedStatement.execute 不设置 ResultSet，导致 Mapper 的 SELECT 为空、COUNT 为 null -->
         <!-- 消息队列 -->
         <rocketmq-spring.version>2.3.6</rocketmq-spring.version>
         <!-- RPC 相关 -->
@@ -48,55 +53,74 @@
         <lock4j.version>2.2.7</lock4j.version>
         <!-- 监控相关 -->
         <skywalking.version>9.7.0</skywalking.version>
-        <spring-boot-admin.version>2.7.15</spring-boot-admin.version>
-        <opentelemetry.version>1.66.0</opentelemetry.version>
+        <spring-boot-admin.version>2.7.16</spring-boot-admin.version>
+        <opentelemetry.version>1.68.0</opentelemetry.version>
         <!-- Test 测试相关 -->
-        <h2.version>2.1.214</h2.version>
         <podam.version>7.2.11.RELEASE</podam.version> <!-- Spring Boot 2.X 最多使用 7.2.11 版本 -->
-        <jedis-mock.version>1.1.19</jedis-mock.version>
+        <jedis-mock.version>1.1.21</jedis-mock.version>
         <mockito-inline.version>4.11.0</mockito-inline.version>
         <!-- Bpm 工作流相关 -->
         <flowable.version>6.8.0</flowable.version> <!-- 不要升级 6.8.1：退回有 bug https://github.com/flowable/flowable-engine/issues/3944 -->
         <!-- 工具类相关 -->
-        <anji-plus-captcha.version>1.4.0</anji-plus-captcha.version>
-        <jsoup.version>1.23.2</jsoup.version>
+        <anji-plus-captcha.version>2.0.0</anji-plus-captcha.version>
+        <jsoup.version>1.24.1</jsoup.version>
         <sensitive-word.version>0.29.5</sensitive-word.version>
         <pinyin4j.version>2.5.1</pinyin4j.version>
         <lombok.version>1.18.48</lombok.version>
         <mapstruct.version>1.7.0.Beta2</mapstruct.version>
-        <hutool-5.version>5.8.47</hutool-5.version>
-        <fastexcel.version>1.3.0</fastexcel.version>
+        <hutool-5.version>5.8.48</hutool-5.version>
+        <fesod.version>2.1.0-incubating</fesod.version>
         <aviator.version>5.4.4</aviator.version>
         <velocity.version>2.4</velocity.version> <!-- JDK8 不能从 2.4 升级到 2.4.1，会报包不存在！！！！ -->
-        <fastjson2.version>2.0.65</fastjson2.version>
-        <guava.version>33.7.1-jre</guava.version>
+        <fastjson2.version>2.0.66</fastjson2.version>
+        <guava.version>33.8.0-jre</guava.version>
         <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
         <commons-net.version>3.13.0</commons-net.version>
-        <commons-lang3.version>3.20.0</commons-lang3.version>
-        <jsch.version>2.28.7</jsch.version>
-        <tika-core.version>2.9.3</tika-core.version> <!-- JDK8 不能从 2.9.3 升级到 3.X，会报 JDK8 不支持 -->
+        <commons-lang3.version>3.22.0</commons-lang3.version>
+        <jsch.version>2.28.8</jsch.version>
+        <tika-core.version>2.9.4</tika-core.version> <!-- JDK8 不能从 2.9.3 升级到 3.X，会报 JDK8 不支持 -->
+        <pdfbox.version>2.0.37</pdfbox.version> <!-- Tika 2.9.X 的 PDF 解析基于 PDFBox 2.X，不能升级到 3.X，否则 PDF 解析报 NoSuchMethodError -->
         <ip2region.version>2.7.0</ip2region.version>
         <bizlog-sdk.version>3.0.6</bizlog-sdk.version>
         <reflections.version>0.10.2</reflections.version>
-        <netty.version>4.2.18.Final</netty.version>
+        <netty.version>4.2.21.Final</netty.version>
         <mqtt.version>1.2.5</mqtt.version>
-        <vertx.version>4.5.26</vertx.version>
-        <okhttp.version>4.12.0</okhttp.version>
+        <vertx.version>4.5.36</vertx.version>
+        <okhttp.version>5.5.1</okhttp.version>
+        <okio.version>3.18.1</okio.version>
         <californium.version>3.14.0</californium.version>
         <j2mod.version>3.4.0</j2mod.version>
+        <yudao-milo.version>1.2.0-RC3-preview-20261123-jdk8</yudao-milo.version>
         <httpclient5.version>5.5.1</httpclient5.version> <!-- WxJava 4.8.x 需要 HttpClient5 5.4+，Spring Boot 2.7 默认 5.1.4 不兼容；JDK8 兼容不能升级到 5.5.2+ -->
         <httpcore5.version>5.3.6</httpcore5.version> <!-- 配套 httpclient5 5.5.1，Spring Boot 2.7 默认 5.1.5 不兼容 -->
+        <rhino.version>1.7.15.1</rhino.version>
         <!-- 三方云服务相关 -->
-        <awssdk.version>2.55.5</awssdk.version>
+        <awssdk.version>2.59.4</awssdk.version>
         <justauth.version>1.16.7</justauth.version>
         <justauth-starter.version>1.4.0</justauth-starter.version>
         <jimureport.version>2.3.4</jimureport.version> <!-- JimuBI 2.3.2 依赖此版本中的 JimuAiConfigBean，升级到 2.5.4 会导致启动失败 -->
         <jimubi.version>2.3.2</jimubi.version>
-        <weixin-java.version>4.8.6-20260919.232150</weixin-java.version>
-        <bouncycastle.version>1.80</bouncycastle.version>
-        <alipay-sdk-java.version>4.40.1014.ALL</alipay-sdk-java.version>
+        <ureport2.version>2.0.1</ureport2.version>
+        <weixin-java.version>4.8.6-20261108.214338</weixin-java.version>
+        <bouncycastle.version>1.87</bouncycastle.version>
+        <alipay-sdk-java.version>4.40.1067.ALL</alipay-sdk-java.version>
         <!-- 专属于 JDK8 安全漏洞升级 -->
         <logback.version>1.2.13</logback.version> <!-- 无法使用 1.3.X 版本，启动会报错 -->
+        <micrometer.version>1.15.12</micrometer.version>
+        <jackson.version>2.21.4</jackson.version>
+        <!-- AI 相关 -->
+        <spring-ai.version>2.1.0-jdk8-preview-20261119</spring-ai.version>
+        <spring-ai-alibaba.version>1.1.2.2-jdk8-20261119</spring-ai-alibaba.version>
+        <tinyflow.version>1.2.6</tinyflow.version>
+        <!-- https://mvnrepository.com/artifact/com.volcengine/volcengine-java-sdk-ark-runtime -->
+        <!-- 注意：使用 volcengine-java-sdk-ark-runtime 系列（2.0.0 起兼容 Jackson 2.20+ 的 PropertyNamingStrategies），
+             与 TinyFlow 间接依赖的同名构件统一为该版本；不使用 com.volcengine:ark-runtime（0.17.0 仍引用已移除的 SNAKE_CASE） -->
+        <volcengine-ark-runtime.version>2.0.34</volcengine-ark-runtime.version>
+        <tencentcloud-sdk.version>3.1.1373</tencentcloud-sdk.version>
+        <volc-sdk.version>1.0.221</volc-sdk.version>
+        <!-- https://mvnrepository.com/artifact/com.alibaba/dashscope-sdk-java -->
+        <!-- 注意：显式声明，覆盖 TinyFlow（agents-flex-image-qwen）间接引入的 2.18.2 -->
+        <dashscope-sdk.version>2.23.6</dashscope-sdk.version>
     </properties>
 
     <dependencyManagement>
@@ -120,6 +144,48 @@
                 <groupId>org.springframework.security</groupId>
                 <artifactId>spring-security-bom</artifactId> <!-- JDK8 版本独有：保证 Spring Security 尽量高 -->
                 <version>${spring.security.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>${opentelemetry.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-bom</artifactId>
+                <version>${kotlin.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-bom</artifactId>
+                <version>${okhttp.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-bom</artifactId>
+                <version>${okio.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId> <!-- Spring AI（JDK8 路线）基于 Jackson 2.21 编译，用到 2.15+ 的 API（如 ObjectNode.properties()），Spring Boot 2.7 默认 2.13.x 运行时报 NoSuchMethodError -->
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-bom</artifactId> <!-- Spring AI（JDK8 路线）的 Observation 需要 micrometer-core 1.10+ 的 MeterObservationHandler，Spring Boot 2.7 默认 1.9.x 不兼容 -->
+                <version>${micrometer.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -326,7 +392,7 @@
                     </exclusion>
                     <exclusion>
                         <groupId>org.redisson</groupId>
-                        <!-- Redisson 4.7.x 默认依赖 redisson-spring-data-41（适配 Spring Data Redis 4.x），排除后使用下方的 spring-data-27 适配 Spring Boot 2.7 -->
+                        <!-- Redisson 4.x 默认依赖 redisson-spring-data-41（适配 Spring Data Redis 4.x），排除后使用下方的 spring-data-27 适配 Spring Boot 2.7 -->
                         <artifactId>redisson-spring-data-41</artifactId>
                     </exclusion>
                 </exclusions>
@@ -359,6 +425,12 @@
                 <groupId>com.taosdata.jdbc</groupId>
                 <artifactId>taos-jdbcdriver</artifactId>
                 <version>${taos.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.iotdb</groupId>
+                <artifactId>iotdb-jdbc</artifactId>
+                <version>${iotdb.version}</version>
             </dependency>
 
             <!-- RPC 远程调用相关 -->
@@ -501,12 +573,6 @@
             </dependency>
 
             <dependency>
-                <groupId>com.h2database</groupId>
-                <artifactId>h2</artifactId>
-                <version>${h2.version}</version>
-            </dependency>
-
-            <dependency>
                 <groupId>com.github.fppt</groupId> <!-- 单元测试，我们采用内嵌的 Redis 数据库 -->
                 <artifactId>jedis-mock</artifactId>
                 <version>${jedis-mock.version}</version>
@@ -573,9 +639,9 @@
             </dependency>
 
             <dependency>
-                <groupId>cn.idev.excel</groupId>
-                <artifactId>fastexcel</artifactId>
-                <version>${fastexcel.version}</version>
+                <groupId>org.apache.fesod</groupId>
+                <artifactId>fesod-sheet</artifactId>
+                <version>${fesod.version}</version>
             </dependency>
 
             <dependency>
@@ -588,6 +654,26 @@
                 <groupId>org.apache.tika</groupId>
                 <artifactId>tika-core</artifactId> <!-- 文件类型的识别 -->
                 <version>${tika-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId> <!-- PDF 的生成 -->
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>fontbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox-tools</artifactId> <!-- Tika 的 PDF 解析 -->
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>xmpbox</artifactId> <!-- Tika 的 XMP 元数据解析 -->
+                <version>${pdfbox.version}</version>
             </dependency>
 
             <dependency>
@@ -688,25 +774,17 @@
                 <artifactId>vertx-mqtt</artifactId>
                 <version>${vertx.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-codegen</artifactId>
+                <version>${vertx.version}</version>
+            </dependency>
 
             <!-- MQTT -->
             <dependency>
                 <groupId>org.eclipse.paho</groupId>
                 <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
                 <version>${mqtt.version}</version>
-            </dependency>
-
-            <!-- OkHttp -->
-            <dependency>
-                <groupId>com.squareup.okhttp3</groupId>
-                <artifactId>okhttp</artifactId>
-                <version>${okhttp.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.squareup.okhttp3</groupId>
-                <artifactId>mockwebserver</artifactId>
-                <version>${okhttp.version}</version>
-                <scope>test</scope>
             </dependency>
 
             <!-- CoAP - Eclipse Californium -->
@@ -721,6 +799,15 @@
                 <groupId>com.ghgande</groupId>
                 <artifactId>j2mod</artifactId>
                 <version>${j2mod.version}</version>
+            </dependency>
+
+            <!-- OPC UA 相关 - 芋道 Milo（JDK 8 分支使用 yudao-milo-jdk8-bom 及 -jdk8 版本） -->
+            <dependency>
+                <groupId>cn.iocoder.boot</groupId>
+                <artifactId>yudao-milo-jdk8-bom</artifactId>
+                <version>${yudao-milo.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- WxJava 4.8.x 需要 HttpClient5 5.4+，覆盖 Spring Boot 2.7 默认的 5.1.4；JDK8 兼容不能升级到 5.5.2+ -->
@@ -738,6 +825,13 @@
                 <groupId>org.apache.httpcomponents.core5</groupId>
                 <artifactId>httpcore5-h2</artifactId>
                 <version>${httpcore5.version}</version>
+            </dependency>
+
+            <!-- JS 脚本引擎 -->
+            <dependency>
+                <groupId>org.mozilla</groupId>
+                <artifactId>rhino</artifactId>
+                <version>${rhino.version}</version>
             </dependency>
 
             <!-- 三方云服务相关 -->
@@ -787,7 +881,7 @@
                 </exclusions>
             </dependency>
 
-            <!-- 锁定 weixin-java 传递依赖，避免 Maven 版本范围自动升级到 1.80.2 后 Fat Jar 启动失败。
+            <!-- 对齐积木报表与 WxJava 的 BouncyCastle 依赖，避免独立 Infra 服务回落到旧版本。
                  反馈：https://t.zsxq.com/pCVBo -->
             <dependency>
                 <groupId>org.bouncycastle</groupId>
@@ -855,6 +949,89 @@
                         <artifactId>fastjson</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <!-- UReport2 报表 -->
+            <dependency>
+                <groupId>cn.iocoder.ureport2</groupId>
+                <artifactId>ureport2-spring-boot-starter</artifactId>
+                <version>${ureport2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.iocoder.cloud</groupId>
+                <artifactId>yudao-spring-boot-starter-elasticsearch</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.dromara.easy-es</groupId>
+                <artifactId>easy-es-boot-starter</artifactId>
+                <version>${easy-es.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-client</artifactId>
+                <version>${elasticsearch-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.json</groupId>
+                <artifactId>jakarta.json-api</artifactId>
+                <version>${jakarta-json.version}</version>
+            </dependency>
+
+            <!-- AI 相关 -->
+            <dependency>
+                <groupId>cn.iocoder.spring-ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>cn.iocoder.spring-ai-alibaba</groupId>
+                <artifactId>spring-ai-alibaba-bom</artifactId>
+                <version>${spring-ai-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>dev.tinyflow</groupId>
+                <artifactId>tinyflow-java-core</artifactId> <!-- AI 工作流 -->
+                <version>${tinyflow.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>dashscope-sdk-java</artifactId> <!-- 阿里百炼 DashScope 官方 SDK -->
+                <version>${dashscope-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.volcengine</groupId>
+                <artifactId>volcengine-java-sdk-ark-runtime</artifactId> <!-- 火山方舟 -->
+                <version>${volcengine-ark-runtime.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.volcengine</groupId>
+                <artifactId>volc-sdk-java</artifactId> <!-- 火山引擎视觉智能 -->
+                <version>${volc-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tencentcloudapi</groupId>
+                <artifactId>tencentcloud-sdk-java-ocr</artifactId> <!-- 腾讯云 OCR -->
+                <version>${tencentcloud-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tencentcloudapi</groupId>
+                <artifactId>tencentcloud-sdk-java-common</artifactId> <!-- 腾讯云 SDK 公共包 -->
+                <version>${tencentcloud-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tencentcloudapi</groupId>
+                <artifactId>tencentcloud-sdk-java-tts</artifactId> <!-- 腾讯云语音合成 -->
+                <version>${tencentcloud-sdk.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

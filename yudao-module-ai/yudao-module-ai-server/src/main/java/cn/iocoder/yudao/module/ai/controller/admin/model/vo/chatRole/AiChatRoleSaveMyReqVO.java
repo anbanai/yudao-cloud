@@ -1,7 +1,7 @@
 package cn.iocoder.yudao.module.ai.controller.admin.model.vo.chatRole;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotEmpty;
 import lombok.Data;
 import org.hibernate.validator.constraints.URL;
 
@@ -39,5 +39,8 @@ public class AiChatRoleSaveMyReqVO {
 
     @Schema(description = "引用的 MCP Client 名字列表", example = "filesystem")
     private List<String> mcpClientNames;
+
+    @Schema(description = "引用的技能编号列表，只能选择启用的技能", example = "1,2,3")
+    private List<Long> skillIds;
 
 }

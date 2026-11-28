@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.pms.service.pm.workitem;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.pms.controller.admin.pm.workitem.vo.status.PmsWorkItemStatusUpdateReqVO;
 import cn.iocoder.yudao.module.pms.controller.admin.pm.workitem.vo.workitem.PmsWorkItemBoardReqVO;
@@ -24,6 +26,7 @@ import cn.iocoder.yudao.module.pms.dal.dataobject.pm.workitem.PmsWorkItemMemberD
 import cn.iocoder.yudao.module.pms.dal.dataobject.pm.workitem.PmsWorkItemStatusDO;
 import cn.iocoder.yudao.module.pms.dal.dataobject.pm.workitem.PmsWorkItemUserSortDO;
 import cn.iocoder.yudao.module.pms.dal.dataobject.pm.workitem.PmsWorkItemWorkLogDO;
+import cn.iocoder.yudao.module.pms.dal.mysql.pm.project.PmsProjectMapper;
 import cn.iocoder.yudao.module.pms.dal.mysql.pm.workitem.PmsWorkItemBoardMapper;
 import cn.iocoder.yudao.module.pms.dal.mysql.pm.workitem.PmsWorkItemCommentMapper;
 import cn.iocoder.yudao.module.pms.dal.mysql.pm.workitem.PmsWorkItemMapper;
@@ -39,17 +42,22 @@ import cn.iocoder.yudao.module.pms.enums.pm.workitem.PmsWorkItemPriorityEnum;
 import cn.iocoder.yudao.module.pms.enums.pm.workitem.PmsWorkItemStatusTypeEnum;
 import cn.iocoder.yudao.module.pms.enums.pm.workitem.PmsWorkItemTypeEnum;
 import cn.iocoder.yudao.module.pms.service.pm.iteration.PmsIterationService;
+import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectAnnouncementService;
+import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectFavoriteService;
+import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectGroupService;
 import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectMemberService;
+import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectServiceImpl;
 import cn.iocoder.yudao.module.system.api.notify.NotifyMessageSendApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendSingleToUserReqDTO;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
-import javax.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -70,6 +78,7 @@ import static cn.iocoder.yudao.module.pms.enums.MessageTemplateConstants.WORK_IT
 import static cn.iocoder.yudao.module.pms.enums.pm.workitem.PmsWorkItemActivityContentEnum.WORK_ITEM_CREATED;
 import static cn.iocoder.yudao.module.pms.enums.pm.workitem.PmsWorkItemActivityContentEnum.WORK_ITEM_NAME_UPDATED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -88,7 +97,8 @@ import static org.mockito.Mockito.when;
  *
  * @author 芋道源码
  */
-@Import({PmsWorkItemServiceImpl.class, PmsWorkItemUserSortServiceImpl.class, PmsWorkItemStatusServiceImpl.class,
+@Import({PmsWorkItemServiceImpl.class, PmsWorkItemUserSortServiceImpl.class, PmsProjectServiceImpl.class,
+        PmsWorkItemStatusServiceImpl.class,
         PmsWorkItemBoardServiceImpl.class,
         PmsWorkItemCommentServiceImpl.class, PmsWorkItemWorkLogServiceImpl.class})
 public class PmsWorkItemServiceImplTest extends BaseDbUnitTest {
@@ -110,9 +120,17 @@ public class PmsWorkItemServiceImplTest extends BaseDbUnitTest {
     private PmsWorkItemWorkLogMapper workItemWorkLogMapper;
     @Resource
     private PmsWorkItemUserSortMapper workItemUserSortMapper;
+    @Resource
+    private PmsProjectMapper projectMapper;
 
     @MockBean
     private PmsProjectMemberService projectMemberService;
+    @MockBean
+    private PmsProjectGroupService projectGroupService;
+    @MockBean
+    private PmsProjectFavoriteService projectFavoriteService;
+    @MockBean
+    private PmsProjectAnnouncementService projectAnnouncementService;
     @MockBean
     private PmsIterationService iterationService;
     @MockBean
@@ -126,6 +144,8 @@ public class PmsWorkItemServiceImplTest extends BaseDbUnitTest {
     private NotifyMessageSendApi notifyMessageSendApi;
     @MockBean
     private AdminUserApi adminUserApi;
+    @MockBean
+    private PermissionApi permissionApi;
 
     @Test
     public void testCreateWorkItem_success() {
@@ -510,6 +530,8 @@ public class PmsWorkItemServiceImplTest extends BaseDbUnitTest {
         // mock 数据
         Long userId = randomLongId();
         Long projectId = randomLongId();
+        PmsProjectDO project = randomProjectDO(projectId, PmsProjectTypeEnum.AGILE.getType());
+        projectMapper.insert(project);
         PmsWorkItemStatusDO taskStatus = randomStatusDO(projectId, PmsWorkItemTypeEnum.TASK.getType(),
                 PmsWorkItemStatusTypeEnum.PENDING.getType(), true, 1);
         workItemStatusMapper.insert(taskStatus);
@@ -521,7 +543,7 @@ public class PmsWorkItemServiceImplTest extends BaseDbUnitTest {
         PmsWorkItemDO second = randomWorkItemDO(projectId, PmsWorkItemTypeEnum.DEFECT.getType(), defectStatus, 2);
         workItemMapper.insert(second);
         when(projectMemberService.validateProjectWritable(projectId, userId))
-                .thenReturn(randomProjectDO(projectId, PmsProjectTypeEnum.AGILE.getType()));
+                .thenReturn(project);
         // 准备参数
         PmsWorkItemPlanningSortReqVO reqVO = new PmsWorkItemPlanningSortReqVO().setProjectId(projectId)
                 .setWorkItemIds(Arrays.asList(second.getId(), first.getId()));
@@ -924,15 +946,25 @@ public class PmsWorkItemServiceImplTest extends BaseDbUnitTest {
     @Test
     public void testBuildQueryWrapper_filterAnyLabel() {
         // 准备参数
+        Long labelId01 = 1872345678901234567L;
+        Long labelId02 = 1872345678901234568L;
         PmsWorkItemPageReqVO reqVO = new PmsWorkItemPageReqVO().setProjectId(randomLongId())
-                .setLabelIds(Arrays.asList(randomLongId(), randomLongId()));
+                .setLabelIds(Arrays.asList(labelId01, labelId02));
 
         // 调用
-        String sqlSegment = PmsWorkItemMapper.buildQueryWrapper(reqVO).getSqlSegment();
+        LambdaQueryWrapperX<PmsWorkItemDO> queryWrapper = PmsWorkItemMapper.buildQueryWrapper(reqVO);
+        String sqlSegment = queryWrapper.getSqlSegment();
 
-        // 断言
-        assertTrue(sqlSegment.contains("JSON_CONTAINS(label_ids, JSON_ARRAY("));
+        // 断言：H2 走平面 Long 数组的 INSTR(列表, ,编号,) 片段，每个标签一个条件并按 OR 连接；标签编号仍以 Long 绑定，不拼接到 SQL 中
+        assertEquals(2, StrUtil.count(sqlSegment, " AND INSTR(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(label_ids,"));
+        assertEquals(2, StrUtil.count(sqlSegment, "']', ','), ',' || COALESCE(CAST(CAST("));
+        assertFalse(sqlSegment.contains("LOCATE("));
+        assertFalse(sqlSegment.contains("JSON_CONTAINS("));
         assertTrue(sqlSegment.contains(" OR "));
+        assertFalse(sqlSegment.contains(labelId01.toString()));
+        assertFalse(sqlSegment.contains(labelId02.toString()));
+        assertTrue(queryWrapper.getParamNameValuePairs().containsValue(labelId01));
+        assertTrue(queryWrapper.getParamNameValuePairs().containsValue(labelId02));
     }
 
     @Test
