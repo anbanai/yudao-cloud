@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.product.service.youzan;
 
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
 import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReqVO;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
@@ -19,19 +18,29 @@ import java.util.*;
 import static cn.iocoder.yudao.module.product.service.youzan.ImportPlan.*;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.BAD_REQUEST;
+import static cn.iocoder.yudao.module.product.dal.mysql.merchant.ProductMerchantMapper.PLATFORM_MERCHANT_NAME;
 
 @Service
 public class YouzanImportService {
+    // Match the catalog's platform merchant rule. The grant belongs to the operator's tenant.
+    private static final String AUTHORIZED_MERCHANTS = """
+            SELECT m.id, COALESCE(NULLIF(TRIM(m.store_name), ''), m.name) AS name
+            FROM product_yz_import_grant g
+            JOIN product_merchant m ON m.id = g.merchant_id
+            WHERE g.tenant_id = ? AND g.operator_id = ? AND m.deleted = 0 AND m.status = ?
+              AND (m.tenant_id = g.tenant_id
+                   OR (m.tenant_id = 0 AND m.name = ? AND m.owner_account_id IS NULL))
+            """;
+
     private final JdbcTemplate db;
-    private final ProductMerchantService merchants;
     private final ObjectMapper json;
     private final ProductSpuService spus;
     private final ProductSkuService skus;
     private final String encodedKey;
 
-    public YouzanImportService(JdbcTemplate db, ProductMerchantService merchants, ObjectMapper json, ProductSpuService spus, ProductSkuService skus,
+    public YouzanImportService(JdbcTemplate db, ObjectMapper json, ProductSpuService spus, ProductSkuService skus,
                               @Value("${yudao.product.youzan.preview-key:}") String encodedKey) {
-        this.db = db; this.merchants = merchants; this.json = json; this.encodedKey = encodedKey;
+        this.db = db; this.json = json; this.encodedKey = encodedKey;
         this.spus = spus; this.skus = skus;
     }
 
@@ -41,15 +50,10 @@ public class YouzanImportService {
     public record MerchantOption(String id, String name) {}
 
     public List<MerchantOption> listAuthorizedMerchants() {
-        return db.query("""
-                SELECT m.id, COALESCE(NULLIF(TRIM(m.store_name), ''), m.name) AS name
-                FROM product_yz_import_grant g
-                JOIN product_merchant m ON m.id = g.merchant_id AND m.tenant_id = g.tenant_id
-                WHERE g.tenant_id = ? AND g.operator_id = ? AND m.deleted = 0 AND m.status = ?
-                ORDER BY m.id
-                """, (rs, rowNum) -> new MerchantOption(rs.getString("id"), rs.getString("name")),
+        return db.query(AUTHORIZED_MERCHANTS + "ORDER BY m.id",
+                (rs, rowNum) -> new MerchantOption(rs.getString("id"), rs.getString("name")),
                 TenantContextHolder.getRequiredTenantId(), SecurityFrameworkUtils.getLoginUserId(),
-                ProductMerchantStatusEnum.APPROVED.getStatus());
+                ProductMerchantStatusEnum.APPROVED.getStatus(), PLATFORM_MERCHANT_NAME);
     }
 
     private record Snapshot(List<Line> lines, List<String> unusedColumns) {}
@@ -72,11 +76,11 @@ public class YouzanImportService {
     private Scope scope(long merchant, boolean lock) {
         long tenant = TenantContextHolder.getRequiredTenantId();
         Long operator = SecurityFrameworkUtils.getLoginUserId();
-        if (operator == null || db.queryForList("SELECT operator_id FROM product_yz_import_grant WHERE tenant_id=? AND merchant_id=? AND operator_id=?" + (lock ? " FOR UPDATE" : ""),
-                Long.class, tenant, merchant, operator).isEmpty()) throw new AccessDeniedException("没有该商家的商品导入授权");
-        if (lock && db.queryForList("SELECT id FROM product_merchant WHERE tenant_id=? AND id=? AND deleted=0 FOR UPDATE", Long.class, tenant, merchant).isEmpty())
-            throw new AccessDeniedException("商家不可用");
-        merchants.validateMerchantForManagement(merchant);
+        if (operator == null || db.query(AUTHORIZED_MERCHANTS + "AND m.id = ?" + (lock ? " FOR UPDATE" : ""),
+                (rs, rowNum) -> rs.getLong("id"), tenant, operator,
+                ProductMerchantStatusEnum.APPROVED.getStatus(), PLATFORM_MERCHANT_NAME, merchant).isEmpty()) {
+            throw new AccessDeniedException("商家不可用或当前账号没有该商家的商品导入授权");
+        }
         return new Scope(tenant, merchant, operator);
     }
 
