@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -31,6 +32,13 @@ public class MemberYouzanImportController {
 
     @Resource
     private MemberYouzanImportService importService;
+
+    @GetMapping("/merchants")
+    @Operation(summary = "获得当前操作人授权的有赞会员导入商家编号")
+    @PreAuthorize("@ss.hasPermission('member:youzan-import:import')")
+    public CommonResult<List<String>> getAuthorizedMerchantIds() {
+        return success(importService.listAuthorizedMerchantIds());
+    }
 
     @GetMapping("/template")
     @Operation(summary = "下载有赞客户积分导入空模板")

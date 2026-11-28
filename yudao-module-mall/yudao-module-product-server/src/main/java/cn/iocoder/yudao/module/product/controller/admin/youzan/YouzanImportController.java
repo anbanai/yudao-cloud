@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.Map;
 import jakarta.validation.Valid;
@@ -22,6 +23,11 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class YouzanImportController {
     private final YouzanImportService service;
     public YouzanImportController(YouzanImportService service) { this.service = service; }
+
+    @GetMapping("/merchants")
+    public CommonResult<List<YouzanImportService.MerchantOption>> getAuthorizedMerchants() {
+        return success(service.listAuthorizedMerchants());
+    }
 
     @GetMapping("/template")
     public void template(HttpServletResponse response) throws IOException {

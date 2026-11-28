@@ -26,6 +26,26 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class MemberYouzanImportServiceTest {
+    @Test
+    void listsOnlyTheCurrentOperatorsAuthorizedSourceIdsAsStrings() {
+        var dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                "jdbc:h2:mem:" + java.util.UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+        var jdbc = new JdbcTemplate(dataSource);
+        jdbc.execute("CREATE TABLE member_youzan_import_grant (tenant_id BIGINT, merchant_id BIGINT, operator_id BIGINT)");
+        jdbc.update("INSERT INTO member_youzan_import_grant VALUES (1,9,2),(1,9007199254740993,2),(1,10,3),(2,11,2)");
+        var service = new MemberYouzanImportService();
+        ReflectionTestUtils.setField(service, "jdbc", jdbc);
+        TenantContextHolder.setTenantId(1L);
+        try (var security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(2L);
+            assertEquals(List.of("9", "9007199254740993"), service.listAuthorizedMerchantIds());
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(4L);
+            assertEquals(List.of(), service.listAuthorizedMerchantIds());
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
     private MockMultipartFile workbook(boolean wrongHeader) throws Exception {
         try (var book = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
             var sheet = book.createSheet(YouzanCustomerImportRules.SHEET_NAME);

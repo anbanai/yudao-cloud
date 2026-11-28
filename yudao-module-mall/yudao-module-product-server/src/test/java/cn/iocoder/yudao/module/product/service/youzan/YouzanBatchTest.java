@@ -48,14 +48,14 @@ class YouzanBatchTest {
         db = new JdbcTemplate(ds);
         tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
         db.execute("CREATE TABLE product_yz_import_grant(tenant_id BIGINT,merchant_id BIGINT,operator_id BIGINT)");
-        db.execute("CREATE TABLE product_merchant(id BIGINT,tenant_id BIGINT,deleted INT)");
+        db.execute("CREATE TABLE product_merchant(id BIGINT,tenant_id BIGINT,deleted INT,name VARCHAR,store_name VARCHAR,status INT)");
         db.execute("CREATE TABLE product_spu(id BIGINT,merchant_id BIGINT,tenant_id BIGINT,deleted INT)");
         db.execute("CREATE TABLE product_sku(id BIGINT,spu_id BIGINT,tenant_id BIGINT,price INT,stock INT,deleted INT)");
         db.execute("CREATE TABLE trade_delivery_express_template(id BIGINT,tenant_id BIGINT,charge_mode INT,deleted INT)");
         db.update("INSERT INTO trade_delivery_express_template VALUES(10,1,1,0),(11,5,1,0),(12,1,1,1),(13,1,9,0)");
         db.execute("CREATE TABLE product_yz_import_batch(batch_id VARCHAR PRIMARY KEY,tenant_id BIGINT, merchant_id BIGINT,operator_id BIGINT,confirmed BOOLEAN DEFAULT FALSE,expires_at TIMESTAMP,confirmed_at TIMESTAMP,row_count INT,draft_count INT,payload BLOB)");
         db.execute("CREATE TABLE product_yz_import_draft(tenant_id BIGINT,merchant_id BIGINT,product_key VARCHAR,sku_key VARCHAR,name VARCHAR,specification VARCHAR,source_price INT,source_stock INT,mapping_hints VARCHAR,mall_sku_id BIGINT,batch_id VARCHAR,PRIMARY KEY(tenant_id,merchant_id,product_key,sku_key))");
-        db.update("INSERT INTO product_merchant VALUES (2,1,0),(3,1,0),(2,5,0)");
+        db.update("INSERT INTO product_merchant VALUES (2,1,0,'一号商家','一号店',20),(3,1,0,'二号商家',NULL,20),(2,5,0,'其他租户',NULL,20)");
         db.update("INSERT INTO product_yz_import_grant VALUES(1,2,7),(1,2,8),(1,3,7),(5,2,7)");
         initializeServices();
     }
@@ -72,6 +72,19 @@ class YouzanBatchTest {
     }
 
     @AfterEach void cleanup() { TenantContextHolder.clear(); SecurityContextHolder.clearContext(); }
+
+    @Test void listsOnlyAvailableMerchantsGrantedToTheCurrentOperator() {
+        db.update("INSERT INTO product_merchant VALUES (4,1,1,'已删除',NULL,20),(5,1,0,'已冻结',NULL,40)");
+        db.update("INSERT INTO product_yz_import_grant VALUES (1,4,8),(1,5,8),(1,6,8)");
+        login(1, 8);
+        assertEquals(List.of(new YouzanImportService.MerchantOption("2", "一号店")),
+                service.listAuthorizedMerchants());
+        login(5, 7);
+        assertEquals(List.of(new YouzanImportService.MerchantOption("2", "其他租户")),
+                service.listAuthorizedMerchants());
+        login(1, 99);
+        assertEquals(List.of(), service.listAuthorizedMerchants());
+    }
 
     private MockMultipartFile file(String sheetName, boolean wrongHeader) throws Exception {
         try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {

@@ -49,6 +49,15 @@ public class MemberYouzanImportService {
     @Value("${mybatis-plus.encryptor.password}")
     private String hashSecret;
 
+    public List<String> listAuthorizedMerchantIds() {
+        return jdbc.queryForList("""
+                SELECT merchant_id FROM member_youzan_import_grant
+                WHERE tenant_id = ? AND operator_id = ?
+                ORDER BY merchant_id
+                """, Long.class, TenantContextHolder.getRequiredTenantId(), SecurityFrameworkUtils.getLoginUserId())
+                .stream().map(String::valueOf).toList();
+    }
+
     private void requireGrant(Long merchantId, boolean lock) {
         if (merchantId == null || jdbc.queryForList("SELECT operator_id FROM member_youzan_import_grant WHERE tenant_id=? AND merchant_id=? AND operator_id=?" + (lock ? " FOR UPDATE" : ""), Long.class, TenantContextHolder.getRequiredTenantId(), merchantId, SecurityFrameworkUtils.getLoginUserId()).isEmpty()) {
             throw new AccessDeniedException("无此商家的导入授权");

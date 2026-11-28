@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.product.service.youzan;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.product.service.merchant.ProductMerchantService;
+import cn.iocoder.yudao.module.product.enums.merchant.ProductMerchantStatusEnum;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReqVO;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
@@ -37,6 +38,20 @@ public class YouzanImportService {
     public record Comparison(Integer price, Integer stock) {}
     public record ResultLine(Row row, String action, Comparison before, String bindingState) {}
     public record Batch(String batchId, boolean confirmed, List<ResultLine> lines, List<String> unusedColumns) {}
+    public record MerchantOption(String id, String name) {}
+
+    public List<MerchantOption> listAuthorizedMerchants() {
+        return db.query("""
+                SELECT m.id, COALESCE(NULLIF(TRIM(m.store_name), ''), m.name) AS name
+                FROM product_yz_import_grant g
+                JOIN product_merchant m ON m.id = g.merchant_id AND m.tenant_id = g.tenant_id
+                WHERE g.tenant_id = ? AND g.operator_id = ? AND m.deleted = 0 AND m.status = ?
+                ORDER BY m.id
+                """, (rs, rowNum) -> new MerchantOption(rs.getString("id"), rs.getString("name")),
+                TenantContextHolder.getRequiredTenantId(), SecurityFrameworkUtils.getLoginUserId(),
+                ProductMerchantStatusEnum.APPROVED.getStatus());
+    }
+
     private record Snapshot(List<Line> lines, List<String> unusedColumns) {}
     private Batch response(Scope scope, String id, boolean confirmed, List<Line> lines, List<String> unused) {
         Map<Key, String> states = new HashMap<>();

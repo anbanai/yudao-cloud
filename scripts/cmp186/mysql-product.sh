@@ -19,7 +19,7 @@ test "$(root -e 'SELECT VERSION()')" = 8.0.44
 node --input-type=module > "$work/schema.sql" <<'JS'
 import fs from 'node:fs';
 const lines=fs.readFileSync('db/yudao.sql','utf8').split('\n');
-for (const table of ['system_menu','product_brand','trade_delivery_express_template','member_user','member_level','member_point_record','member_level_record']) {
+for (const table of ['system_menu','system_role_menu','product_brand','trade_delivery_express_template','member_user','member_level','member_point_record','member_level_record']) {
   const start=lines.findIndex(line=>line.startsWith('CREATE TABLE `'+table+'` '));
   const end=lines.findIndex((line,i)=>i>start && /^\)\s*ENGINE\s*=/i.test(line));
   const ddl=lines.slice(start,end+1).join('\n');
@@ -28,12 +28,20 @@ for (const table of ['system_menu','product_brand','trade_delivery_express_templ
 }
 JS
 root < "$work/schema.sql"
-root -e "INSERT INTO system_menu(id,name,type,parent_id,path) VALUES (209,'synthetic',1,0,''),(210,'会员管理',2,0,'user')"
+root -e "INSERT INTO system_menu(id,name,type,parent_id,path) VALUES (209,'synthetic',1,0,''),(210,'会员管理',2,0,'user'),(700,'会员中心',1,0,'/member'),(701,'商城系统',1,0,'/mall'),(702,'商品中心',1,701,'product')"
 root < sql/mysql/member_youzan_import.sql
 root < sql/mysql/cmp158/02-member-recovery-floor.sql
 root < sql/mysql/cmp172/01-youzan-claim-receipt.sql
 root < sql/mysql/cmp172/02-youzan-recovery-source.sql
 root < sql/mysql/V20261125_01__product_youzan_import.sql
+test "$(root -e "SELECT GROUP_CONCAT(parent_id ORDER BY parent_id) FROM system_menu WHERE component IN ('member/youzan-import/index','mall/product/youzan-import/index')")" = '0,209'
+root -e "INSERT INTO system_role_menu(role_id,menu_id,tenant_id) SELECT 13,id,1 FROM system_menu WHERE component IN ('member/youzan-import/index','mall/product/youzan-import/index')"
+menus=sql/mysql/V20261128_01__youzan_import_menus.sql
+root < "$menus"
+root < "$menus"
+test "$(root -e "SELECT GROUP_CONCAT(parent_id ORDER BY parent_id) FROM system_menu WHERE component IN ('member/youzan-import/index','mall/product/youzan-import/index')")" = '700,702'
+test "$(root -e 'SELECT COUNT(*) FROM system_role_menu WHERE role_id=13 AND tenant_id=1')" = 5
+test "$(root -e "SELECT keep_alive+0 FROM system_menu WHERE component='mall/product/youzan-import/index'")" = 1
 brand=sql/mysql/cmp158/01-brand-detail.sql
 root < "$brand"
 root -e "INSERT INTO product_brand(name,pic_url,sort,status) VALUES('synthetic','fixture.png',1,0)"
