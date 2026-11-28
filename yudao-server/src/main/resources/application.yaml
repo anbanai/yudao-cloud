@@ -341,7 +341,7 @@ yudao:
       topic: ${spring.application.name}-websocket # 消息发送的 Kafka Topic
       consumer-group: ${spring.application.name}-websocket-consumer # 消息发送的 Kafka Consumer Group
   swagger:
-    title: 芋道快速开发平台
+    title: 好茶引力 API
     description: 提供管理后台、用户 App 的所有功能
     version: ${yudao.info.version}
     url: ${yudao.web.admin-ui.url}

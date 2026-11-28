@@ -239,7 +239,7 @@ class LogisticsPrintBridgeServiceImplTest {
                 .setId(1L).setTenantId(9L).setStatus(0).setDeviceName("PrintBridge device");
         when(taskMapper.selectClaimable(eq(1L), isNull(), any())).thenReturn(null);
 
-        service.pull(device, "不忍独享");
+        service.pull(device, "好茶引力");
 
         verify(deviceMapper).updateById(argThat((TradeLogisticsPrintDeviceDO updated) ->
                 "PrintBridge device".equals(updated.getDeviceName())));
