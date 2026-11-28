@@ -51,6 +51,7 @@ grep -q 'ERROR 1062' "$work/duplicate.log"
 test "$(sql -e 'SELECT COUNT(*) FROM member_point_record')" = 3
 sql -e 'DELETE FROM member_point_record WHERE user_id=12'
 sql < sql/mysql/cmp172/02-youzan-recovery-source.sql
+sql < sql/mysql/V20261128_06__member_youzan_direct_claim.sql
 sql -e "INSERT INTO member_youzan_point_snapshot(id,batch_id,merchant_id,mobile_hash,encrypted_mobile,snapshot_hash,restore_status,tenant_id) VALUES(701,1,9,'probe','probe','probe',0,1)"
 docker_local exec -i "$container" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot -N -B cmp175_ephemeral' < scripts/cmp175/source-lock-probe.sql | tee "$work/locks.log"
 awk -F '\t' '$3=="member_point_record" && ($5=="const" || $5=="ref" || $5=="eq_ref") && $7=="uk_youzan_recovery_source" {hit=1} END {exit !hit}' "$work/locks.log"
@@ -66,8 +67,8 @@ mvn -B -ntp "$@" -pl yudao-module-member/yudao-module-member-server -am -Dflatte
 node --input-type=module <<'JS'
 import fs from 'node:fs';
 const suite = fs.readFileSync('yudao-module-member/yudao-module-member-server/target/surefire-reports/TEST-cn.iocoder.yudao.module.member.service.youzan.YouzanClaimFlowTest.xml','utf8').match(/<testsuite\b[^>]*>/)?.[0] || '';
-for (const [name, required] of Object.entries({tests:11, failures:0, errors:0, skipped:0})) {
+for (const [name, required] of Object.entries({tests:14, failures:0, errors:0, skipped:0})) {
     if (!suite.includes(` ${name}="${required}"`)) throw Error(`Unexpected native suite result: ${name}`);
 }
-console.log('Native flow: 11 passed, 0 skipped');
+console.log('Native flow: 14 passed, 0 skipped');
 JS

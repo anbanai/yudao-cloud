@@ -34,6 +34,8 @@ root < sql/mysql/cmp158/02-member-recovery-floor.sql
 root < sql/mysql/cmp172/01-youzan-claim-receipt.sql
 root < sql/mysql/cmp172/02-youzan-recovery-source.sql
 root < sql/mysql/V20261125_01__product_youzan_import.sql
+root < sql/mysql/V20261128_03__product_youzan_pending_batches.sql
+root < sql/mysql/V20261128_05__product_youzan_item_drafts.sql
 test "$(root -e "SELECT GROUP_CONCAT(parent_id ORDER BY parent_id) FROM system_menu WHERE component IN ('member/youzan-import/index','mall/product/youzan-import/index')")" = '0,209'
 root -e "INSERT INTO system_role_menu(role_id,menu_id,tenant_id) SELECT 13,id,1 FROM system_menu WHERE component IN ('member/youzan-import/index','mall/product/youzan-import/index')"
 menus=sql/mysql/V20261128_01__youzan_import_menus.sql
@@ -64,7 +66,7 @@ CREATE USER 'product_fixture'@'%' IDENTIFIED BY '$CMP186_PRODUCT_PASSWORD';
 GRANT LOCK TABLES ON cmp186_ephemeral.* TO 'product_fixture'@'%';
 SQL
 for table in product_merchant trade_delivery_express_template product_yz_import_grant; do root -e "GRANT SELECT ON cmp186_ephemeral.$table TO 'product_fixture'@'%'"; done
-for table in product_yz_import_batch product_yz_import_draft product_spu product_sku; do root -e "GRANT SELECT,INSERT,UPDATE ON cmp186_ephemeral.$table TO 'product_fixture'@'%'"; done
+for table in product_yz_import_batch product_yz_import_draft product_yz_import_item product_spu product_sku; do root -e "GRANT SELECT,INSERT,UPDATE ON cmp186_ephemeral.$table TO 'product_fixture'@'%'"; done
 if app -e 'UPDATE trade_delivery_express_template SET name=name WHERE id=10' > "$work/denied" 2>&1; then exit 1; fi
 grep -q 'ERROR 1142' "$work/denied"
 lock='SELECT id FROM trade_delivery_express_template WHERE id=10 AND tenant_id=1 AND deleted=0 AND charge_mode IN (1,2,3) FOR UPDATE'

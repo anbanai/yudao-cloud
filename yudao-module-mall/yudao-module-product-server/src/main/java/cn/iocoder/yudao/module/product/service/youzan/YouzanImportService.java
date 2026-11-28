@@ -59,7 +59,17 @@ public class YouzanImportService {
     private record Snapshot(List<Line> lines, List<String> unusedColumns) {}
     private Batch response(Scope scope, String id, boolean confirmed, List<Line> lines, List<String> unused) {
         Map<Key, String> states = new HashMap<>();
-        if (confirmed && scope.merchant != null) {
+        if (confirmed && scope.merchant == null) {
+            Set<String> published = new HashSet<>(db.queryForList(
+                    "SELECT product_key FROM product_yz_import_item WHERE tenant_id=? AND batch_id=? AND spu_id IS NOT NULL",
+                    String.class, scope.tenant, id));
+            for (Line line : lines) {
+                if ("PENDING".equals(line.action())) {
+                    Key key = line.row().item().key();
+                    states.put(key, published.contains(key.product()) ? "BOUND" : "UNBOUND");
+                }
+            }
+        } else if (confirmed) {
             db.query("SELECT product_key,sku_key,mall_sku_id FROM product_yz_import_draft WHERE tenant_id=? AND merchant_id=? AND batch_id=?",
                     rs -> { states.put(new Key(rs.getString(1), rs.getString(2)), rs.getObject(3) == null ? "UNBOUND" : "BOUND"); },
                     scope.tenant, scope.merchant, id);
@@ -171,8 +181,9 @@ public class YouzanImportService {
                 if (!current.equals(lines)) throw invalid("预览后数据已变化，请重新预览");
                 count = insertDrafts(scope, id, lines);
             }
-            db.update("UPDATE product_yz_import_batch SET confirmed=TRUE, confirmed_at=NOW(6),draft_count=? WHERE batch_id=? AND tenant_id=? AND operator_id=?",
-                    count, id, scope.tenant, scope.operator);
+            boolean noDrafts = scope.merchant == null && lines.stream().noneMatch(line -> "PENDING".equals(line.action()));
+            db.update("UPDATE product_yz_import_batch SET confirmed=TRUE, confirmed_at=NOW(6),draft_count=?,all_products_published=? WHERE batch_id=? AND tenant_id=? AND operator_id=?",
+                    count, noDrafts, id, scope.tenant, scope.operator);
         }
         return response(scope, id, confirm || batch.confirmed, lines, snapshot.unusedColumns());
     }
@@ -194,7 +205,7 @@ public class YouzanImportService {
         Scope owner = scope(null, false);
         String query = """
                 SELECT batch_id FROM product_yz_import_batch
-                WHERE tenant_id=? AND operator_id=? AND confirmed=TRUE AND merchant_id IS NULL
+                WHERE tenant_id=? AND operator_id=? AND confirmed=TRUE AND merchant_id IS NULL AND all_products_published=FALSE
                 """;
         String order = " ORDER BY batch_id DESC LIMIT 20";
         if (before == null) return db.queryForList(query + order, String.class, owner.tenant, owner.operator);
@@ -207,18 +218,91 @@ public class YouzanImportService {
         Stored batch = stored(id, true);
         Scope target = scope(merchant, true);
         if (!batch.confirmed) throw invalid("请先确认导入批次");
-        if (batch.merchant != null && batch.merchant != merchant) throw invalid("该批次已分配至其他商家");
-        Scope previous = new Scope(target.tenant, batch.merchant, target.operator);
-        Snapshot snapshot = decode(previous, id, batch);
-        if (batch.merchant == null) {
-            var lines = evaluateBatch(target, snapshot.lines().stream().map(Line::row).toList(), true);
-            snapshot = new Snapshot(lines, snapshot.unusedColumns());
-            byte[] payload = encode(target, id, snapshot);
-            int count = insertDrafts(target, id, lines);
-            db.update("UPDATE product_yz_import_batch SET merchant_id=?,payload=?,draft_count=? WHERE batch_id=? AND tenant_id=? AND operator_id=?",
-                    merchant, payload, count, id, target.tenant, target.operator);
-        }
+        if (batch.merchant == null) throw invalid("请在商品上架时选择商家");
+        if (batch.merchant != merchant) throw invalid("该批次已分配至其他商家");
+        Snapshot snapshot = decode(target, id, batch);
         return response(target, id, true, snapshot.lines(), snapshot.unusedColumns());
+    }
+
+    public record ItemDraft(ProductSpuSaveReqVO form, Map<String, String> sourceByProperties, String merchantId, String spuId) {}
+    private record ItemPayload(ProductSpuSaveReqVO form, Map<String, String> sourceByProperties) {}
+    private record DraftSource(Scope owner, String id, String product, List<Line> lines, long productCount) {
+        String aad() { return owner.aad(id) + ":item:" + product; }
+    }
+
+    private DraftSource draftSource(UUID batchId, String product, boolean lock) throws Exception {
+        String id = batchId.toString();
+        Stored batch = stored(id, lock);
+        if (!batch.confirmed || batch.merchant != null) throw invalid("请选择已确认且未分配商家的批次");
+        Scope owner = scope(null, false);
+        List<Line> pending = decode(owner, id, batch).lines().stream().filter(line -> "PENDING".equals(line.action())).toList();
+        List<Line> selected = pending.stream().filter(line -> product.equals(line.row().item().key().product())).toList();
+        if (selected.isEmpty()) throw invalid("该批次中无此待处理商品");
+        return new DraftSource(owner, id, product, selected, pending.stream().map(line -> line.row().item().key().product()).distinct().count());
+    }
+
+    private ItemDraft readItem(DraftSource source) throws Exception {
+        record StoredItem(byte[] bytes, String merchantId, String spuId) {}
+        var items = db.query("SELECT payload,merchant_id,spu_id FROM product_yz_import_item WHERE tenant_id=? AND batch_id=? AND product_key=?",
+                (rs, n) -> new StoredItem(rs.getBytes(1), rs.getString(2), rs.getString(3)),
+                source.owner.tenant, source.id, source.product);
+        if (items.isEmpty()) return new ItemDraft(null, Map.of(), null, null);
+        var item = items.get(0);
+        ItemPayload payload = json.readValue(new PreviewCipher(encodedKey).open(source.aad(), item.bytes), ItemPayload.class);
+        return new ItemDraft(payload.form(), payload.sourceByProperties(), item.merchantId(), item.spuId());
+    }
+
+    @Transactional(readOnly = true)
+    public ItemDraft draft(UUID batchId, String product) throws Exception {
+        return readItem(draftSource(batchId, product, false));
+    }
+
+    private void writeItem(DraftSource source, ProductSpuSaveReqVO form, Map<String, String> mapping, Long merchant, Long spu) throws Exception {
+        byte[] payload = new PreviewCipher(encodedKey).seal(source.aad(), json.writeValueAsBytes(new ItemPayload(form, mapping)));
+        if (payload.length > 12_000_000) throw exception(BAD_REQUEST);
+        db.update("""
+                INSERT INTO product_yz_import_item(tenant_id,batch_id,product_key,payload,merchant_id,spu_id) VALUES(?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE payload=?,merchant_id=?,spu_id=?
+                """, source.owner.tenant, source.id, source.product, payload, merchant, spu, payload, merchant, spu);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ItemDraft saveDraft(UUID batchId, String product, ProductSpuSaveReqVO form, Map<String, String> mapping) throws Exception {
+        DraftSource source = draftSource(batchId, product, true);
+        if (readItem(source).spuId() != null) throw invalid("商品已上架，请通过商城商品编辑");
+        if (form.getMerchantId() != null || form.getId() != null) throw invalid("待上架草稿不可指定商家或商城商品编号");
+        Set<String> sourceKeys = new HashSet<>();
+        source.lines.forEach(line -> sourceKeys.add(line.row().item().key().sku()));
+        if (!sourceKeys.containsAll(mapping.values()) || new HashSet<>(mapping.values()).size() != mapping.size()) {
+            throw invalid("来源规格映射无效");
+        }
+        writeItem(source, form, mapping, null, null);
+        return new ItemDraft(form, mapping, null, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public String publish(UUID batchId, String product, long merchant, ProductSpuSaveReqVO form, Map<String, String> mapping) throws Exception {
+        DraftSource source = draftSource(batchId, product, true);
+        Scope target = scope(merchant, true);
+        ItemDraft item = readItem(source);
+        if (item.spuId() != null) {
+            if (!item.merchantId().equals(String.valueOf(merchant))) throw invalid("该商品已在其他商家上架");
+            return item.spuId();
+        }
+        if (form.getMerchantId() != null && form.getMerchantId() != merchant) throw invalid("商品与上架商家不匹配");
+        var current = evaluateBatch(target, source.lines.stream().map(Line::row).toList(), true);
+        if (current.stream().anyMatch(line -> !"PENDING".equals(line.action()))) throw invalid("目标商家已有该来源商品，请核对商城商品");
+        insertDrafts(target, source.id, current);
+        form.setMerchantId(merchant);
+        Long spu = createAndBind(target, batchId, product, mapping, form, true);
+        writeItem(source, form, mapping, merchant, spu);
+        int published = db.queryForObject("SELECT COUNT(*) FROM product_yz_import_item WHERE tenant_id=? AND batch_id=? AND spu_id IS NOT NULL",
+                Integer.class, source.owner.tenant, source.id);
+        db.update("""
+                UPDATE product_yz_import_batch SET all_products_published=?,draft_count=draft_count+?
+                WHERE tenant_id=? AND operator_id=? AND batch_id=?
+                """, published == source.productCount, current.size(), source.owner.tenant, source.owner.operator, source.id);
+        return spu.toString();
     }
 
     private static RuntimeException invalid(String text) {
@@ -235,6 +319,12 @@ public class YouzanImportService {
         Scope scope = scope(merchant, true);
         if (db.queryForList("SELECT batch_id FROM product_yz_import_batch WHERE tenant_id=? AND merchant_id=? AND operator_id=? AND batch_id=? AND confirmed=TRUE", String.class, scope.tenant, merchant, scope.operator, batchId.toString()).isEmpty())
             throw new AccessDeniedException("批次不可访问");
+        return createAndBind(scope, batchId, product, sourceByProperties, form, false);
+    }
+
+    private Long createAndBind(Scope scope, UUID batchId, String product, Map<String,String> sourceByProperties,
+                               ProductSpuSaveReqVO form, boolean publish) {
+        long merchant = scope.merchant;
         if (form.getId() != null || !Objects.equals(form.getMerchantId(), merchant) || form.getSkus() == null || form.getSkus().isEmpty())
             throw invalid("草稿或商家不匹配");
         if (form.getName() == null || form.getName().isBlank() || form.getName().length() > 255)
@@ -256,14 +346,14 @@ public class YouzanImportService {
                     .anyMatch(field -> "预售".equals(draft.source().hints().get(field)) || "预售商品".equals(draft.source().hints().get(field)));
             if (presale && (!Boolean.TRUE.equals(form.getIsPreSale()) || form.getDeliveryDays() == null || form.getDeliveryDays() < 1))
                 throw invalid("请补充来源预售商品的发货周期");
-            if (draft.price() != null) sku.setPrice(draft.price());
-            if (draft.stock() != null) sku.setStock(draft.stock());
+            if (draft.price() != null && (!publish || sku.getPrice() == null)) sku.setPrice(draft.price());
+            if (draft.stock() != null && (!publish || sku.getStock() == null)) sku.setStock(draft.stock());
             if (sku.getPrice() == null || sku.getStock() == null || sku.getPrice() < 0 || sku.getStock() < 0)
                 throw invalid("请补充有效的规格价格和库存");
         }
         validateDelivery(scope, form);
         form.setSalesCount(0); form.setBrowseCount(0); form.setVirtualSalesCount(0);
-        Long spu = spus.createUnlistedSpu(form);
+        Long spu = publish ? spus.createSpu(form) : spus.createUnlistedSpu(form);
         var created = skus.getSkuListBySpuId(spu);
         if (created.size() != keys.size()) throw invalid("规格绑定失败");
         for (var sku : created) {

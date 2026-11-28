@@ -116,7 +116,7 @@ class MemberYouzanImportServiceTest {
             when(snapshots.findSource(eq(9L), anyString(), eq(true))).thenReturn(null);
             assertEquals(1, service.confirm(12L).importedRows());
             assertEquals(result.rows(), service.confirm(12L).rows());
-            when(batches.selectById(12L)).thenReturn(saved.get());
+            when(batches.selectResult(12L)).thenReturn(saved.get());
             assertEquals(result.rows(), service.getResult(12L).rows());
             saved.get().setMaskedRows("[{\"rowNumber\":2,\"maskedMobile\":\"138****0001\",\"outcome\":\"待导入快照\"}]");
             var historical = service.getResult(12L).rows().get(0);

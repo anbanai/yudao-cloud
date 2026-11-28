@@ -66,6 +66,28 @@ public class YouzanImportController {
         return success(service.assign(batchId, merchantId));
     }
 
+    public record DraftEdit(@NotNull UUID batchId, @NotNull String product, @NotNull Map<String,String> sourceByProperties,
+                            @NotNull ProductSpuSaveReqVO form) {}
+
+    @GetMapping("/draft")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<YouzanImportService.ItemDraft> draft(@RequestParam UUID batchId, @RequestParam String product) throws Exception {
+        return success(service.draft(batchId, product));
+    }
+
+    @PostMapping("/draft")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<YouzanImportService.ItemDraft> saveDraft(@Valid @RequestBody DraftEdit body) throws Exception {
+        return success(service.saveDraft(body.batchId(), body.product(), body.form(), body.sourceByProperties()));
+    }
+
+    @PostMapping("/publish")
+    @PreAuthorize("@ss.hasPermission('product:youzan:import') and @ss.hasPermission('product:spu:create') and @ss.hasPermission('product:spu:update')")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<String> publish(@RequestParam long merchantId, @Valid @RequestBody DraftEdit body) throws Exception {
+        return success(service.publish(body.batchId(), body.product(), merchantId, body.form(), body.sourceByProperties()));
+    }
+
     public record Supplement(@NotNull UUID batchId, @NotNull String product, @NotNull Map<String,String> sourceByProperties, @Valid @NotNull ProductSpuSaveReqVO form) {}
 
     @PostMapping("/supplement")

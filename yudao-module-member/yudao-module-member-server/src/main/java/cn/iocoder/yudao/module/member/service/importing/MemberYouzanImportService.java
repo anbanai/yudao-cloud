@@ -37,6 +37,7 @@ public class MemberYouzanImportService {
     private static final int STATUS_IMPORTED = 1;
     private static final int STATUS_EXPIRED = 2;
     private static final int STATUS_PENDING_ASSIGNMENT = 3;
+    private static final int STATUS_MIGRATION_FAILED = 4;
     private static final int MAX_ROWS = 10_000;
 
     @Resource
@@ -117,7 +118,7 @@ public class MemberYouzanImportService {
             if (error == null && conflicts.contains(YouzanCustomerImportRules.normalizeMobile(mobile))) error = "同一手机号的资产记录冲突，整组跳过";
             if (error == null && level != null && !level.isBlank() && mappedLevelId == null) error = "免费等级未匹配当前五档配置";
             if (error == null && get(row, 7) != null && !get(row, 7).isBlank() && parseNonNegativeInteger(get(row, 7)) == null) error = "成长值必须为非负整数";
-            String outcome = merchantId == null ? "待分配会员来源" : "待导入快照";
+            String outcome = "待导入快照";
             YouzanCustomerImportRules.SnapshotDisposition disposition = error == null
                     ? YouzanCustomerImportRules.classifySnapshot(mobile, points, firstPointByMobile)
                     : YouzanCustomerImportRules.SnapshotDisposition.INVALID;
@@ -175,8 +176,11 @@ public class MemberYouzanImportService {
         if (batch.getMerchantId() != null) {
             requireGrant(batch.getMerchantId(), true);
         }
-        if (batch.getStatus() == STATUS_IMPORTED || batch.getStatus() == STATUS_PENDING_ASSIGNMENT) {
+        if (batch.getStatus() == STATUS_IMPORTED) {
             return toImportResult(batch);
+        }
+        if (isConfirmedStaging(batch)) {
+            return importSnapshots(batch);
         }
         if (batch.getStatus() != STATUS_PREVIEW) {
             throw new IllegalStateException("预览状态已失效，请重新上传");
@@ -187,45 +191,27 @@ public class MemberYouzanImportService {
             throw new IllegalStateException("预览已过期，请重新上传");
         }
 
-        if (batch.getMerchantId() == null) {
-            batch.setStatus(STATUS_PENDING_ASSIGNMENT);
-            batch.setExpiresAt(null);
-            batchMapper.updateById(batch);
-            return toImportResult(batch);
-        }
         return importSnapshots(batch);
     }
 
-    public List<String> listPending(Long beforeBatchId) {
-        return batchMapper.selectList(new LambdaQueryWrapper<MemberYouzanImportBatchDO>()
-                .select(MemberYouzanImportBatchDO::getId)
-                .eq(MemberYouzanImportBatchDO::getTenantId, TenantContextHolder.getRequiredTenantId())
-                .eq(MemberYouzanImportBatchDO::getOperatorId, SecurityFrameworkUtils.getLoginUserId())
-                .eq(MemberYouzanImportBatchDO::getStatus, STATUS_PENDING_ASSIGNMENT)
-                .isNull(MemberYouzanImportBatchDO::getMerchantId)
-                .lt(beforeBatchId != null, MemberYouzanImportBatchDO::getId, beforeBatchId)
-                .orderByDesc(MemberYouzanImportBatchDO::getId).last("LIMIT 20"))
-                .stream().map(batch -> batch.getId().toString()).toList();
-    }
-
+    /** Converts a previously confirmed batch within the migration worker's tenant context. */
     @Transactional(rollbackFor = Exception.class)
-    public ImportResult assign(Long batchId, Long merchantId) {
-        MemberYouzanImportBatchDO batch = batchMapper.selectByIdForUpdate(batchId);
-        validateOwner(batch);
-        requireGrant(merchantId, true);
-        if (batch.getStatus() == STATUS_IMPORTED && Objects.equals(batch.getMerchantId(), merchantId)) {
-            return toImportResult(batch);
+    public void migrateConfirmedBatch(long id) {
+        var batch = batchMapper.selectByIdForUpdate(id);
+        if (batch != null && Objects.equals(batch.getTenantId(), TenantContextHolder.getRequiredTenantId())
+                && isConfirmedStaging(batch)) {
+            importSnapshots(batch);
         }
-        if (batch.getStatus() != STATUS_PENDING_ASSIGNMENT || batch.getMerchantId() != null) {
-            throw new IllegalStateException("仅可分配已确认且待分配的批次");
-        }
-        batch.setMerchantId(merchantId);
-        return importSnapshots(batch);
+    }
+
+    private boolean isConfirmedStaging(MemberYouzanImportBatchDO batch) {
+        return batch.getMerchantId() == null && (batch.getStatus() == STATUS_PENDING_ASSIGNMENT
+                || batch.getStatus() == STATUS_MIGRATION_FAILED);
     }
 
     private ImportResult importSnapshots(MemberYouzanImportBatchDO batch) {
-        boolean assigning = batch.getStatus() == STATUS_PENDING_ASSIGNMENT;
-        Map<Integer, String> assignedOutcomes = new HashMap<>();
+        boolean direct = batch.getMerchantId() == null;
+        Map<Integer, String> directOutcomes = new HashMap<>();
         List<SnapshotPayload> payload;
         try {
             payload = PAYLOAD_JSON.readValue(batch.getEncryptedPayload(), new TypeReference<>() { });
@@ -240,8 +226,8 @@ public class MemberYouzanImportService {
             String mobileHash = YouzanCustomerImportRules.keyedHash(item.getMobile(), hashSecret);
             String snapshotHash = fingerprint(item);
             MemberYouzanPointSnapshotDO existing = snapshotMapper.findSource(batch.getMerchantId(), mobileHash, true);
-            if ((!assigning && !observed(existing).equals(item.getObserved()))
-                    || (item.getMappedLevelId() != null && !Objects.equals(levels.get(item.getFreeLevel()), item.getMappedLevelId()))) {
+            if ((!direct && !observed(existing).equals(item.getObserved()))
+                    || (!isConfirmedStaging(batch) && item.getMappedLevelId() != null && !Objects.equals(levels.get(item.getFreeLevel()), item.getMappedLevelId()))) {
                 throw new IllegalStateException("预览后数据已变化，请重新预览");
             }
             if (existing != null) {
@@ -249,8 +235,8 @@ public class MemberYouzanImportService {
                 if (different) {
                     changed++;
                 }
-                if (assigning) {
-                    assignedOutcomes.put(item.getRowNumber(), different ? "来源快照已变化，仅报告" : "重复快照，跳过");
+                if (direct) {
+                    directOutcomes.put(item.getRowNumber(), different ? "来源快照已变化，仅报告" : "重复快照，跳过");
                 }
                 skipped++;
                 continue;
@@ -268,15 +254,16 @@ public class MemberYouzanImportService {
             snapshot.setSnapshotHash(snapshotHash);
             snapshot.setRestoreStatus(0);
             snapshotMapper.insert(snapshot);
-            if (assigning) {
-                assignedOutcomes.put(item.getRowNumber(), "已导入快照");
+            if (direct) {
+                directOutcomes.put(item.getRowNumber(), "已导入快照");
             }
             imported++;
         }
-        if (assigning) {
+        if (direct) {
+            batch.setExpiresAt(null);
             List<PreviewRow> rows = maskedRows(batch).stream()
                     .map(row -> new PreviewRow(row.rowNumber(), row.maskedMobile(), row.legacyPoints(), row.levelName(),
-                            assignedOutcomes.getOrDefault(row.rowNumber(), row.outcome()))).toList();
+                            directOutcomes.getOrDefault(row.rowNumber(), row.outcome()))).toList();
             batch.setMaskedRows(JsonUtils.toJsonString(rows));
         }
         batch.setStatus(STATUS_IMPORTED);
@@ -289,7 +276,7 @@ public class MemberYouzanImportService {
     }
 
     public ImportResult getResult(Long batchId) {
-        MemberYouzanImportBatchDO batch = batchMapper.selectById(batchId);
+        MemberYouzanImportBatchDO batch = batchMapper.selectResult(batchId);
         validateOwner(batch);
         if (batch.getMerchantId() != null) {
             requireGrant(batch.getMerchantId(), false);

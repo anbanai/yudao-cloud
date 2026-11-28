@@ -73,6 +73,7 @@ class YouzanClaimFlowTest extends BaseDbUnitTest {
         String tables = Files.readString(Path.of("../../sql/mysql/member_youzan_import.sql")).split("INSERT INTO `system_menu`")[0];
         for (String ddl : tables.replace("b'0'", "false").split(";")) if (!ddl.isBlank()) jdbc.execute(ddl);
         if (PORT == null) {
+            jdbc.execute("alter table member_youzan_point_snapshot alter column merchant_id drop not null");
             jdbc.execute("alter table member_youzan_point_snapshot add column if not exists claimed_user_id bigint");
             jdbc.execute("alter table member_youzan_point_snapshot add column if not exists claimed_at timestamp");
         }
@@ -286,6 +287,65 @@ class YouzanClaimFlowTest extends BaseDbUnitTest {
                 assertEquals(2, scalar("select count(distinct user_id) from " + table));
             }
         } finally { fire.countDown(); pool.shutdownNow(); }
+    }
+
+    @Test void verifiedDirectMobileRecoversWithoutConfiguredSource() throws Exception {
+        jdbc.update("UPDATE member_user SET tenant_id=2 WHERE id=11");
+        jdbc.update("UPDATE member_level SET tenant_id=2");
+        TenantContextHolder.setTenantId(2L);
+        try (var workbook = new XSSFWorkbook(); var bytes = new ByteArrayOutputStream(); var security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(2L);
+            var sheet = workbook.createSheet(YouzanCustomerImportRules.SHEET_NAME);
+            var header = sheet.createRow(0);
+            for (int i = 0; i < YouzanCustomerImportRules.HEADERS.size(); i++) header.createCell(i).setCellValue(YouzanCustomerImportRules.HEADERS.get(i));
+            var row = sheet.createRow(1);
+            row.createCell(2).setCellValue(MOBILE);
+            row.createCell(8).setCellValue("L3");
+            row.createCell(11).setCellValue("25");
+            workbook.write(bytes);
+            long batch = imports.preview(new MockMultipartFile("file", "synthetic.xlsx", "application/octet-stream", bytes.toByteArray()), null).batchId();
+            assertEquals("NOT_FOUND", claims.recover(11L, MOBILE).status());
+            assertEquals(1, imports.confirm(batch).importedRows());
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(11L);
+            when(weixin.verifiedMobile("authorized")).thenReturn(MOBILE);
+            var request = new AppMemberUserUpdateMobileByWeixinReqVO();
+            request.setCode("authorized");
+            assertEquals(new YouzanAssetClaimService.Result("RESTORED", 25), endpoint.recover(request).getCheckedData());
+            assertEquals("ALREADY_RESTORED", endpoint.recover(request).getCheckedData().status());
+        }
+        assertEquals(55, scalar("SELECT point FROM member_user WHERE id=11"));
+        assertEquals(103, scalar("SELECT level_id FROM member_user WHERE id=11"));
+        assertEquals(0, scalar("SELECT restore_status FROM member_youzan_point_snapshot WHERE tenant_id=1"));
+    }
+
+    private void addDirectCopy() {
+        jdbc.update("""
+                INSERT INTO member_youzan_point_snapshot
+                    (batch_id, merchant_id, mobile_hash, encrypted_mobile, snapshot_hash, legacy_points, mapped_level_id, tenant_id)
+                SELECT batch_id, NULL, mobile_hash, encrypted_mobile, snapshot_hash, legacy_points, mapped_level_id, tenant_id
+                FROM member_youzan_point_snapshot WHERE merchant_id=9
+                """);
+    }
+
+    @Test void equivalentDirectAndHistoricalRowsPayOnlyOnceEvenAfterTheSourceChanges() {
+        addDirectCopy();
+        assertEquals(new YouzanAssetClaimService.Result("RESTORED", 100), claims.recover(11L, MOBILE));
+        jdbc.update("UPDATE member_youzan_point_snapshot SET merchant_id=8, deleted=1 WHERE merchant_id=9");
+        assertEquals("ALREADY_RESTORED", claims.recover(11L, MOBILE).status());
+        assertEquals(130, scalar("SELECT point FROM member_user WHERE id=11"));
+        assertEquals(1, scalar("SELECT COUNT(*) FROM member_point_record"));
+    }
+
+    @Test void conflictingDirectAndLegacySnapshotsOrUnreceiptedCreditsBlockPayment() {
+        addDirectCopy();
+        jdbc.update("UPDATE member_youzan_point_snapshot SET legacy_points=200 WHERE merchant_id IS NULL");
+        assertThrows(IllegalStateException.class, () -> claims.recover(11L, MOBILE));
+        String id = jdbc.queryForObject("SELECT id FROM member_youzan_point_snapshot WHERE merchant_id=9", String.class);
+        jdbc.update("UPDATE member_youzan_point_snapshot SET merchant_id=8, deleted=1 WHERE merchant_id=9");
+        addHistory(12, 1, 3, 25, id);
+        assertThrows(IllegalStateException.class, () -> claims.recover(11L, MOBILE));
+        assertEquals(30, scalar("SELECT point FROM member_user WHERE id=11"));
+        assertEquals(0, scalar("SELECT COUNT(*) FROM member_youzan_point_snapshot WHERE restore_status=1"));
     }
 
     @Test void deniedAndWrongSourceCannotBindOrPay() {

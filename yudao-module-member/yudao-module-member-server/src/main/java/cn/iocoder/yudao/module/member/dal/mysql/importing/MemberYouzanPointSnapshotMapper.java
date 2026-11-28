@@ -12,7 +12,8 @@ public interface MemberYouzanPointSnapshotMapper extends BaseMapperX<MemberYouza
 
     default MemberYouzanPointSnapshotDO findSource(Long merchantId, String mobileHash, boolean lock) {
         return selectOne(new LambdaQueryWrapper<MemberYouzanPointSnapshotDO>()
-                .eq(MemberYouzanPointSnapshotDO::getMerchantId, merchantId)
+                .eq(merchantId != null, MemberYouzanPointSnapshotDO::getMerchantId, merchantId)
+                .isNull(merchantId == null, MemberYouzanPointSnapshotDO::getMerchantId)
                 .eq(MemberYouzanPointSnapshotDO::getMobileHash, mobileHash).last(lock, "FOR UPDATE"));
     }
 

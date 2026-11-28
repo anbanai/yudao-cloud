@@ -8,6 +8,12 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MemberYouzanImportBatchMapper extends BaseMapperX<MemberYouzanImportBatchDO> {
 
+    default MemberYouzanImportBatchDO selectResult(Long id) {
+        return selectOne(new LambdaQueryWrapper<MemberYouzanImportBatchDO>()
+                .select(MemberYouzanImportBatchDO.class, field -> !"encryptedPayload".equals(field.getProperty()))
+                .eq(MemberYouzanImportBatchDO::getId, id));
+    }
+
     default MemberYouzanImportBatchDO selectByIdForUpdate(Long id) {
         return selectOne(new LambdaQueryWrapper<MemberYouzanImportBatchDO>()
                 .eq(MemberYouzanImportBatchDO::getId, id).last("FOR UPDATE"));
