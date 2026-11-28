@@ -52,6 +52,9 @@ public class MerchantAuthServiceImpl implements MerchantAuthService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MerchantAuthLoginRespVO register(MerchantAuthRegisterReqVO reqVO) {
+        if (tenantEnabled && reqVO.getTenantId() == null) {
+            throw exception(GlobalErrorCodeConstants.BAD_REQUEST);
+        }
         MerchantUserDO user = merchantUserService.registerUser(reqVO);
         return createTokenAfterLoginSuccess(merchantUserService.getUser(user.getId()), reqVO.getUsername());
     }

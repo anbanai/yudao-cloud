@@ -131,6 +131,7 @@ class MerchantAuthServiceImplTest extends BaseMockitoUnitTest {
     void registerUsesPersistedAccountTenantAndRestoresHeaderlessContext() {
         MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
         reqVO.setUsername("seller");
+        reqVO.setTenantId(32L);
         MerchantUserDO stored = new MerchantUserDO().setId(10L);
         stored.setTenantId(32L);
         TenantContextHolder.setIgnore(true);
@@ -153,19 +154,30 @@ class MerchantAuthServiceImplTest extends BaseMockitoUnitTest {
         MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
         MerchantUserDO stored = new MerchantUserDO().setId(10L);
         stored.setTenantId(0L);
+        ReflectionTestUtils.setField(merchantAuthService, "tenantEnabled", false);
         TenantContextHolder.setTenantId(73L);
         TenantContextHolder.setIgnore(true);
         when(merchantUserService.registerUser(reqVO)).thenReturn(stored);
         when(merchantUserService.getUser(10L)).thenReturn(stored);
         when(oauth2TokenService.createAccessToken(10L, UserTypeEnum.MERCHANT.getValue(), "default", null))
                 .thenAnswer(invocation -> {
-                    assertNull(TenantContextHolder.getTenantId());
+                    assertEquals(73L, TenantContextHolder.getTenantId());
                     assertTrue(TenantContextHolder.isIgnore());
                     return new OAuth2AccessTokenDO().setUserId(10L);
                 });
 
         assertEquals(10L, merchantAuthService.register(reqVO).getUserId());
         assertEquals(73L, TenantContextHolder.getTenantId());
+    }
+
+    @Test
+    void registerRequiresPlatformWhenTenantEnabled() {
+        MerchantAuthRegisterReqVO reqVO = new MerchantAuthRegisterReqVO();
+
+        assertServiceException(() -> merchantAuthService.register(reqVO), GlobalErrorCodeConstants.BAD_REQUEST);
+
+        verify(merchantUserService, never()).registerUser(reqVO);
+        verify(oauth2TokenService, never()).createAccessToken(anyLong(), anyInt(), anyString(), any());
     }
 
     @Test
