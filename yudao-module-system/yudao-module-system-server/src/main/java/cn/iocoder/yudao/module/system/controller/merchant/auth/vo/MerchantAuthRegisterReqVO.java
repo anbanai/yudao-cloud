@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.controller.merchant.auth.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
@@ -31,5 +32,9 @@ public class MerchantAuthRegisterReqVO {
     @NotBlank(message = "手机号不能为空")
     @Pattern(regexp = "^[0-9+() -]{11,30}$", message = "手机号格式不正确")
     private String mobile;
+
+    @Schema(description = "入驻平台租户编号", example = "1024")
+    @Positive(message = "请选择有效的平台")
+    private Long tenantId;
 
 }

@@ -120,6 +120,7 @@ class MerchantUserServiceImplTest extends BaseDbUnitTest {
         reqVO.setNickname("Tea Seller");
         reqVO.setPassword("secret123");
         reqVO.setMobile("15601691300");
+        reqVO.setTenantId(32L);
         when(passwordEncoder.encode(eq("secret123"))).thenReturn("encoded-secret");
 
         MerchantUserDO created = merchantUserService.registerUser(reqVO);
@@ -130,6 +131,8 @@ class MerchantUserServiceImplTest extends BaseDbUnitTest {
         assertEquals("15601691300", persisted.getMobile());
         assertEquals(CommonStatusEnum.ENABLE.getStatus(), persisted.getStatus());
         assertEquals(null, persisted.getMerchantId());
+        assertEquals(32L, persisted.getTenantId());
+        verify(tenantService).validTenant(32L);
     }
 
     @Test

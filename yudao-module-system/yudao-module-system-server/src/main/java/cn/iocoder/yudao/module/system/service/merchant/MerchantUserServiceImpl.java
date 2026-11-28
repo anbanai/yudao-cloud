@@ -42,12 +42,16 @@ public class MerchantUserServiceImpl implements MerchantUserService {
     public MerchantUserDO registerUser(MerchantAuthRegisterReqVO reqVO) {
         validateUsernameUnique(reqVO.getUsername());
         validateMobileUnique(null, reqVO.getMobile());
+        if (reqVO.getTenantId() != null) {
+            tenantService.validTenant(reqVO.getTenantId());
+        }
         MerchantUserDO user = new MerchantUserDO()
                 .setUsername(reqVO.getUsername())
                 .setNickname(reqVO.getNickname())
                 .setMobile(reqVO.getMobile())
                 .setPassword(passwordEncoder.encode(reqVO.getPassword()))
                 .setStatus(CommonStatusEnum.ENABLE.getStatus());
+        user.setTenantId(reqVO.getTenantId());
         merchantUserMapper.insert(user);
         return user;
     }
