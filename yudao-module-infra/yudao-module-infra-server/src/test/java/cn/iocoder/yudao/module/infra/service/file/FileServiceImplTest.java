@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.framework.test.core.util.AssertUtils;
+import cn.iocoder.yudao.module.infra.api.file.FileApiImpl;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileCreateReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePageReqVO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
@@ -32,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
 
-@Import({FileServiceImpl.class})
+@Import({FileServiceImpl.class, FileApiImpl.class})
 public class FileServiceImplTest extends BaseDbUnitTest {
 
     @Resource
@@ -40,6 +41,9 @@ public class FileServiceImplTest extends BaseDbUnitTest {
 
     @Resource
     private FileMapper fileMapper;
+
+    @Resource
+    private FileApiImpl fileApi;
 
     @MockitoBean
     private FileConfigService fileConfigService;
@@ -302,6 +306,36 @@ public class FileServiceImplTest extends BaseDbUnitTest {
 
         // 断言
         AssertUtils.assertPojoEquals(latestFile, result);
+    }
+
+    @Test
+    public void testValidateImageUrl_acceptsSignedUrlReturnedByUpload() throws Exception {
+        byte[] content = ResourceUtil.readBytes("file/erweima.jpg");
+        String signedUrl = "https://storage.example/products/cover.jpg?X-Amz-Signature=abc";
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getMasterFileClient()).thenReturn(client);
+        when(fileConfigService.getFileClient(10L)).thenReturn(client);
+        when(client.getId()).thenReturn(10L);
+        when(client.upload(same(content), anyString(), eq("image/jpeg"))).thenReturn(signedUrl);
+        when(client.getContent(anyString())).thenReturn(content);
+
+        String url = fileService.createFile(content, "cover.jpg", "products", "image/jpeg",
+                FileUploadSceneEnum.PRODUCT);
+
+        assertEquals(signedUrl, url);
+        assertTrue(fileApi.validateImageUrl(url, "product").getCheckedData());
+    }
+
+    @Test
+    public void testGetFileByUrl_findsRecordStoredWithoutQuery() {
+        String url = "https://storage.example/products/cover.jpg";
+        FileDO dbFile = randomPojo(FileDO.class, o -> o.setUrl(url));
+        fileMapper.insert(dbFile);
+
+        FileDO result = fileService.getFileByUrl(url + "?v=1");
+
+        assertNotNull(result);
+        assertEquals(dbFile.getId(), result.getId());
     }
 
     @Test

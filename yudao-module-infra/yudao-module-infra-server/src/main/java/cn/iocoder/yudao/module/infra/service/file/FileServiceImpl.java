@@ -336,7 +336,12 @@ public class FileServiceImpl implements FileService {
         if (StrUtil.isBlank(url)) {
             return null;
         }
-        return fileMapper.selectByUrl(HttpUtils.removeUrlQuery(url));
+        // 服务端上传可能保存完整签名 URL，直传登记则会移除查询参数。
+        FileDO file = fileMapper.selectByUrl(url);
+        if (file == null && url.indexOf('?') >= 0) {
+            return fileMapper.selectByUrl(HttpUtils.removeUrlQuery(url));
+        }
+        return file;
     }
 
 }
