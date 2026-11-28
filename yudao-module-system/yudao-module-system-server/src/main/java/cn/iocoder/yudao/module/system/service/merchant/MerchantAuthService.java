@@ -17,7 +17,9 @@ public interface MerchantAuthService {
 
     void logout(String accessToken);
 
-    MerchantUserProfileRespVO getProfile(Long userId);
+    MerchantUserProfileRespVO getProfile(Long userId, String website);
+
+    MerchantAuthLoginRespVO selectPlatform(Long userId, Long tenantId);
 
     void updateProfile(Long userId, @Valid MerchantUserProfileUpdateReqVO reqVO);
 

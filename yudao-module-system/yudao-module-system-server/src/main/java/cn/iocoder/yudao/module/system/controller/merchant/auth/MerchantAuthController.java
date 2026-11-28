@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.access.prepost.PreAuthorize;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -81,8 +82,16 @@ public class MerchantAuthController {
     @GetMapping("/profile")
     @Operation(summary = "获取商家账号资料")
     @PreAuthorize("isAuthenticated()")
-    public CommonResult<MerchantUserProfileRespVO> getProfile() {
-        return success(merchantAuthService.getProfile(getCurrentMerchantUserId()));
+    public CommonResult<MerchantUserProfileRespVO> getProfile(@RequestParam(required = false) String website) {
+        return success(merchantAuthService.getProfile(getCurrentMerchantUserId(), website));
+    }
+
+    @PostMapping("/select-platform")
+    @PreAuthorize("isAuthenticated()")
+    @TenantIgnore
+    @Operation(summary = "选择首次入驻的平台并换取平台会话")
+    public CommonResult<MerchantAuthLoginRespVO> selectPlatform(@RequestParam("tenantId") @Positive Long tenantId) {
+        return success(merchantAuthService.selectPlatform(getCurrentMerchantUserId(), tenantId));
     }
 
     @PutMapping("/profile")

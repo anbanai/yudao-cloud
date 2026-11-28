@@ -25,6 +25,8 @@ public interface MerchantUserService {
 
     void updateUserProfile(Long id, @Valid MerchantUserProfileUpdateReqVO reqVO);
 
+    MerchantUserDO selectOnboardingPlatform(Long userId, Long tenantId);
+
     void bindMerchantId(Long userId, Long merchantId);
     void bindApprovedMerchant(Long userId, Long merchantId, Long merchantTenantId);
 

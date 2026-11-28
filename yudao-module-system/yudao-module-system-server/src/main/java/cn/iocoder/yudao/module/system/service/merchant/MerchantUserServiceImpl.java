@@ -53,6 +53,27 @@ public class MerchantUserServiceImpl implements MerchantUserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MerchantUserDO selectOnboardingPlatform(Long userId, Long tenantId) {
+        MerchantUserDO user = merchantUserMapper.selectByIdForUpdate(userId);
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
+        if (CommonStatusEnum.isDisable(user.getStatus())) {
+            throw exception(AUTH_LOGIN_USER_DISABLED);
+        }
+        if (user.getMerchantId() != null || user.getTenantId() != null && user.getTenantId() != 0L) {
+            throw exception(SYSTEM_MERCHANT_PLATFORM_ALREADY_ASSIGNED);
+        }
+        tenantService.validTenant(tenantId);
+        MerchantUserDO update = new MerchantUserDO().setId(userId);
+        update.setTenantId(tenantId);
+        merchantUserMapper.updateById(update);
+        user.setTenantId(tenantId);
+        return user;
+    }
+
+    @Override
     public MerchantUserDO getUser(Long id) {
         return merchantUserMapper.selectById(id);
     }

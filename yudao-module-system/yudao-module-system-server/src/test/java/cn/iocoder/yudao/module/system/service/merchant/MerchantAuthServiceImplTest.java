@@ -12,11 +12,16 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.MerchantUserDO;
 import cn.iocoder.yudao.module.system.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.system.service.logger.LoginLogService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
+import cn.iocoder.yudao.module.system.service.tenant.TenantService;
+import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantDO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,6 +38,41 @@ class MerchantAuthServiceImplTest extends BaseMockitoUnitTest {
     private LoginLogService loginLogService;
     @Mock
     private OAuth2TokenService oauth2TokenService;
+
+    @Mock
+    private TenantService tenantService;
+
+    @Test
+    void profileRecommendsCurrentWebsiteAmongActivePlatforms() {
+        when(merchantUserService.getUser(10L)).thenReturn(new MerchantUserDO().setId(10L));
+        LocalDateTime now = LocalDateTime.now();
+        when(tenantService.getTenantListByStatus(CommonStatusEnum.ENABLE.getStatus())).thenReturn(List.of(
+                TenantDO.builder().id(4L).name("旧平台").expireTime(now.minusDays(1)).build(),
+                TenantDO.builder().id(5L).name("其他平台").expireTime(now.plusDays(1)).build(),
+                TenantDO.builder().id(7L).name("好茶引力").expireTime(now.plusDays(1))
+                        .websites(List.of("tea.example")).build()));
+        var platforms = merchantAuthService.getProfile(10L, "TEA.example").getOnboardingPlatforms();
+        assertEquals(List.of(5L, 7L), platforms.stream().map(platform -> platform.id()).toList());
+        assertFalse(platforms.get(0).recommended());
+        assertTrue(platforms.get(1).recommended());
+    }
+
+    @Test
+    void selectionReplacesUnassignedSessionWithChosenTenantToken() {
+        var user = new MerchantUserDO().setId(10L).setUsername("seller");
+        user.setTenantId(7L);
+        when(merchantUserService.selectOnboardingPlatform(10L, 7L)).thenReturn(user);
+        when(oauth2TokenService.createAccessToken(10L, UserTypeEnum.MERCHANT.getValue(), "default", null))
+                .thenAnswer(invocation -> {
+                    assertEquals(7L, TenantContextHolder.getTenantId());
+                    assertFalse(TenantContextHolder.isIgnore());
+                    return new OAuth2AccessTokenDO().setAccessToken("scoped").setRefreshToken("refresh");
+                });
+        var tokens = merchantAuthService.selectPlatform(10L, 7L);
+        assertEquals("scoped", tokens.getAccessToken());
+        assertEquals("refresh", tokens.getRefreshToken());
+        verify(oauth2TokenService).removeAccessToken(10L, UserTypeEnum.MERCHANT.getValue());
+    }
 
     @AfterEach
     void clearTenantContext() {

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.merchant;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
+import cn.iocoder.yudao.framework.common.util.date.DateUtils;
 import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
@@ -20,11 +21,13 @@ import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
 import cn.iocoder.yudao.module.system.enums.oauth2.OAuth2ClientConstants;
 import cn.iocoder.yudao.module.system.service.logger.LoginLogService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
+import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -39,6 +42,8 @@ public class MerchantAuthServiceImpl implements MerchantAuthService {
 
     @Resource
     private MerchantUserService merchantUserService;
+    @Resource
+    private TenantService tenantService;
     @Resource
     private LoginLogService loginLogService;
     @Resource
@@ -92,12 +97,37 @@ public class MerchantAuthServiceImpl implements MerchantAuthService {
     }
 
     @Override
-    public MerchantUserProfileRespVO getProfile(Long userId) {
+    public MerchantUserProfileRespVO getProfile(Long userId, String website) {
         MerchantUserDO user = merchantUserService.getUser(userId);
         if (user == null) {
             throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS);
         }
-        return BeanUtils.toBean(user, MerchantUserProfileRespVO.class);
+        MerchantUserProfileRespVO profile = BeanUtils.toBean(user, MerchantUserProfileRespVO.class);
+        if (tenantEnabled && assignedTenant(user.getTenantId()) == null) {
+            if (user.getMerchantId() != null) {
+                // 已关联的历史主体须由平台核对归属，不能重新选择。
+                profile.setOnboardingPlatforms(List.of());
+                return profile;
+            }
+            profile.setOnboardingPlatforms(tenantService.getTenantListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
+                    .filter(tenant -> tenant.getExpireTime() != null && !DateUtils.isExpired(tenant.getExpireTime()))
+                    .map(tenant -> new MerchantUserProfileRespVO.Platform(tenant.getId(), tenant.getName(),
+                            website != null && tenant.getWebsites() != null
+                                    && tenant.getWebsites().stream().anyMatch(website::equalsIgnoreCase)))
+                    .toList());
+        }
+        return profile;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MerchantAuthLoginRespVO selectPlatform(Long userId, Long tenantId) {
+        if (!tenantEnabled) {
+            throw exception(GlobalErrorCodeConstants.BAD_REQUEST);
+        }
+        MerchantUserDO user = merchantUserService.selectOnboardingPlatform(userId, tenantId);
+        oauth2TokenService.removeAccessToken(userId, UserTypeEnum.MERCHANT.getValue());
+        return createTokenAfterLoginSuccess(user, user.getUsername());
     }
 
     @Override

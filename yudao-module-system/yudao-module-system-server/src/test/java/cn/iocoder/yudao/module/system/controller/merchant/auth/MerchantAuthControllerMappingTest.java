@@ -32,6 +32,7 @@ class MerchantAuthControllerMappingTest {
                     "/merchant-api/system/auth/login",
                     "/merchant-api/system/auth/refresh-token",
                     "/merchant-api/system/auth/logout",
+                    "/merchant-api/system/auth/select-platform",
                     "/merchant-api/system/auth/profile");
             assertThat(paths).doesNotContain("/merchant-api/merchant-api/system/auth/login");
         }

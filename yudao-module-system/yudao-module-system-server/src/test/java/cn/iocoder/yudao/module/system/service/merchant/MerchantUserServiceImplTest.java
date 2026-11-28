@@ -49,6 +49,29 @@ class MerchantUserServiceImplTest extends BaseDbUnitTest {
     private OAuth2TokenService oauth2TokenService;
 
     @Test
+    void selectPlatformPersistsFirstChoiceAndRejectsReassignment() {
+        MerchantUserDO user = new MerchantUserDO().setUsername("applicant").setPassword("hash")
+                .setNickname("Applicant").setStatus(CommonStatusEnum.ENABLE.getStatus());
+        merchantUserMapper.insert(user);
+
+        merchantUserService.selectOnboardingPlatform(user.getId(), 32L);
+        assertEquals(32L, merchantUserMapper.selectById(user.getId()).getTenantId());
+        verify(tenantService).validTenant(32L);
+        assertServiceException(() -> merchantUserService.selectOnboardingPlatform(user.getId(), 73L),
+                ErrorCodeConstants.SYSTEM_MERCHANT_PLATFORM_ALREADY_ASSIGNED);
+    }
+
+    @Test
+    void selectPlatformRejectsLinkedLegacyAccount() {
+        MerchantUserDO user = new MerchantUserDO().setUsername("legacy").setPassword("hash")
+                .setNickname("Legacy").setMerchantId(99L).setStatus(CommonStatusEnum.ENABLE.getStatus());
+        merchantUserMapper.insert(user);
+
+        assertServiceException(() -> merchantUserService.selectOnboardingPlatform(user.getId(), 32L),
+                ErrorCodeConstants.SYSTEM_MERCHANT_PLATFORM_ALREADY_ASSIGNED);
+    }
+
+    @Test
     void getUserPageFiltersMerchantAccounts() {
         MerchantUserDO expected = new MerchantUserDO().setUsername("seller100").setPassword("hash")
                 .setNickname("Tea Seller").setMobile("15601691300").setStatus(CommonStatusEnum.ENABLE.getStatus());
